@@ -1,0 +1,7 @@
+interface:
+  display_name: "Finalize Plan"
+  short_description: "Finalize active plans with completed styling"
+  default_prompt: "Use $finalize-plan to verify completion evidence, apply completed-plan presentation styling, and rename an active implementation plan to _plan_finalized.md."
+
+policy:
+  allow_implicit_invocation: true

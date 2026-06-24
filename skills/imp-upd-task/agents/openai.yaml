@@ -1,0 +1,7 @@
+interface:
+  display_name: "Imp Upd Task"
+  short_description: "Create or update workspace tasks"
+  default_prompt: "Use $imp-upd-task to create or update a workspace housekeeping/admin task with the full colored Estimated Effort table required at every depth, including Compact and mini tasks."
+
+policy:
+  allow_implicit_invocation: true

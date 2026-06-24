@@ -1,0 +1,7 @@
+interface:
+  display_name: "Brainstorm"
+  short_description: "Enter Brainstorming mode"
+  default_prompt: "Use $brainstorm to enter Brainstorming mode for structured, collaborative, no-code-first thinking with north-star framing, idea exploration, convergence, and next-step options."
+
+policy:
+  allow_implicit_invocation: true

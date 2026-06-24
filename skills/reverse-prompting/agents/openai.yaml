@@ -1,0 +1,7 @@
+interface:
+  display_name: "Reverse Prompting"
+  short_description: "Ask 5 clarifying questions before implementing"
+  default_prompt: "Use $reverse-prompting to surface your assumptions, ask the user the 5 clarifying questions that would most change your approach, wait for answers, and only then proceed with implementation."
+
+policy:
+  allow_implicit_invocation: true

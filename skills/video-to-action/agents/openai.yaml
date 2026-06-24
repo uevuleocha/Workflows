@@ -1,0 +1,4 @@
+interface:
+  display_name: "Video to Action"
+  short_description: "Extract actionable procedures from public YouTube videos via the Gemini API"
+  default_prompt: "Use /video-to-action to extract a structured procedure from the specified public YouTube video with the bundled script, then present it per the user's intent."

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Model Chat"
+  short_description: "Run a script-backed multi-agent Anthropic API debate with durable outputs"
+  default_prompt: "Use /model-chat to debate the specified topic with parallel Claude participants via the bundled script, then present the synthesized result."

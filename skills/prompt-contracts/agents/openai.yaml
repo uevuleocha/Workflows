@@ -1,0 +1,7 @@
+interface:
+  display_name: "Prompt Contracts"
+  short_description: "5-part engineering spec before implementation"
+  default_prompt: "Use $prompt-contracts to define GOAL, CONSTRAINTS, FORMAT, DEFINITION OF DONE, and FAILURE for the task, validate the contract, implement against it, and self-verify every DoD and FAILURE condition before delivering."
+
+policy:
+  allow_implicit_invocation: true

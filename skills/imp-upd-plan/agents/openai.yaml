@@ -1,0 +1,7 @@
+interface:
+  display_name: "Imp Upd Plan"
+  short_description: "Create polished active plans"
+  default_prompt: "Use $imp-upd-plan to create or update an active implementation plan with the full colored Estimated Effort table required at every depth, including Compact and mini plans."
+
+policy:
+  allow_implicit_invocation: true

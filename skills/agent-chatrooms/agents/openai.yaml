@@ -1,0 +1,4 @@
+interface:
+  display_name: "Agent Chatrooms"
+  short_description: "Run a structured multi-agent debate and synthesize the result"
+  default_prompt: "Use /agent-chatrooms to debate the specified question from distinct roles and return a clear synthesis."

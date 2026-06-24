@@ -1,0 +1,4 @@
+interface:
+  display_name: "Subagent Verification Loops"
+  short_description: "Review an artifact with independent reviewer and resolver agents"
+  default_prompt: "Use /subagent-verification-loops to independently review the specified artifact and report verified findings without auto-applying changes."

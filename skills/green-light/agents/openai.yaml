@@ -1,0 +1,7 @@
+interface:
+  display_name: "Green Light"
+  short_description: "Proceed with approved task"
+  default_prompt: "Use $green-light to proceed with the named task after explicit approval while preserving surgical code-block delivery, exact placement instructions, Antigravity greenlight behavior, and all project-contract safety rules (e.g. CLAUDE.md / AGENTS.md / GEMINI.md)."
+
+policy:
+  allow_implicit_invocation: true

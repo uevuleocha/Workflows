@@ -1,0 +1,7 @@
+interface:
+  display_name: "Inspect"
+  short_description: "Verify applied code batches"
+  default_prompt: "Use $inspect to cross-check the latest user-provided code batch, confirm changes were applied properly, sync to the current-session working context, and stand by for the next phase."
+
+policy:
+  allow_implicit_invocation: true

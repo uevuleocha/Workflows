@@ -1,0 +1,7 @@
+interface:
+  display_name: "Session Summary"
+  short_description: "Write session summary files"
+  default_prompt: "Use $session-summary to create a durable session summary for the current conversation."
+
+policy:
+  allow_implicit_invocation: true

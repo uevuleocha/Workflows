@@ -1,0 +1,7 @@
+interface:
+  display_name: "Finalize Task"
+  short_description: "Finalize pending workspace tasks"
+  default_prompt: "Use $finalize-task to verify and finalize a pending workspace housekeeping/admin task by checking its Definition of Done, updating status/lifecycle notes, and renaming it to _done.md."
+
+policy:
+  allow_implicit_invocation: true

@@ -1,0 +1,2 @@
+name: git-diff
+description: When invoked via /git-diff or git-diff, checks if the workspace is a Git repository. If it is, the agent runs git status and git diff --stat to collate and report tracked changes, untracked files, and overall repository status.

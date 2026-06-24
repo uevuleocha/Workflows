@@ -1,0 +1,7 @@
+interface:
+  display_name: "Global Skills Creator"
+  short_description: "Guided skill creation"
+  default_prompt: "Use $global-skills-creator to guide creation of a new reusable skill by asking for the user's prompt/style notes, proposing a skill design checkpoint, waiting for approval, then creating and syncing across the local master plus Codex, Claude, and Antigravity globals."
+
+policy:
+  allow_implicit_invocation: true

@@ -1,0 +1,7 @@
+interface:
+  display_name: "LTNEY"
+  short_description: "Talk only, no executions yet"
+  default_prompt: "Use $ltney to answer questions, discuss carefully, avoid command execution, code generation, file edits, and workspace changes, and stand by for next instructions."
+
+policy:
+  allow_implicit_invocation: true

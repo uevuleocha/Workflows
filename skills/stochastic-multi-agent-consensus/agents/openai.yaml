@@ -1,0 +1,4 @@
+interface:
+  display_name: "Stochastic Multi-Agent Consensus"
+  short_description: "Poll independent agents and aggregate consensus and divergence"
+  default_prompt: "Use /stochastic-multi-agent-consensus to independently evaluate the specified options and aggregate the results."

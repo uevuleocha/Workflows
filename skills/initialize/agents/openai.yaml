@@ -1,0 +1,7 @@
+interface:
+  display_name: "Initialize"
+  short_description: "Initialize a new chat session"
+  default_prompt: "Use $initialize to read the project's canonical contract (e.g. CLAUDE.md, AGENTS.md, GEMINI.md) and present the Tell Me More Boss! structured intake template for session onboarding."
+
+policy:
+  allow_implicit_invocation: true

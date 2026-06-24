@@ -1,0 +1,7 @@
+interface:
+  display_name: "Debug"
+  short_description: "Enter Debug mode"
+  default_prompt: "Use $debug to enter command-triggered Debug mode, capture a Debug Intake, summarize the bug list, investigate with evidence-first discipline, ask before edits, and sign debug responses with mode = debug."
+
+policy:
+  allow_implicit_invocation: true

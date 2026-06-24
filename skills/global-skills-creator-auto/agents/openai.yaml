@@ -1,0 +1,7 @@
+interface:
+  display_name: "Global Skills Creator Auto"
+  short_description: "Auto-create and sync skills"
+  default_prompt: "Use $global-skills-creator-auto to autonomously create a new reusable skill, sync it across the local master plus Codex, Claude, and Antigravity globals, validate it, and let the user refine afterward."
+
+policy:
+  allow_implicit_invocation: true

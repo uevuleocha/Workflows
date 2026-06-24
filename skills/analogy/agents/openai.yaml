@@ -1,0 +1,7 @@
+interface:
+  display_name: "Analogy"
+  short_description: "Re-explain with analogies"
+  default_prompt: "Use $analogy to re-explain the referenced idea with concise analogies."
+
+policy:
+  allow_implicit_invocation: true

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Antigravity Workspace Chat Migration"
+  short_description: "Safely migrate Antigravity chats between workspaces."
+  default_prompt: "Use this skill to migrate selected Antigravity Desktop conversations from one workspace/project to another by reassigning the conversation blob's Project UUID (protobuf Field 18) to the destination's existing project, plus rewriting the workspace URI, with backups and verification. Antigravity must be fully closed for the execution side."
