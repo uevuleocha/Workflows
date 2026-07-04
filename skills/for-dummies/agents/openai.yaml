@@ -1,0 +1,7 @@
+interface:
+  display_name: "For Dummies"
+  short_description: "Re-explain it dead simple"
+  default_prompt: "Use $for-dummies to re-explain the referenced idea in simple, jargon-free terms."
+
+policy:
+  allow_implicit_invocation: true
