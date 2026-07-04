@@ -11,6 +11,28 @@ This skill is a lighter sibling to implementation-plan workflows. Use it for ope
 
 If the user asks for a task "in house", "in chat", "chat only", or clearly says they do not want a durable file, do not create or update a task artifact. Provide the task/checklist in chat only and make clear that no file was changed.
 
+## Prompt Contract Integration (Mandatory)
+
+Every task created or updated with this skill MUST carry a Prompt Contract authored through the `prompt-contracts` skill. This is compulsory at every task depth, including Compact and mini tasks. This skill and `prompt-contracts` travel together; if you ever share this skill, ship that one with it.
+
+On every create and every update:
+
+1. **Invoke `prompt-contracts`** to author the contract for this task's work, in its canonical structure: GOAL, CONSTRAINTS, FORMAT, DEFINITION OF DONE, FAILURE. Pre-fill it from the task, scope boundaries, and reference files so the user does not restate anything.
+   - Standard and Deep tasks: full 5-part contract.
+   - Compact and mini tasks: a minimal contract (GOAL + DEFINITION OF DONE + FAILURE) is acceptable unless the user asks for the full form.
+2. **Show the full contract in chat (in-house)** so the user can read and adjust it. This is an explicit exception to the "do not paste the task into chat" rule: always paste the Prompt Contract block, even though you do not paste the rest of the task.
+3. **Embed the exact same contract verbatim** into the task file under a `## Prompt Contract` section, placed after `## What Needs To Be Done` and before `## Task Checklist`. (For in-chat-only tasks there is no file to embed into; the contract simply appears inline with the rest of the task.)
+4. The contract's DEFINITION OF DONE clause is this task's authoritative Definition of Done, and its FAILURE clause the authoritative rejection criteria; `finalize-task` verifies against them. This skill no longer writes a separate `## Definition of Done` section — the contract is the single home for it.
+
+On any later update, re-derive or revise the contract to match the new scope, refresh the `## Prompt Contract` section in the file, and re-show the updated contract in chat.
+
+**Availability guard.** Before authoring the contract, confirm the `prompt-contracts` skill is present in the agent's loaded skills.
+
+- If it is NOT available, pause and tell the user:
+  > The `prompt-contracts` skill is not loaded. It is required to author the mandatory Prompt Contract for this task. Please make it available, or tell me to continue without it.
+- If the user insists on continuing without it, produce the 5-part contract inline from the known GOAL / CONSTRAINTS / FORMAT / DEFINITION OF DONE / FAILURE format, embed and show it the same way, and note in your final report that the dedicated skill was unavailable.
+- Never silently skip the Prompt Contract.
+
 ## Project Contract
 
 This skill operates under the project's canonical contract (e.g. `CLAUDE.md`, `AGENTS.md` or `GEMINI.md`). Safety rules, path scope, and product-code workflow defined there apply unchanged.
@@ -93,10 +115,10 @@ Ask before writing when:
 Default directory:
 
 ```text
-Tasks/
+<project root>\Archive\Tasks\
 ```
 
-If the workspace contract specifies a different task directory, use that contract path instead. If no task directory exists and the workspace contract is silent, ask before creating a new top-level task directory.
+Task files always live under `Archive/` (in `Archive/Tasks/`). If the workspace contract specifies a different task directory, use that contract path instead. Otherwise default to `<project root>\Archive\Tasks\` — do not create a separate top-level `Tasks/` directory outside `Archive/`.
 
 Filename format:
 
@@ -134,7 +156,7 @@ We need to define this task before writing it.
 How these fields determine the task path:
 - Task Area / Component becomes the leading part of the filename.
 - Main Task becomes the rest of the filename body.
-- Together they produce `N.) {area_or_component}_{main_task}_pending.md` directly under the workspace's task directory, where `N` is the next available integer (start at `1`).
+- Together they produce `N.) {area_or_component}_{main_task}_pending.md` under the workspace's task directory (`<project root>\Archive\Tasks\` by default), where `N` is the next available integer (start at `1`).
 - If the user explicitly asked for a mini task, use `N.) {area_or_component}_{main_task}_mini_task_pending.md` instead.
 
 1. Task Area / Component:
@@ -157,7 +179,7 @@ Scope boundaries mean what should be included, excluded, deferred, or treated as
 For Task Depth, use:
 
 - `Compact`: short checklist for a small housekeeping task, still including the mandatory full colored `Estimated Effort` table
-- `Standard`: polished task with lifecycle note, context, checklist, Definition of Done, validation, and boundaries
+- `Standard`: polished task with lifecycle note, context, Prompt Contract (its DEFINITION OF DONE clause is the task's Definition of Done), checklist, validation, and boundaries
 - `Deep`: full phased task for multi-step workspace maintenance, sync, validation, or migration work
 
 Default to `Standard` unless the task is clearly tiny or clearly complex.
@@ -181,7 +203,7 @@ Task lifecycle: PENDING on [YYYY-MM-DD]. [One sentence explaining what this task
 
 ## What Needs To Be Done
 
-## Definition of Done
+## Prompt Contract
 
 ## Task Checklist
 
@@ -192,11 +214,13 @@ Task lifecycle: PENDING on [YYYY-MM-DD]. [One sentence explaining what this task
 ## Notes / Reopen History
 ```
 
+The task's Definition of Done is not a standalone section — it lives in the `## Prompt Contract` section's DEFINITION OF DONE clause.
+
 For compact tasks, allow:
 
 - `## Context`
+- `## Prompt Contract` (the mandatory minimal contract: GOAL + DEFINITION OF DONE + FAILURE)
 - `## Checklist`
-- `## Definition of Done`
 - `## Validation`
 - `## Estimated Effort` using the mandatory full `Phase | Sessions | 🟣 | Complexity` table
 
@@ -240,7 +264,7 @@ For Standard and Deep tasks:
 
 - include a top `Status:` line
 - include a top `Task lifecycle:` line
-- include a clear `Definition of Done` section
+- include the mandatory `## Prompt Contract` section; its DEFINITION OF DONE clause is the task's Definition of Done (no standalone `## Definition of Done` section)
 - use checkboxes for concrete task steps
 - use standard Markdown checkboxes: `- [ ]` for pending work and `- [x]` only for completed or user-confirmed work
 - use `Pending Phase ⌛` headings for active phase sections when phases are needed
@@ -271,9 +295,11 @@ Do not mark a task complete unless the user confirms completion or the session e
 
 ## Output Rules
 
-Task files belong in the workspace's task directory. If the workspace contract does not define one, prefer `Tasks/` only after confirming that directory with the user or detecting it already exists.
+Task files belong in the workspace's task directory, which lives under `Archive/` (`<project root>\Archive\Tasks\` by default). If the workspace contract defines a different task directory, use that instead.
 
 If the output directory is missing, create it only when file creation is allowed.
+
+**Archive folder rule.** Tasks always live under `Archive/` (in `Archive/Tasks/`). If the `Archive/` folder does not yet exist in the workspace, create it yourself — along with the needed `Tasks/` subfolder — when file creation is allowed. Never redirect the task into any other folder (such as `Documentation/` or a separate top-level `Tasks/` outside `Archive/`) as a fallback. The task folder always nests inside `Archive/`.
 
 After creating or updating a task, report the task path and summarize the change. Do not paste the entire task into chat unless the user asks.
 
@@ -292,7 +318,8 @@ After creating or updating a task:
 - confirm the filename ends in `_pending.md`, `_done.md`, `_mini_task_pending.md`, or `_mini_task_done.md` as appropriate
 - confirm UTF-8 text was used
 - confirm the top status and lifecycle lines exist for Standard and Deep tasks
-- confirm a `Definition of Done` section exists
+- confirm a `## Prompt Contract` section exists with a DEFINITION OF DONE clause (the task's authoritative Definition of Done); confirm no standalone `## Definition of Done` section was written
+- confirm the Prompt Contract was shown in chat and, unless the `prompt-contracts` skill was unavailable, authored through it
 - confirm validation steps are present
 - for every durable task, including Compact and mini tasks, confirm the `Estimated Effort` table uses the full `Phase | Sessions | 🟣 | Complexity` shape, includes colored row markers, keeps raw Markdown pipes vertically aligned, and includes a total estimate line
 - for every durable task, confirm the final chat response reports either successful `🟣` marker usage or the explicit Unicode fallback message

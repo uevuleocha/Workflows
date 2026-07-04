@@ -115,6 +115,8 @@ Based on the user's stated intent:
 
 ## Output Files
 
+**Archive folder rule.** Extraction runs always live under `Archive/` (in `Archive/Video-to-action/`, the `--output-dir` default). If the `Archive/` folder does not yet exist in the workspace, create it — along with the needed `Video-to-action/` subfolder — when file creation is allowed. Never redirect a run into any other folder (such as `Documentation/`) as a fallback. The run folder always nests inside `Archive/`.
+
 Each run saves to a folder named `<output-dir>\<YYYYMMDD-HHMMSS> - <sanitized-title>\` — timestamp first (so runs still sort chronologically) followed by the readable, sanitized title:
 
 | File | Description |

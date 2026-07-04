@@ -72,9 +72,21 @@ Do not silently convert all pending work to complete just because the user says 
 
 Apply completed presentation language only when the evidence supports completion. Do not add `✅`, `Complete`, or finalized wording to a section that still contains unresolved, blocked, pending, reopened, or unclear work.
 
+## Prompt Contract Review
+
+Tasks created under the current `imp-upd-task` workflow carry a `## Prompt Contract` section (GOAL, CONSTRAINTS, FORMAT, DEFINITION OF DONE, FAILURE). When it exists, it is the authoritative completion gate. Before finalizing, walk it explicitly:
+
+- Check each DEFINITION OF DONE item against completion evidence; mark it met, user-confirmed, or explicitly deferred out of scope.
+- Check each FAILURE condition; confirm none is triggered. If any is active, do not finalize until it is resolved or the user waives it.
+- Confirm the GOAL is met with evidence and that the CONSTRAINTS were respected.
+
+Finalize only when every DEFINITION OF DONE item is satisfied or explicitly deferred and no FAILURE condition remains active. When applying completed styling, mark the contract's DEFINITION OF DONE complete (e.g. `## Prompt Contract ✅ Complete` or checked DoD items) and note in the finalize record that the contract was verified.
+
+If the task predates this convention and has no `## Prompt Contract` section, fall back to the `Definition Of Done Review` below.
+
 ## Definition Of Done Review
 
-Before finalizing, inspect the task's `Definition of Done` section.
+Before finalizing, inspect the task's Definition of Done. For tasks created under the current workflow, that lives in the `## Prompt Contract` section's DEFINITION OF DONE clause — review it there (see **Prompt Contract Review** above). Older tasks may still carry a standalone `## Definition of Done` section; use that when present.
 
 Finalize only when:
 
@@ -104,7 +116,8 @@ When the task is fully complete, use these conventions where the matching sectio
 - if the created date is unavailable: `Status: DONE ✅ - finalized [YYYY-MM-DD].`
 - lifecycle line: `Task lifecycle: DONE on [YYYY-MM-DD]. [Past-tense completion summary.]`
 - `## What Needs To Be Done` -> `## What Was Done ✅`
-- `## Definition of Done` -> `## Definition of Done ✅ Complete`
+- `## Prompt Contract` -> `## Prompt Contract ✅ Complete` (only once every DEFINITION OF DONE item is met/deferred and no FAILURE condition is active)
+- `## Definition of Done` -> `## Definition of Done ✅ Complete` (older tasks with a standalone section)
 - `## Task Checklist` -> `## Task Checklist ✅ Complete`
 - `## Validation` -> `## Validation ✅ Complete`
 - `### Pending Phase ...` or `### Finalized Phase - ...` -> `### Finalized Phase ✅: ...`
@@ -188,7 +201,8 @@ After finalizing a task:
 - confirm the done target path exists
 - confirm the filename ends in `_done.md`
 - confirm the file contains a done status or lifecycle note
-- confirm a `Definition of Done` section exists, or record that the user explicitly waived it
+- confirm the `## Prompt Contract` DEFINITION OF DONE items were reviewed and no FAILURE condition remains active, or record that the task predates the Prompt Contract convention
+- confirm a `Definition of Done` is present (the `## Prompt Contract` DEFINITION OF DONE clause for tasks carrying a contract, or a standalone `## Definition of Done` section on older tasks), or record that the user explicitly waived it
 - confirm the file contains `Status: DONE ✅` or record why the completed-style status was not applicable
 - confirm the file contains a `Task lifecycle: DONE` note
 - confirm a `Definition of Done ✅ Complete` section exists, or record that the user explicitly waived it or the original task used a different equivalent heading

@@ -11,6 +11,28 @@ This skill owns active plan creation and active plan updates only. Do not finali
 
 If the user asks for a plan "in house", "in chat", "chat only", or clearly says they do not want a durable file, do not create or update a plan artifact. Provide the plan in chat only and make clear that no file was changed.
 
+## Prompt Contract Integration (Mandatory)
+
+Every plan created or updated with this skill MUST carry a Prompt Contract authored through the `prompt-contracts` skill. This is compulsory at every plan depth, including Compact and mini plans. This skill and `prompt-contracts` travel together; if you ever share this skill, ship that one with it.
+
+On every create and every update:
+
+1. **Invoke `prompt-contracts`** to author the contract for this plan's work, in its canonical structure: GOAL, CONSTRAINTS, FORMAT, DEFINITION OF DONE, FAILURE. Pre-fill it from the plan's task, scope boundaries, and reference files so the user does not restate anything.
+   - Standard and Deep plans: full 5-part contract.
+   - Compact and mini plans: a minimal contract (GOAL + DEFINITION OF DONE + FAILURE) is acceptable unless the user asks for the full form.
+2. **Show the full contract in chat (in-house)** so the user can read and adjust it. This is an explicit exception to the "do not paste the plan into chat" rule: always paste the Prompt Contract block, even though you do not paste the rest of the plan.
+3. **Embed the exact same contract verbatim** into the plan file under a `## Prompt Contract` section, placed after `## Context` and before `## Phased Implementation Plan`. (For in-chat-only plans there is no file to embed into; the contract simply appears inline with the rest of the plan.)
+4. The contract's DEFINITION OF DONE and FAILURE clauses are the plan's authoritative completion criteria; `finalize-plan` verifies against them.
+
+On any later update, re-derive or revise the contract to match the new scope, refresh the `## Prompt Contract` section in the file, and re-show the updated contract in chat.
+
+**Availability guard.** Before authoring the contract, confirm the `prompt-contracts` skill is present in the agent's loaded skills.
+
+- If it is NOT available, pause and tell the user:
+  > The `prompt-contracts` skill is not loaded. It is required to author the mandatory Prompt Contract for this plan. Please make it available, or tell me to continue without it.
+- If the user insists on continuing without it, produce the 5-part contract inline from the known GOAL / CONSTRAINTS / FORMAT / DEFINITION OF DONE / FAILURE format, embed and show it the same way, and note in your final report that the dedicated skill was unavailable.
+- Never silently skip the Prompt Contract.
+
 ## Project Contract
 
 This skill operates under the project's canonical contract (e.g. `CLAUDE.md`, `AGENTS.md` or `GEMINI.md`). Safety rules, path scope, and product-code workflow defined there apply unchanged.
@@ -195,6 +217,8 @@ Plan lifecycle: ACTIVE on [YYYY-MM-DD]. [One sentence explaining what this plan 
 
 ## Context
 
+## Prompt Contract
+
 ## Locked Decisions
 
 ## Critical Files
@@ -235,6 +259,7 @@ Use the richer table style from `9.) uzzy_sr_drawing_engine_plan_finalized.md` a
 For compact plans, allow:
 
 - `## Context`
+- `## Prompt Contract` (the mandatory minimal contract: GOAL + DEFINITION OF DONE + FAILURE)
 - `## Checklist`
 - `## Verification`
 - `## Estimated Effort` using the mandatory full `Phase | Sessions | 🟣 | Complexity` table
@@ -315,6 +340,8 @@ Plans belong under `<project root>\Archive\Plans\`.
 
 If the output directory is missing, create it only when file creation is allowed.
 
+**Archive folder rule.** Plans always live under `Archive/` (in `Archive/Plans/[Project]/`). If the `Archive/` folder does not yet exist in the workspace, create it yourself — along with the needed `Plans/[Project]/` subfolders — when file creation is allowed. Never redirect the plan into any other folder (such as `Documentation/`) as a fallback. The plan folder always nests inside `Archive/`.
+
 After creating or updating a plan, report the plan path and summarize the change. Do not paste the entire plan into chat unless the user asks.
 
 After creating or updating any durable plan, report the `Estimated Effort` marker outcome in chat:
@@ -331,6 +358,7 @@ After creating or updating a plan:
 - confirm the file exists
 - confirm the filename starts with the correct `N.) ` numeric prefix when a durable plan file was created
 - confirm the filename ends in `_plan_active.md`, or `_mini_plan_active.md` when the user explicitly requested a mini plan
+- confirm a `## Prompt Contract` section exists (GOAL / CONSTRAINTS / FORMAT / DEFINITION OF DONE / FAILURE, or the minimal GOAL + DEFINITION OF DONE + FAILURE form for Compact and mini plans), that it was shown in chat, and that it was authored through the `prompt-contracts` skill unless that skill was unavailable
 - if reopening a finalized plan, confirm the file was renamed from `_plan_finalized.md` back to `_plan_active.md`, or from `_mini_plan_finalized.md` back to `_mini_plan_active.md`, and that prior finalized evidence was preserved
 - skim the major headings for the chosen plan depth
 - for Standard and Deep plans, confirm the top status/lifecycle lines exist

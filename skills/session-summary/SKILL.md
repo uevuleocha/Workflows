@@ -140,6 +140,8 @@ Example:
 
 If the directory does not exist, create it only after the required inputs are confirmed and file creation is allowed.
 
+**Archive folder rule.** Session summaries always live under `Archive/` (in `Archive/Summaries/[Project Name]/`). If the `Archive/` folder does not yet exist in the workspace, create it yourself — along with the needed `Summaries/[Project Name]/` subfolders — when file creation is allowed. Never redirect the summary into any other folder (such as `Documentation/`) as a fallback. The summary folder always nests inside `Archive/`.
+
 After writing the file, do not paste the full finished summary into chat. Tell the user the file path.
 
 ### "In House" / "In Chat" Only Mode

@@ -71,9 +71,21 @@ Do not silently convert all pending work to complete just because the user says 
 
 Apply completed presentation language only when the evidence supports completion. Do not add `✅`, `Complete`, or finalized wording to a section that still contains unresolved, blocked, pending, debug-pending, reopened, deferred, or unclear work.
 
+## Prompt Contract Review
+
+Plans created under the current `imp-upd-plan` workflow carry a `## Prompt Contract` section (GOAL, CONSTRAINTS, FORMAT, DEFINITION OF DONE, FAILURE). When it exists, it is the authoritative completion gate. Before finalizing, walk it explicitly:
+
+- Check each DEFINITION OF DONE item against completion evidence; mark it met, user-confirmed, or explicitly deferred out of scope.
+- Check each FAILURE condition; confirm none is triggered. If any is active, do not finalize until it is resolved or the user waives it.
+- Confirm the GOAL is met with evidence and that the CONSTRAINTS were respected.
+
+Finalize only when every DEFINITION OF DONE item is satisfied or explicitly deferred and no FAILURE condition remains active. When applying completed styling, mark the contract's DEFINITION OF DONE complete (e.g. `## Prompt Contract ✅ Complete` or checked DoD items) and note in the finalize record that the contract was verified.
+
+If the plan predates this convention and has no `## Prompt Contract` section, fall back to the `Definition Of Done Review` below.
+
 ## Definition Of Done Review
 
-Before finalizing, inspect the plan's `Definition of Done` section when one exists.
+Before finalizing, inspect the plan's `Definition of Done` section when one exists (for plans carrying a `## Prompt Contract`, the Definition of Done is the contract's DEFINITION OF DONE clause — see **Prompt Contract Review** above).
 
 Finalize only when:
 
@@ -103,6 +115,7 @@ When the plan is fully complete, use these conventions where the matching sectio
 - if the created date is unavailable: `Status: FINALIZED ✅ - finalized [YYYY-MM-DD].`
 - lifecycle line: `Plan lifecycle: FINALIZED on [YYYY-MM-DD]. [Past-tense completion summary.]`
 - `## What Needs To Be Done` -> `## What Was Done ✅`
+- `## Prompt Contract` -> `## Prompt Contract ✅ Complete` (only once every DEFINITION OF DONE item is met/deferred and no FAILURE condition is active)
 - `## Implementation Checklist` -> `## Implementation Checklist ✅ Complete`
 - `## Definition of Done` -> `## Definition of Done ✅ Complete`
 - `## Validation` -> `## Validation ✅ Complete`
@@ -189,7 +202,8 @@ After finalizing a plan:
 - confirm the finalized target path exists
 - confirm the filename ends in `_plan_finalized.md`
 - confirm the file contains a finalized status or lifecycle note
-- confirm a `Definition of Done` section exists, or record that the user explicitly waived it or the original plan used a different equivalent completion section
+- confirm the `## Prompt Contract` DEFINITION OF DONE items were reviewed and no FAILURE condition remains active, or record that the plan predates the Prompt Contract convention
+- confirm a `Definition of Done` section exists (or the `## Prompt Contract` DEFINITION OF DONE clause for plans carrying a contract), or record that the user explicitly waived it or the original plan used a different equivalent completion section
 - confirm the file contains `Status: FINALIZED ✅` or record why the completed-style status was not applicable
 - confirm the file contains a `Plan lifecycle: FINALIZED` note
 - confirm a `Definition of Done ✅ Complete` section exists, or record that the user explicitly waived it or the original plan used a different equivalent heading
