@@ -1,4 +1,4 @@
-# Agent Instructions - Uzzys World
+# Agent Instructions - Uzzy Skills
 
 `CLAUDE.md` is the canonical project contract for this workspace.
 

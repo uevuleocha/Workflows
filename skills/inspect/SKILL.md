@@ -1,21 +1,22 @@
 ---
 name: inspect
-description: Cross-check recently applied code batches and sync to the latest user-provided version for the current session. Use when the user explicitly invokes /inspect, use inspect, use the inspect skill, or asks to verify that recently applied blocks/lines/methods were added correctly before the next phase.
+description: Inspect and audit whatever the user points at — verify a recently applied code batch (any language), or audit any file, skill, document, or artifact for mistakes, issues, consistency, or things to learn/adapt. Use when the user explicitly invokes /inspect, use inspect, use the inspect skill, asks to verify that recently applied blocks/lines/methods were added correctly, or asks to inspect/audit/check a file or artifact.
 ---
 
 # Inspect
 
-Cross-check a recently applied code batch and sync the assistant's working context to the latest user-provided version for the current session.
+Inspect or audit whatever the user points at, and report findings clearly. This skill lives up to its name: it is the general "check this for me" workflow, with a dedicated fast path for verifying a code batch the user just applied.
 
-This skill is for post-batch verification and state sync after the user applies or sends code changes. It is not debug mode, not a broad code review, and not a code generation workflow.
+There are two modes, auto-selected by context:
+
+- **Mode A — Code-Batch Verification.** The user just applied or sent code and wants it checked before the next phase. Works for any programming language. This is the original inspect behavior, generalized.
+- **Mode B — General Inspection / Audit.** The user points at any file, skill, document, config, or artifact and asks you to inspect/audit/check it — for mistakes, issues, consistency, or to learn or adapt something.
+
+This skill is not Debug mode, not a code-generation workflow, and not a permission gate. If the user wants a broad bug diagnosis, use `debug`. If the user wants permission to proceed with a task, use `green-light`. If the user wants new implementation planning, use `imp-upd-plan`.
 
 ## Project Contract
 
-This skill operates under the project's canonical contract (e.g. `CLAUDE.md`, `AGENTS.md` or `GEMINI.md`). Safety rules, path scope, and product-code workflow defined there apply unchanged.
-
-For product source files, preserve the manual-copy workflow defined in the project contract. Inspect code the user provides or explicitly points to inside `<project root>\Sources\`, but do not directly edit product source files unless the user separately and explicitly authorizes direct product-code edits.
-
-Default output is chat only: verification, issues if any, current-session sync confirmation, and next-phase readiness.
+This skill operates under the project's canonical contract (e.g. `CLAUDE.md`, `AGENTS.md`, or `GEMINI.md`). Safety rules, path scope, and product-code workflow defined there apply unchanged. Default output is chat only: findings, issues if any, and next-step readiness. Do not edit files unless the project contract and the user both authorize it.
 
 ## Invocation
 
@@ -26,7 +27,7 @@ Treat these as direct invocation and begin the inspect workflow:
 - `use the inspect skill`
 - clear equivalents where the user explicitly names this skill
 
-Use this skill when the user asks a batch-verification style question, such as:
+Mode A (code-batch) also triggers on batch-verification phrasing, such as:
 
 - "How does the code and the updates we just made look?"
 - "Confirm I made the changes properly."
@@ -34,136 +35,146 @@ Use this skill when the user asks a batch-verification style question, such as:
 - "Update your memory with this version."
 - "Next please."
 
-If the user asks for a broader bug diagnosis, use `debug` instead. If the user asks for permission to proceed with a task, use `green-light`. If the user asks for new implementation planning, use `imp-upd-plan`.
+Mode B (general audit) also triggers on phrasing like:
 
-## Inspect Scope
+- "Inspect this file / skill / doc."
+- "Audit this for mistakes / issues / consistency."
+- "Check this and tell me if it's done well."
+- "Look this over and tell me what we can learn / adapt / reuse."
 
-Inspect only the latest relevant code batch, file version, or phase the user wants checked.
+## Mode Selection
 
-This skill should verify:
+Pick the mode from context; do not ask if it is obvious:
 
-- whether the latest code version is visible
-- whether the requested blocks, lines, or methods appear to have been applied
-- whether placement looks correct
-- whether obvious duplicate, missing, or malformed code exists
-- whether XML `/// <summary>` requirements were preserved or added where needed
-- whether relevant comments were preserved when logic remains
-- whether the assistant should use this latest code as the active current-session context
+- If the target is applied/pasted code, a code diff, or a source file the user just changed → **Mode A**.
+- If the target is any other file, skill, document, config, or artifact, or the user asks you to audit/check/learn-from something → **Mode B**.
+- If genuinely ambiguous, ask one short question: "Do you want a code-batch verification, or a general audit of this file?"
 
-Do not turn this into a broad repository audit unless the user explicitly asks for one.
+Scope stays tight in both modes: inspect only what the user pointed at. Do not expand into a whole-repository audit unless the user explicitly asks for one.
+
+---
+
+## Mode A — Code-Batch Verification (any language)
+
+Verify a recently applied code batch and sync your working context to the latest version the user provided for this session.
+
+### A1. Universal code checks (language-independent)
+
+1. **Latest version visibility** — confirm you see the newest version the user sent or pointed to, and treat it as the active working context for this session after inspection.
+2. **Applied-change correctness** — confirm expected blocks, lines, methods, functions, fields, parameters, or enum entries are present, and that replacements landed in the right function/class/region/anchor. Confirm old conflicting blocks were removed when removal was required.
+3. **Placement and structure** — look for obvious brace/bracket/indentation, nesting, duplicate-definition, or unreachable-code issues. Confirm the change fits the surrounding local pattern.
+4. **Comments** — confirm existing comments were preserved when they still describe retained logic.
+5. **Scope and safety** — confirm no unexpected full-file rewrite was introduced, and that the agent did not directly edit product source files unless separately and explicitly authorized.
+6. **Next-phase readiness** — state whether the batch is ready for the next phase; if not, list the smallest corrections needed.
+
+### A2. Language-aware doc-comment check
+
+Detect the language from the file extension or content, and apply the matching documentation-comment convention rather than assuming one:
+
+- C# → XML doc comments (`/// <summary>`)
+- Python → docstrings
+- Java → Javadoc (`/** ... */`)
+- JavaScript / TypeScript → JSDoc (`/** ... */`)
+- Other languages → that language's idiomatic doc-comment form
+
+If a modified public method/function lacked a doc comment and the batch should have added one, flag it. If the language has no established doc-comment convention, skip this check.
+
+### A3. Ecosystem profile (opt-in sub-case)
+
+Only when the target is a `.cs` file inside the Uzzy Ecosystem `Sources\` tree, additionally:
+
+- Require XML `/// <summary>` descriptions on method blocks where expected.
+- Enforce the manual-copy `.cs` workflow from that project's contract: prefer inspecting the user-provided latest file or the working copy under `<project root>\Sources\`, and do not directly edit product `.cs` files.
+
+Everywhere else, this profile does not apply.
+
+### A4. Current-session memory sync
+
+When the user says to "update your memory with this version," treat the latest inspected code as the active working context for the current session. If the batch changes architecture in a way worth preserving, mention that a documentation update may be useful at session end, but do not write it without approval.
+
+---
+
+## Mode B — General Inspection / Audit
+
+The user points at a file, skill, document, config, or artifact. Read it, then inspect it **for whatever the user asked** — and only that, unless they invite a wider look.
+
+1. **Confirm the target and the goal.** Identify exactly what to inspect and why: mistakes, issues, consistency with a standard, correctness, clarity, or to learn/adapt/reuse something. If the goal is unstated and not obvious, ask one short question.
+2. **Read the target fully** before judging. For folder-style skills, read `SKILL.md` and any referenced resources.
+3. **Inspect against the stated goal**, checking as relevant:
+   - correctness and internal consistency
+   - alignment with the project's conventions and canonical contract
+   - missing, duplicated, malformed, contradictory, or outdated content
+   - clarity, structure, and whether it does what it claims
+   - anything reusable or worth adapting, when the user asked to learn/adapt
+4. **Report findings**, most important first, each with a specific location and a concrete suggestion. Separate "must fix" from "optional / nice-to-have."
+5. **State readiness** — whether the artifact is good as-is, or what the smallest set of changes would be.
+
+Do not rewrite or edit the target in this mode unless the user explicitly asks. Reporting comes first.
 
 ## Required Inputs
 
-If the latest code and task scope are already visible, do not ask unnecessary questions. Inspect the provided material.
-
-If anything important is missing, ask only for the missing or uncertain item:
+If the target and goal are already clear, do not ask unnecessary questions — just inspect. Only ask for what is genuinely missing:
 
 ```text
-I can inspect this batch, but I need the latest version first.
+I can inspect this, but I need one thing first:
 
-1. Which component/file should I inspect?
-2. Is this the latest version after your applied batch?
-3. Which batch or phase should I verify against?
+1. Which file / batch / artifact should I inspect?
+2. (Mode A) Is this the latest version after your applied batch?
+3. What should I inspect it for — correctness, issues, consistency, or something to learn/adapt?
 ```
-
-For product source files, prefer inspecting the user-provided latest file or the working copy under `<project root>\Sources\`, per the project's canonical contract.
-
-## Inspection Checklist
-
-Use the smallest checklist that fits the batch. For code batches, check:
-
-1. **Latest version visibility**
-   - Confirm you see the newest code version the user sent or pointed to.
-   - Treat it as the active working context for this session after inspection.
-
-2. **Applied-change correctness**
-   - Confirm expected blocks, lines, methods, fields, parameters, or enum entries are present.
-   - Check that replacements landed in the right method, class, region, or anchor area.
-   - Check that old conflicting blocks were removed when the instructions required removal.
-
-3. **Placement and structure**
-   - Look for obvious brace, nesting, duplicate-method, duplicate-field, or unreachable-code issues.
-   - Check that the change fits the surrounding local pattern.
-
-4. **XML summaries and comments**
-   - Confirm method blocks have XML `/// <summary>` descriptions where expected.
-   - If a modified method lacked a summary and the batch should have added one, flag it.
-   - Confirm existing comments were preserved when they still describe retained logic.
-
-5. **Scope and safety**
-   - Confirm no unexpected full-file rewrite was introduced.
-   - Confirm product source-file direct edits were not performed by the agent unless explicitly authorized.
-
-6. **Next-phase readiness**
-   - State whether the batch is ready for the next phase.
-   - If not ready, list the smallest corrections needed before continuing.
-
-## Current-Session Memory Sync
-
-When the user says to "update your memory with this version," treat the latest inspected code as the active working context for the current session.
-
-If the inspected batch changes bot or indicator architecture in a way that should be preserved later, mention that a documentation update may be useful at session end, but do not write it without approval.
 
 ## Output Format
 
-Lead with the inspection result.
+Lead with the result.
 
-Use this shape when everything looks good:
+When everything looks good:
 
 ```text
-I see the latest version, and the batch looks properly applied.
+I inspected [target]. It looks good.
 
 Confirmed:
-- [specific applied change]
-- [specific placement or structure confirmation]
-- XML summaries/comments: [status]
+- [specific check that passed]
+- [specific placement / consistency confirmation]
+- Doc comments / conventions: [status]
 
-I am now using this latest version as the active working context for this session.
+[Mode A only] I am now using this latest version as the active working context for this session.
 Ready for the next phase.
 ```
 
-Use this shape when issues exist:
+When issues exist:
 
 ```text
-I see the latest version, but this batch needs correction before the next phase.
+I inspected [target]. It needs attention before moving on.
 
 Issues:
 - [specific issue and location]
-- [specific missing/misplaced/duplicated block]
+- [specific missing / misplaced / duplicated / inconsistent item]
 
-Corrections needed:
-- [smallest correction instruction]
+Suggested corrections:
+- [smallest correction]
 
-I will treat this latest version as the current working context, with the above issue list pending.
+[Mode A only] I will treat this latest version as the current working context, with the above issues pending.
 ```
-
-Do not generate new code unless the user asks for the correction blocks or invokes `green-light` for the next work step.
 
 ## Boundaries
 
 Do:
 
-- confirm latest-code visibility
-- verify recent batch placement and structure
-- flag missing or duplicated blocks
-- check XML `/// <summary>` expectations
-- confirm current-session working context
-- stand by for the next phase
+- confirm what you are inspecting and why
+- verify code-batch placement/structure (Mode A) or audit the artifact against the stated goal (Mode B)
+- flag missing, duplicated, malformed, inconsistent, or outdated content
+- apply the language-appropriate doc-comment convention (Mode A)
+- confirm current-session working context (Mode A) and next-step readiness
 
 Do not:
 
-- edit product source files directly without separate explicit authorization
+- edit files directly without separate explicit authorization
 - generate the next batch of implementation code unless the user asks for it
+- expand into a full repository audit unless the user explicitly asks
 - turn inspection into full Debug mode unless the user invokes `debug`
 
 ## Validation
 
-After an inspection:
+After an inspection, state: what was inspected, whether it passed or what the issues are, any suggested corrections, and whether the next step is ready. For Mode A, also confirm the latest version was visible and the current-session context is synced.
 
-- state whether the latest version was visible
-- state whether the batch was applied properly
-- list any issues or corrections
-- confirm current-session context sync
-- state whether the next phase is ready
-
-When creating or updating this skill itself, validate folder-style skills with the `quick_validate.py` script that ships with your skill-creator install, running Python in UTF-8 mode (`-X utf8`).
+When creating or updating this skill itself, validate the folder-style skill with the `quick_validate.py` script that ships with your skill-creator install, running Python in UTF-8 mode (`-X utf8`).
