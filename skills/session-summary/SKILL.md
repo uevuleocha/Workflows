@@ -44,15 +44,36 @@ If the user only wants a quick chat answer, do not create a file.
 
 ## Required Inputs
 
-Before writing the summary file, make sure these are known.
+Four values drive the summary file: **Project Name**, **Topic**, **Session Number**, and **Directory**.
 
-If the Project Name, Topic, Session Number, or Directory is missing or unclear, present this exact structured template for the user to copy, fill out, and return, followed by the Key block beneath it:
+**Inference is mandatory and compulsory.** Before asking the user anything, you MUST attempt to infer all four values from the session and the workspace. Do not present a blank template, and do not ask the user to supply a value you could have derived yourself. Presenting empty fields, or asking without having first inferred, is a protocol violation. Your job is to do the legwork so the user can simply approve — not to make the user fill out a form.
+
+How to infer each value:
+
+- **Project Name** — Derive it from what the session was actually about, scoped to the workspace. First check the existing subfolders under `<project root>\Archive\Summaries\`; if this session clearly continues one of them, reuse that exact folder name. If the workspace name itself would be redundant as the project name (e.g. the workspace is "Uzzy Skills" and every summary would trivially read "Uzzy Skills"), infer a more specific project label from the session's actual focus (e.g. "Workspace Setup").
+- **Topic** — Derive it from the concrete work done this session (e.g. `Session-Summary Inference Update`). Keep it short and specific, matching the example style below.
+- **Session Number** — Look inside the resolved `<project root>\Archive\Summaries\[Project Name]\` folder, find the highest existing summary number, and use the next integer. If the folder is empty or does not exist, this is `1`.
+- **Directory** — Default to `<project root>\Archive\Summaries\[Project Name]\` unless the user explicitly named a specific in-project path.
+
+Reference examples:
+
+- Project name, e.g. `SR`, `KL`, `TRUTH`, `Workspace Setup`
+- Topic, e.g. `Drawing Engine pt2`, `Zone Engine Port`, `Discord Alerts Imp`
+- Session Number, e.g. `9`, `10`, `11`
+- Directory choice:
+  - Default: `<project root>\Archive\Summaries\[Project Name]\`
+  - A specific in-project directory the user named: use it exactly
+  - A directory outside the project root: stop and ask before proceeding
+
+**Present inferred suggestions, never blanks.** Unless the user already gave every value explicitly, present the template **pre-filled with your inferred suggestions** and ask the user to confirm or adjust. Use this wording:
 
 ```text
-1. Project Name: 
-2. Topic: 
-3. Session Number: 
-4. Directory: [Default | specific path]
+Here are my inferred values — green-light to use them as-is, or change any single line:
+
+1. Project Name: [inferred value]
+2. Topic: [inferred value]
+3. Session Number: [inferred value]
+4. Directory: [Default -> <resolved absolute path>]
 ```
 
 ```text
@@ -63,15 +84,9 @@ Key:
 8.) Where "x.)" = [Session Number] also
 ```
 
-- Project name, e.g. `SR`, `KL`, `TRUTH`
-- Topic, e.g. `Drawing Engine pt2`, `Zone Engine Port`, `Discord Alerts Imp`
-- Session Number, e.g. `9`, `10`, `11`
-- Directory choice:
-  - If user says `Default`, use `<project root>\Archive\Summaries\[Project Name]\`
-  - If user gives a specific directory, use that exact directory if it is inside the project root
-  - If the directory is outside the project root, stop and ask before proceeding
+Fill every numbered line with a concrete inferred value, never a blank — the user should be able to green-light the whole block without typing anything, and if they disagree with one line they overwrite only that line. If, after honestly trying, you genuinely cannot infer a single value (rare), mark that one line `[unable to infer - please provide]` and still pre-fill the other three.
 
-Do not guess these values. Wait for the user to return the filled template before proceeding to create the file.
+Wait for the user's confirmation or corrections before creating the file, unless the user has told you to proceed without confirming.
 
 ## Required Review
 

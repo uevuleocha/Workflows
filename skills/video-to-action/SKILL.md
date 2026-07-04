@@ -38,7 +38,7 @@ Run the harmless preflight (no API call, no cost):
 python scripts\video_to_action.py --check-setup
 ```
 
-If any prerequisite is missing, **stop**. Do not attempt the extraction. Route the user to the pending video-to-action setup/learning task under the host workspace's task directory (for the Uzzy Ecosystem: `Archive\Tasks\`).
+If any prerequisite is missing, **stop**. Do not attempt the extraction. Route the user to a setup task under the host workspace's configured task directory. Common default: `<project root>\Archive\Tasks\` on Windows or `<project root>/Archive/Tasks/` on macOS/Linux. If the workspace has no task convention, ask the user where setup tasks should live.
 
 ## Hard Limits (Per Google's Documentation)
 

@@ -5,11 +5,11 @@ description: Autonomously create reusable skills from a local master and sync th
 
 # Global Skills Creator Auto
 
-Autonomously create a reusable skill, starting from the local master copy under the configured Uzzy Skills workspace (`C:\Users\Admin\Uzzys Universe\Galaxies\Tools\Uzzy Skills\skills\` by default), then promote it to the configured global locations for Codex, Claude, and Antigravity.
+Autonomously create a reusable skill from a local master skills folder, then optionally promote it to configured global locations for Codex, Claude, and Antigravity. On Uzo's machine, the default local master is the Uzzy Skills workspace. On any other machine, first discover or ask for the user's local master skills folder and global skill install paths.
 
 This is the automatic variant of `global-skills-creator`. Use it when the user wants the agent to infer sensible defaults, create the skill, sync it globally, validate it, and then allow refinement afterward.
 
-Use `C:\Users\Admin\Uzzys Universe\Galaxies\Tools\Uzzy Skills\skills\session-summary\SKILL.md` only as a structural muse: clear frontmatter, concise sections, required-input prompts, safety notes, and validation discipline. Do not copy the `session-summary` workflow unless the new skill actually summarizes sessions.
+Use `session-summary/SKILL.md` from the resolved local master skills folder only as a structural muse when it exists: clear frontmatter, concise sections, required-input prompts, safety notes, and validation discipline. Do not copy the `session-summary` workflow unless the new skill actually summarizes sessions.
 
 ## Project Contract
 
@@ -67,7 +67,21 @@ If the user has already provided enough detail, proceed with the reasonable defa
 
 ## Default Path Stack
 
-Use these as the default/example paths:
+Resolve the path stack before creating or syncing. The user should normally have **one canonical local master skills folder per machine** unless they explicitly ask for multiple local masters. Help the user choose that folder when needed, and after it is chosen, treat it as the rule for that user's machine for future skill creation and sync work.
+
+Preferred discovery order:
+
+1. If the host workspace contains a `skills/` folder and a canonical contract file such as `CLAUDE.md`, `AGENTS.md`, or `GEMINI.md`, treat `<project root>/skills/` as the local master candidate.
+2. If no local master candidate is obvious, ask the user whether they want a local master folder, where it should live, and whether it should be the machine's single canonical local master.
+3. Resolve global install candidates from the user's home directory:
+   - Codex: `~/.codex/skills/`
+   - Claude: `~/.claude/skills/`
+   - Antigravity/Gemini: `~/.gemini/config/skills/`
+4. If a target does not exist, stop and ask whether to create it, skip it, or use a different path.
+
+Do not assume Windows paths on macOS or Linux. Translate examples into the host OS path style.
+
+Maintainer defaults for Uzo's machine:
 
 ```text
 Local master:
@@ -83,18 +97,18 @@ Antigravity global:
 C:\Users\Admin\.gemini\config\skills\[Skill-name]\SKILL.md
 ```
 
-The global skill paths above are literal — they are real install locations on the user's machine. The local master path points to the dedicated Uzzy Skills workspace inside this Universe.
+These maintainer defaults are known-good examples for Uzo's machine, not universal paths.
 
 Create or update the local master first. After the local master is complete, sync it to Codex, Claude, and Antigravity as folder-style skill copies.
 
 ## Path Handling
 
-Before creating or syncing, verify each base directory exists:
+Before creating or syncing, verify each resolved base directory exists:
 
-- Local skills folder: `C:\Users\Admin\Uzzys Universe\Galaxies\Tools\Uzzy Skills\skills\`
-- Codex global skills folder: `C:\Users\Admin\.codex\skills\`
-- Claude global skills folder: `C:\Users\Admin\.claude\skills\`
-- Antigravity global skills folder: `C:\Users\Admin\.gemini\config\skills\`
+- Local master skills folder
+- Codex global skills folder
+- Claude global skills folder
+- Antigravity/Gemini global skills folder
 
 If any directory is missing, stop and ask the user for the replacement path for that specific target.
 
@@ -107,14 +121,14 @@ Example:
 `[example path]`
 ```
 
-Do not guess alternative global paths silently. If the user provides a replacement path, use it for that run and record it in the final status.
+Do not guess alternative global paths silently. If the user provides a replacement path, use it for that run and record it in the final status. If the user confirms a canonical local master skills folder, state that it should remain the default local master for that machine unless the user explicitly chooses a different multi-master setup.
 
 ## Creation Workflow
 
 1. Read the requested references, including existing skills or summaries the user named.
 2. Normalize the skill name to lowercase hyphen-case and confirm it has only lowercase letters, digits, and hyphens.
 3. Decide whether the skill needs only `SKILL.md` and `agents/openai.yaml`, or also `scripts/`, `references/`, or `assets/`.
-4. Create the local master folder under `C:\Users\Admin\Uzzys Universe\Galaxies\Tools\Uzzy Skills\skills\[Skill-name]\`.
+4. Create the skill folder under the resolved local master skills folder.
 5. Write `SKILL.md` with only `name` and `description` in frontmatter.
 6. Write `agents/openai.yaml` for Codex UI metadata.
 7. Validate the local master.
@@ -147,14 +161,14 @@ Antigravity must still follow the 2FA edit rule from `AGENTS.md` before creating
 
 For Codex global:
 
-- Create `C:\Users\Admin\.codex\skills\[Skill-name]\`.
+- Create `[resolved Codex global skills folder]\[Skill-name]\`.
 - Copy `SKILL.md`.
 - Copy `agents\openai.yaml`.
 - Copy any required `scripts/`, `references/`, or `assets/`.
 
 For Claude global:
 
-- Create `C:\Users\Admin\.claude\skills\[Skill-name]\`.
+- Create `[resolved Claude global skills folder]\[Skill-name]\`.
 - Copy `SKILL.md`.
 - Copy `agents\openai.yaml` as a required mirror file.
 - Copy any required resources.
@@ -162,7 +176,7 @@ For Claude global:
 
 For Antigravity:
 
-- Create `C:\Users\Admin\.gemini\config\skills\[Skill-name]\`.
+- Create `[resolved Antigravity/Gemini global skills folder]\[Skill-name]\`.
 - Copy `SKILL.md`.
 - Copy `agents\openai.yaml` as a required mirror file.
 - Copy any required resources.

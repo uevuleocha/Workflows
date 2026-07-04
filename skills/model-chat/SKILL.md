@@ -47,7 +47,7 @@ Run the harmless preflight (no API call, no cost):
 python scripts\model_chat.py --check-setup
 ```
 
-If any prerequisite is missing, **stop**. Do not attempt the debate. Route the user to the pending model-chat setup/learning task under the host workspace's task directory (for the Uzzy Ecosystem: `Archive\Tasks\`). Do not improvise installation steps outside that task without the user's consent.
+If any prerequisite is missing, **stop**. Do not attempt the debate. Route the user to a setup task under the host workspace's configured task directory. Common default: `<project root>\Archive\Tasks\` on Windows or `<project root>/Archive/Tasks/` on macOS/Linux. If the workspace has no task convention, ask the user where setup tasks should live. Do not improvise installation steps outside that task without the user's consent.
 
 ## Cost Warning
 
