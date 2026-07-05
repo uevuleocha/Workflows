@@ -9,6 +9,7 @@ This workspace runs on a simple model: **Workflows** (markdown SOPs + skills) sa
 - **Files inside folders start with `x.)`** — this is a **hard rule with a fixed set of exceptions**, not a suggestion. Every file saved into a workspace folder gets a sequential index (`1.) `, `2.) `…; `0.)` allowed for a preamble). **The only exceptions:** structural/special files (`CLAUDE.md`, `AGENTS.md`, `README.md`, `SKILL.md`, dotfiles, config); files a skill or script generates under its own naming scheme; and any case where the user explicitly says not to use the numbering convention. Outside those exceptions, always apply it — if unsure whether something qualifies, apply the prefix.
 - **`tmp/` is strictly temporary.** Throwaway files only, deletable at any time when the user says so. Never store anything durable there.
 - **UTF-8 for everything** — skill, markdown, YAML, and helper-script text. Never rely on the Windows default encoding. Validate folder-style skills with Python in UTF-8 mode (`-X utf8`).
+- **All Markdown tables must be pipe-aligned — no exceptions.** Before writing any table in any artifact, cap every cell at 80 characters, including any overflow marker. If a cell's full content would exceed 80 characters, truncate it at the nearest word boundary within the cap, append a pointer such as `→ see note [row-id]` (using that row's own identifier — its `#`, `Phase`, name, or whichever column already identifies the row), and place the full original text as a plain note directly below the table, keyed by that same identifier. Then compute each column's maximum cell width (now always ≤80 characters) across the header, separator, and every row, and pad every cell to that width so the `|` characters stack vertically in raw text. This applies to every table an agent writes, not only Estimated Effort tables.
 
 ## Skills Workflow (the core job of this workspace)
 
@@ -45,7 +46,7 @@ Keep explanations tight; use a short analogy only when it genuinely clarifies. E
 
 ## Workspace Layout
 
-> **Layout sync status:** `current` · last verified 2026-07-03
+> **Layout sync status:** `current` · last verified 2026-07-05
 >
 > Keep this tree honest. If the real workspace and this tree disagree — a new folder/file that isn't shown here, or an entry here that no longer exists — **prompt the user before continuing substantive work**. The user may: (a) add the entry to the tree, (b) prune or replace something to keep it lean, or (c) decline the change. In every case, once the user has reviewed, reset the status line to `current` with today's date so the next agent doesn't re-raise it. Prefer a lean schema over an exhaustive one — prompt to prune before the tree sprawls; the goal is a map, not an inventory.
 
@@ -64,6 +65,7 @@ C:\Users\Admin\Uzzys Universe\Galaxies\Tools\Uzzy Skills\
 │       ├── SKILL.md             ← The skill's procedure + frontmatter
 │       └── agents/openai.yaml   ← Codex UI metadata (mirrored across all copies)
 ├── Archive/                     ← Durable artifacts (gitignored; not pushed)
-│   └── Summaries/               ← Session summaries (owned by session-summary)
+│   ├── Summaries/               ← Session summaries (owned by session-summary)
+│   └── Tasks/                   ← Pending/done housekeeping tasks (owned by imp-upd-task)
 └── tmp/                         ← Strictly temporary scratch; safe to delete anytime
 ```

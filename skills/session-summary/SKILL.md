@@ -57,9 +57,9 @@ How to infer each value:
 
 Reference examples:
 
-- Project name, e.g. `SR`, `KL`, `TRUTH`, `Workspace Setup`
-- Topic, e.g. `Drawing Engine pt2`, `Zone Engine Port`, `Discord Alerts Imp`
-- Session Number, e.g. `9`, `10`, `11`
+- Project name, e.g. `Skills`, `Skill Maintenance`, `Uzzy TRUTH`, `cTrader MCP`
+- Topic, e.g. `Codex Migration session-summary Integration`, `New Skills + Global-Sync + Hermes Target`, `Zone Evaluation & Invalidation Logic Audit`, `V2 Control-Based Card Build`
+- Session Number, e.g. `2`, `5`, `36`, `2`
 - Directory choice:
   - Default: `<project root>\Archive\Summaries\[Project Name]\`
   - A specific in-project directory the user named: use it exactly
@@ -79,9 +79,9 @@ Here are my inferred values — green-light to use them as-is, or change any sin
 ```text
 Key:
 5.) If user says Default, use <project root>\Archive\Summaries\[Project Name]\
-6.) x.) [Project Name] [Topic] Summary [Session Number].md
+6.) x.) [Topic].md
 7.) <project root>\Archive\Summaries\[Project Name]\
-8.) Where "x.)" = [Session Number] also
+8.) Where "x.)" = [Session Number]
 ```
 
 Fill every numbered line with a concrete inferred value, never a blank — the user should be able to green-light the whole block without typing anything, and if they disagree with one line they overwrite only that line. If, after honestly trying, you genuinely cannot infer a single value (rare), mark that one line `[unable to infer - please provide]` and still pre-fill the other three.
@@ -127,15 +127,15 @@ Default directory format:
 Filename format:
 
 ```text
-x.) [Project Name] [Topic] Summary [Session Number].md
+x.) [Topic].md
 ```
 
-Where `x` is the Session Number (starting from `1` for the first summary).
+Where `x` is the Session Number (starting from `1` for the first summary). `[Project Name]` is not repeated in the filename — the parent folder (`Archive\Summaries\[Project Name]\`) already identifies the project.
 
 Example:
 
 ```text
-<project root>\Archive\Summaries\SR\9.) SR Drawing Engine pt2 Summary 9.md
+<project root>\Archive\Summaries\Uzzy TRUTH\9.) QS LCA Extraction.md
 ```
 
 If the directory does not exist, create it only after the required inputs are confirmed and file creation is allowed.
@@ -187,7 +187,7 @@ The **last** ACT of every summary must always be the Definition of Done ACT, tit
 Use this structure unless the user explicitly asks for a different one:
 
 ```markdown
-# [Project Name] [Topic] Summary [Session Number]
+# [Topic]
 
 **Topic:** [Topic]  
 **Date:** [YYYY-MM-DD]  
