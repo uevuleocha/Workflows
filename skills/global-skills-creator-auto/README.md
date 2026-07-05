@@ -25,5 +25,10 @@ Read this README and the skill's SKILL.md. Help me configure the local master sk
 - Codex: `~/.codex/skills/`
 - Claude: `~/.claude/skills/`
 - Antigravity/Gemini: `~/.gemini/config/skills/`
+- Hermes: the Hermes desktop app's skills directory (on Windows, `%LOCALAPPDATA%\hermes\skills\`), under a `Personal/` category subfolder
 
 These are candidates, not guarantees. The agent should verify each path exists before syncing.
+
+## Depends On `global-sync`
+
+This skill delegates its global-sync step to the `global-sync` skill (Mode A), so the same copy-and-validate workflow is used everywhere. **If you adopt this skill, adopt `global-sync` too.** If `global-sync` is unavailable at sync time, this skill pauses and tells you it is required; it only falls back to inline copy logic if you explicitly continue without it.
