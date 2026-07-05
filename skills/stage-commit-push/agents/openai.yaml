@@ -1,0 +1,7 @@
+interface:
+  display_name: "Stage Commit Push"
+  short_description: "Stage, commit, and push in one deterministic run"
+  default_prompt: "Use $stage-commit-push to stage (all or named paths), commit with a drafted message and Agent trailer, and push to the current repo's remote."
+
+policy:
+  allow_implicit_invocation: false

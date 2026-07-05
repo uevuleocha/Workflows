@@ -1,0 +1,7 @@
+interface:
+  display_name: "Doc This"
+  short_description: "Create a numbered documentation file in house style"
+  default_prompt: "Use $doc-this to create or update a documentation file in Documentation/ using this workspace's house style, with the next available X.) number."
+
+policy:
+  allow_implicit_invocation: true
