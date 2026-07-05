@@ -73,7 +73,7 @@ Use update mode when:
 
 - the user explicitly references an existing active plan
 - the user says to update, revise, continue, extend, or add to a plan
-- the user provides task details that clearly match exactly one existing `_plan_active.md` **and** does not imply a new standalone plan
+- the user provides task details that clearly match exactly one existing `_active.md` **and** does not imply a new standalone plan
 - the user explicitly references an existing finalized plan and asks to update, revise, continue, reopen, extend, or add to it
 
 Use create mode when:
@@ -81,7 +81,7 @@ Use create mode when:
 - no existing matching active plan is found
 - the task is clearly separate from existing active plans
 - the user explicitly asks for a new plan
-- the user provides a specific new filename ending in `_plan_active.md`
+- the user provides a specific new filename ending in `_active.md`
 
 Ask before writing when:
 
@@ -91,26 +91,26 @@ Ask before writing when:
 - the target filename, directory, project/component, scope boundaries, or plan depth is unclear
 - the user provides a vague request such as "make/update a plan for this" without enough context to choose create vs update confidently
 
-When matching existing plans, inspect `<project root>\Archive\Plans\` for `_plan_active.md` and `_plan_finalized.md` files and compare project/component names, primary files, task phrases, and current plan titles.
+When matching existing plans, inspect `<project root>\Archive\Plans\` for `_active.md` and `_finalized.md` files and compare project/component names, primary files, task phrases, and current plan titles.
 
 ## Plan Lifecycle
 
 Plan files use this lifecycle:
 
-- `_plan_active.md` means the plan is open or still needs action.
-- `_plan_finalized.md` means the plan was completed and closed through the `finalize-plan` workflow.
-- `_mini_plan_active.md` means the user explicitly asked for a mini plan and the plan is open or still needs action.
-- `_mini_plan_finalized.md` means a mini plan was completed and closed through the `finalize-plan` workflow.
+- `_active.md` means the plan is open or still needs action.
+- `_finalized.md` means the plan was completed and closed through the `finalize-plan` workflow.
+- `_mini_active.md` means the user explicitly asked for a mini plan and the plan is open or still needs action.
+- `_mini_finalized.md` means a mini plan was completed and closed through the `finalize-plan` workflow.
 
-When creating a new durable plan, the filename must end in `_plan_active.md`.
+When creating a new durable plan, the filename must end in `_active.md`.
 
-When the user explicitly asks for a "mini plan", the filename must end in `_mini_plan_active.md` instead. Preserve the `mini_plan` marker through lifecycle renames, so finalization produces `_mini_plan_finalized.md` and reopening returns to `_mini_plan_active.md`.
+When the user explicitly asks for a "mini plan", the filename must end in `_mini_active.md` instead. Preserve the `mini` marker through lifecycle renames, so finalization produces `_mini_finalized.md` and reopening returns to `_mini_active.md`.
 
-When the user wants to update an existing `_plan_finalized.md` plan, reopen it gracefully:
+When the user wants to update an existing `_finalized.md` plan, reopen it gracefully:
 
 1. Preserve the previous finalized work, completion evidence, and finalization notes.
 2. Add a new phase, checklist section, or dated update section that explains why the plan is active again.
-3. Rename the plan file from `_plan_finalized.md` back to `_plan_active.md`.
+3. Rename the plan file from `_finalized.md` back to `_active.md`.
 4. Update the status and lifecycle lines to show that the plan was reopened.
 5. Leave finalization for a later explicit `finalize-plan` pass after the user verifies the reopened work.
 
@@ -127,16 +127,16 @@ Default directory:
 Filename format:
 
 ```text
-N.) {primary_file_or_component}_{main_task}_plan_active.md
+N.) {primary_file_or_component}_{main_task}_active.md
 ```
 
 Mini plan filename format, only when the user explicitly asks for a "mini plan":
 
 ```text
-N.) {primary_file_or_component}_{main_task}_mini_plan_active.md
+N.) {primary_file_or_component}_{main_task}_mini_active.md
 ```
 
-`N` is the next available integer in the target plan directory, starting from `1`. If the directory is empty, use `1`. If existing plan files already use the `N.) ` prefix, increment past the highest existing number. The numeric prefix survives `_plan_active.md` -> `_plan_finalized.md` and `_plan_finalized.md` -> `_plan_active.md` lifecycle renames. Do not renumber existing plans during finalization or reopening.
+`N` is the next available integer in the target plan directory, starting from `1`. If the directory is empty, use `1`. If existing plan files already use the `N.) ` prefix, increment past the highest existing number. The numeric prefix survives `_active.md` -> `_finalized.md` and `_finalized.md` -> `_active.md` lifecycle renames. Do not renumber existing plans during finalization or reopening.
 
 Generate the body of the filename from `Primary File or Main Component` and `Main Task`. Use lowercase letters, digits, and underscores for the body. Do not ask the user for the filename unless the derived name would be ambiguous or misleading.
 
@@ -149,7 +149,7 @@ When updating an active plan:
 - update statuses only when the user or session evidence supports the status
 - keep unrelated sections intact
 - do not restyle the whole plan just for consistency
-- do not rename `_plan_active.md` to `_plan_finalized.md`
+- do not rename `_active.md` to `_finalized.md`
 
 If an update conflicts with the existing plan, record the new user decision clearly in `Locked Decisions` or the relevant phase rather than silently deleting the old context.
 
@@ -174,8 +174,8 @@ How these fields determine the plan path:
 - Project / Component decides the folder under `Archive/Plans`, usually `Archive/Plans/[Project]`.
 - Primary File or Main Component becomes the filename prefix.
 - Main Task becomes the filename body.
-- Together they produce `N.) {primary_file_or_component}_{main_task}_plan_active.md`, where `N` is the next available integer in the target plan directory.
-- If the user explicitly asked for a mini plan, use `N.) {primary_file_or_component}_{main_task}_mini_plan_active.md` instead.
+- Together they produce `N.) {primary_file_or_component}_{main_task}_active.md`, where `N` is the next available integer in the target plan directory.
+- If the user explicitly asked for a mini plan, use `N.) {primary_file_or_component}_{main_task}_mini_active.md` instead.
 
 1. Project / Component:
 2. Main Task:
@@ -231,7 +231,7 @@ Plan lifecycle: ACTIVE on [YYYY-MM-DD]. [One sentence explaining what this plan 
 
 ## Estimated Effort
 
-For every durable plan at every depth, including Compact plans and `_mini_plan_active.md` plans, the `Estimated Effort` section must use this full estimated-effort table shape unless Unicode rendering is confirmed broken:
+For every durable plan at every depth, including Compact plans and `_mini_active.md` plans, the `Estimated Effort` section must use this full estimated-effort table shape unless Unicode rendering is confirmed broken:
 
 ```markdown
 | Phase | Sessions |    🟣    |                                            Complexity                                            |
@@ -251,7 +251,7 @@ The `🟣` column header is required for every durable plan. It means "colored e
 - `🟡` = Medium
 - `🔴` = Hard
 
-Use the richer table style from `9.) uzzy_sr_drawing_engine_plan_finalized.md` as the preferred example: include phase letters, session-count estimates, colored markers, explanatory complexity text, and a total estimate line below the table. Do not use a simpler two-column `Phase | Effort` style for Compact, Standard, Deep, or mini plans.
+Use the richer table style from existing polished finalized plans as the preferred example: include phase letters, session-count estimates, colored markers, explanatory complexity text, and a total estimate line below the table. Do not use a simpler two-column `Phase | Effort` style for Compact, Standard, Deep, or mini plans.
 
 ## Open Items Explicitly Out Of Scope
 ```
@@ -327,7 +327,7 @@ Do not finalize plans in this skill.
 
 Do not:
 
-- rename `_plan_active.md` to `_plan_finalized.md`
+- rename `_active.md` to `_finalized.md`
 - mark every item complete because the user said "final"
 - archive or delete plan files
 - treat session-summary plan status updates as finalization
@@ -357,9 +357,9 @@ After creating or updating a plan:
 
 - confirm the file exists
 - confirm the filename starts with the correct `N.) ` numeric prefix when a durable plan file was created
-- confirm the filename ends in `_plan_active.md`, or `_mini_plan_active.md` when the user explicitly requested a mini plan
+- confirm the filename ends in `_active.md`, or `_mini_active.md` when the user explicitly requested a mini plan
 - confirm a `## Prompt Contract` section exists (GOAL / CONSTRAINTS / FORMAT / DEFINITION OF DONE / FAILURE, or the minimal GOAL + DEFINITION OF DONE + FAILURE form for Compact and mini plans), that it was shown in chat, and that it was authored through the `prompt-contracts` skill unless that skill was unavailable
-- if reopening a finalized plan, confirm the file was renamed from `_plan_finalized.md` back to `_plan_active.md`, or from `_mini_plan_finalized.md` back to `_mini_plan_active.md`, and that prior finalized evidence was preserved
+- if reopening a finalized plan, confirm the file was renamed from `_finalized.md` back to `_active.md`, or from `_mini_finalized.md` back to `_mini_active.md`, and that prior finalized evidence was preserved
 - skim the major headings for the chosen plan depth
 - for Standard and Deep plans, confirm the top status/lifecycle lines exist
 - for every durable plan, including Compact and mini plans, confirm the `Estimated Effort` table uses the full `Phase | Sessions | 🟣 | Complexity` shape, includes colored row markers, keeps raw Markdown pipes vertically aligned, and includes a total estimate line

@@ -1,6 +1,6 @@
 ---
 name: finalize-plan
-description: Finalize existing active implementation plans by verifying completion evidence, resolving pending or debug-pending items with user confirmation, applying completed-plan presentation styling, updating lifecycle/status text, and renaming _plan_active.md files to _plan_finalized.md. Use when the user asks to finalize a plan, mark an implementation plan complete, close an active plan, rename an active plan to finalized, or says a plan is done/final/complete.
+description: Finalize existing active implementation plans by verifying completion evidence, resolving pending or debug-pending items with user confirmation, applying completed-plan presentation styling, updating lifecycle/status text, and renaming _active.md files to _finalized.md. Use when the user asks to finalize a plan, mark an implementation plan complete, close an active plan, rename an active plan to finalized, or says a plan is done/final/complete.
 ---
 
 # Finalize Plan
@@ -34,7 +34,7 @@ Review only the sources needed to finalize the plan safely:
 
 1. The project's canonical contract (e.g. `CLAUDE.md`)
 2. the user-referenced active plan, if provided
-3. existing `_plan_active.md` files under `<project root>\Archive\Plans\` when the user did not name the plan
+3. existing `_active.md` files under `<project root>\Archive\Plans\` when the user did not name the plan
 4. referenced verification results, session notes, or source files only when needed to confirm completion
 
 Do not perform a broad repo audit unless the user asks or completion evidence genuinely requires it.
@@ -43,14 +43,14 @@ Do not perform a broad repo audit unless the user asks or completion evidence ge
 
 Use the plan the user explicitly references.
 
-If the user does not reference a plan, inspect `<project root>\Archive\Plans\` for `_plan_active.md` files:
+If the user does not reference a plan, inspect `<project root>\Archive\Plans\` for `_active.md` files:
 
 - If exactly one active plan exists, use it.
 - If exactly one active plan clearly matches the user's project/component/task, use it.
 - If multiple active plans are plausible, ask which plan to finalize.
 - If no active plan exists, stop and report that there is no active implementation plan to finalize.
 
-Never finalize a `_plan_finalized.md` file.
+Never finalize a `_finalized.md` file.
 
 ## Completion Evidence Rules
 
@@ -155,18 +155,18 @@ Use the current local date for lifecycle text.
 Rename the active file:
 
 ```text
-{name}_plan_active.md
+{name}_active.md
 ```
 
 to:
 
 ```text
-{name}_plan_finalized.md
+{name}_finalized.md
 ```
 
 Do not keep a duplicate active copy after a successful rename.
 
-If the target `_plan_finalized.md` file already exists, stop and ask before overwriting, deleting, or choosing another name.
+If the target `_finalized.md` file already exists, stop and ask before overwriting, deleting, or choosing another name.
 
 Do not delete unrelated plan files.
 
@@ -200,7 +200,7 @@ After finalizing a plan:
 
 - confirm the active source path no longer exists
 - confirm the finalized target path exists
-- confirm the filename ends in `_plan_finalized.md`
+- confirm the filename ends in `_finalized.md`
 - confirm the file contains a finalized status or lifecycle note
 - confirm the `## Prompt Contract` DEFINITION OF DONE items were reviewed and no FAILURE condition remains active, or record that the plan predates the Prompt Contract convention
 - confirm a `Definition of Done` section exists (or the `## Prompt Contract` DEFINITION OF DONE clause for plans carrying a contract), or record that the user explicitly waived it or the original plan used a different equivalent completion section

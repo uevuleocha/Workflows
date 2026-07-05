@@ -1,6 +1,6 @@
 # Global Sync Adoption Guide
 
-This skill propagates an artifact that **already exists** in a local master skills folder out to one or more global agent skill installs (Codex, Claude, Antigravity, Hermes), validating every copy. It does not design or create artifacts — for that, use `global-skills-creator` (guided) or `global-skills-creator-auto` (autonomous).
+This skill propagates an artifact that **already exists** in a local master skills folder out to one or more global agent skill installs (Codex, Claude, Antigravity, Hermes, zCode), validating every copy. It does not design or create artifacts — for that, use `global-skills-creator` (guided) or `global-skills-creator-auto` (autonomous).
 
 If you cloned this skill from someone else, do not assume the original maintainer's paths apply to your machine. Ask your agent to read this README and `SKILL.md`, then help you configure your own path stack before running any sync.
 
@@ -14,6 +14,7 @@ By default, a machine should have one canonical local master skills folder — t
 - Claude: `~/.claude/skills/`
 - Antigravity/Gemini: `~/.gemini/config/skills/`
 - Hermes: the Hermes desktop app's skills directory (on Windows, `%LOCALAPPDATA%\hermes\skills\`), under a `Personal/` category subfolder
+- zCode: `~/.zcode/skills/`
 
 These are candidates, not guarantees. The agent should verify each path exists before syncing, and must never invent a missing path.
 
@@ -35,5 +36,5 @@ If `global-sync` is unavailable when one of those skills reaches its sync step, 
 Give this prompt to your agent:
 
 ```text
-Read this README and the skill's SKILL.md. Help me configure the local master skills path and my global install paths (Codex, Claude, Antigravity, Hermes) for my machine. Use my OS conventions, do not assume the original maintainer's Windows paths, and ask before creating missing folders or using a Hermes category other than Personal.
+Read this README and the skill's SKILL.md. Help me configure the local master skills path and my global install paths (Codex, Claude, Antigravity, Hermes, zCode) for my machine. Use my OS conventions, do not assume the original maintainer's Windows paths, and ask before creating missing folders or using a Hermes category other than Personal.
 ```

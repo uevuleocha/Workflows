@@ -1,7 +1,7 @@
 interface:
   display_name: "Global Sync"
   short_description: "Propagate a local-master skill out to all global installs"
-  default_prompt: "Use $global-sync to propagate an existing local-master skill (or all) to Codex, Claude, Antigravity, and Hermes, validating every copy."
+  default_prompt: "Use $global-sync to propagate an existing local-master skill (or all) to Codex, Claude, Antigravity, Hermes, and zCode, validating every copy."
 
 policy:
   allow_implicit_invocation: false

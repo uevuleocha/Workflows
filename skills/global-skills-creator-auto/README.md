@@ -26,6 +26,7 @@ Read this README and the skill's SKILL.md. Help me configure the local master sk
 - Claude: `~/.claude/skills/`
 - Antigravity/Gemini: `~/.gemini/config/skills/`
 - Hermes: the Hermes desktop app's skills directory (on Windows, `%LOCALAPPDATA%\hermes\skills\`), under a `Personal/` category subfolder
+- zCode: `~/.zcode/skills/`
 
 These are candidates, not guarantees. The agent should verify each path exists before syncing.
 

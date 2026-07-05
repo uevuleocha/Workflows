@@ -1,6 +1,6 @@
 ---
 name: global-sync
-description: Propagate an existing local-master artifact (skills now; agents/sub-agents as a future stub mode) out to the configured global install locations (Codex, Claude, Antigravity, Hermes), validating every copy. Use when the user explicitly invokes /global-sync, use global-sync, "sync this skill globally", "sync all skills", "re-sync after an update", "push this skill to Codex/Claude/Antigravity/Hermes", or clear equivalents asking to propagate something that already exists locally — not to design or create a new one.
+description: Propagate an existing local-master artifact (skills now; agents/sub-agents as a future stub mode) out to the configured global install locations (Codex, Claude, Antigravity, Hermes, zCode), validating every copy. Use when the user explicitly invokes /global-sync, use global-sync, "sync this skill globally", "sync all skills", "re-sync after an update", "push this skill to Codex/Claude/Antigravity/Hermes/zCode", or clear equivalents asking to propagate something that already exists locally — not to design or create a new one.
 ---
 
 # Global Sync
@@ -27,7 +27,7 @@ Treat these as direct invocation and begin the workflow:
 - `sync this skill globally`
 - `sync all skills`
 - `re-sync after an update`
-- `push this skill to Codex, Claude, Antigravity, and Hermes`
+- `push this skill to Codex, Claude, Antigravity, Hermes, and zCode`
 - clear equivalents asking to propagate an existing local-master artifact to the global installs
 
 ## Modes
@@ -56,9 +56,12 @@ C:\Users\Admin\.gemini\config\skills\<skill>\
 
 Hermes global:
 C:\Users\Admin\AppData\Local\hermes\skills\Personal\<skill>\
+
+zCode global:
+C:\Users\Admin\.zcode\skills\<skill>\
 ```
 
-These are known-good defaults for Uzo's machine, not universal paths. On any other machine, resolve the user's own `~/.codex/skills/`, `~/.claude/skills/`, `~/.gemini/config/skills/`, and Hermes app-data skills directory, and translate examples into the host OS path style. Never invent a path — if a target base directory is missing, stop and ask the user for the replacement path for that specific target.
+These are known-good defaults for Uzo's machine, not universal paths. On any other machine, resolve the user's own `~/.codex/skills/`, `~/.claude/skills/`, `~/.gemini/config/skills/`, Hermes app-data skills directory, and `~/.zcode/skills/`, and translate examples into the host OS path style. Never invent a path — if a target base directory is missing, stop and ask the user for the replacement path for that specific target.
 
 ## Hermes Specifics (Mode A)
 
@@ -83,8 +86,8 @@ description: Personal reusable skills synced from the Uzzy Skills local master. 
 1. **Resolve scope.** A named skill, a comma-separated list of skills, or `all` (every folder under the local master `skills/`).
 2. **Confirm each named skill exists in the local master.** If a named skill is missing locally, stop and report it — this skill never creates artifacts.
 3. **Validate the local master first.** Run `quick_validate.py` (UTF-8 mode) on each in-scope local master skill. If any fails, stop and report — never propagate a broken skill to the global targets.
-4. **Verify target base directories.** For each of Codex, Claude, Antigravity, Hermes, confirm the global skills base directory exists. If one is missing, stop and ask for the replacement path for that target (do not guess).
-5. **Copy per target.** For each in-scope skill × each target: create the destination skill folder if missing (Hermes → under `Personal/`), then true-copy with `Copy-Item -Recurse -Force` (not `Write` — a real copy preserves content faithfully) of `SKILL.md`, `agents/openai.yaml`, and any `scripts/`, `references/`, or `assets/` present.
+4. **Verify target base directories.** For each of Codex, Claude, Antigravity, Hermes, and zCode, confirm the global skills base directory exists. If one is missing, stop and ask for the replacement path for that target (do not guess).
+5. **Copy per target.** For each in-scope skill × each target: create the destination skill folder if missing (Hermes → under `Personal/`; zCode → flat under `~/.zcode/skills/`), then true-copy with `Copy-Item -Recurse -Force` (not `Write` — a real copy preserves content faithfully) of `SKILL.md`, `agents/openai.yaml`, and any `scripts/`, `references/`, or `assets/` present.
 6. **Ensure Hermes category file.** Confirm or create `...\hermes\skills\Personal\DESCRIPTION.md`.
 7. **Validate every copy.** Run `quick_validate.py` (UTF-8 mode) against each synced copy at each target.
 8. **Report.** A skill × target × validation-result table, plus any replacement paths used and any targets skipped (with the reason).
@@ -94,7 +97,7 @@ description: Personal reusable skills synced from the Uzzy Skills local master. 
 Not built yet. Reserved for the day the user starts saving custom sub-agents and wants their propagation automated. What is already confirmed, to save future work:
 
 - Claude Code custom sub-agents are **single Markdown files** with YAML frontmatter (`name`, `description`, `tools`, optionally `model`), living at `.claude/agents/<name>.md` (project-level, discovered by walking up to the repo root) or `~/.claude/agents/<name>.md` (user-global). This is a **single-file** shape, not a folder — so Mode A's folder-copy logic does not apply as-is.
-- Codex, Antigravity, and Hermes sub-agent conventions are **not yet confirmed**. Codex's `AGENTS.md` is a single contract/wrapper file, **not** a registry of individually named sub-agents — do not assume equivalence.
+- Codex, Antigravity, Hermes, and zCode sub-agent conventions are **not yet confirmed**. Codex's `AGENTS.md` is a single contract/wrapper file, **not** a registry of individually named sub-agents — do not assume equivalence.
 
 **Before building Mode B:** confirm each platform's real sub-agent mechanism (if any), decide the target path stack for single-file agents, then mirror Mode A's shape — resolve path stack → validate local → copy → validate targets — adapted for single-file artifacts. Until then, if a user asks to sync an agent, explain that Mode B is a stub and stop.
 

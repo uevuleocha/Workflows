@@ -1,6 +1,6 @@
 # Agent Instructions — Uzzy Skills
 
-This workspace is the **home for Uzo's skills**. It holds the **local master copies** of reusable skills — created from scratch, adapted from others' work, or brought in for personal workflows. Skill work *starts here*, then syncs outward to the global agent installs (Codex, Claude, Antigravity). This repo may become public one day, so treat everything here as potentially world-readable.
+This workspace is the **home for Uzo's skills**. It holds the **local master copies** of reusable skills — created from scratch, adapted from others' work, or brought in for personal workflows. Skill work *starts here*, then syncs outward to the global agent installs (Codex, Claude, Antigravity, Hermes, zCode). This repo may become public one day, so treat everything here as potentially world-readable.
 
 This workspace runs on a simple model: **Workflows** (markdown SOPs + skills) say what to do, you're the **Agent** deciding how, and **Tools** (skills + built-ins) do the executing.
 
@@ -13,13 +13,15 @@ This workspace runs on a simple model: **Workflows** (markdown SOPs + skills) sa
 
 ## Skills Workflow (the core job of this workspace)
 
-- **Local master first.** All skill creation/edits begin in `skills/<name>/`. Finish and let the user verify the local master **before** any global sync. Global sync runs only when the user explicitly asks — never in the same pass as the local edit. The one exception is `global-skills-creator-auto`, which is designed to create-and-sync in a single pass.
+- **Local master first.** All skill creation/edits begin in `skills/<name>/`. Finish and let the user verify the local master **before** any global sync. Global sync runs only when the user explicitly asks — never in the same pass as the local edit. The exceptions are `global-skills-creator` and `global-skills-creator-auto`, which are designed to create-and-sync after their own approval flow.
 - **Folder-style skills mirror structure** — each keeps `SKILL.md` + `agents/openai.yaml` across the local master and every global copy.
 - **Sync targets (path stack):**
   - Local master: `skills/<name>/`
   - Codex: `C:\Users\Admin\.codex\skills\<name>\`
   - Claude: `C:\Users\Admin\.claude\skills\<name>\`
   - Antigravity: `C:\Users\Admin\.gemini\config\skills\<name>\`
+  - Hermes: `C:\Users\Admin\AppData\Local\hermes\skills\Personal\<name>\`
+  - zCode: `C:\Users\Admin\.zcode\skills\<name>\`
 - **Never invent a path.** If a target directory is missing, stop and ask — don't guess.
 - Prefer an existing skill over improvising. `global-skills-creator` (guided) and `global-skills-creator-auto` (autonomous) own skill creation and cross-agent sync.
 

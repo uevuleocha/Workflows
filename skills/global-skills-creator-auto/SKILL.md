@@ -1,11 +1,11 @@
 ---
 name: global-skills-creator-auto
-description: Autonomously create reusable skills from a local master and sync them across Codex, Claude, and Antigravity global skill or workflow locations, using reasonable defaults first so the user can refine afterward. Use when the user explicitly asks for automatic skill creation, autonomous skill generation, fast create-and-sync behavior, or "use global-skills-creator-auto".
+description: Autonomously create reusable skills from a local master and sync them across Codex, Claude, Antigravity, Hermes, and zCode global skill or workflow locations, using reasonable defaults first so the user can refine afterward. Use when the user explicitly asks for automatic skill creation, autonomous skill generation, fast create-and-sync behavior, or "use global-skills-creator-auto".
 ---
 
 # Global Skills Creator Auto
 
-Autonomously create a reusable skill from a local master skills folder, then optionally promote it to configured global locations for Codex, Claude, and Antigravity. On Uzo's machine, the default local master is the Uzzy Skills workspace. On any other machine, first discover or ask for the user's local master skills folder and global skill install paths.
+Autonomously create a reusable skill from a local master skills folder, then optionally promote it to configured global locations for Codex, Claude, Antigravity, Hermes, and zCode. On Uzo's machine, the default local master is the Uzzy Skills workspace. On any other machine, first discover or ask for the user's local master skills folder and global skill install paths.
 
 This is the automatic variant of `global-skills-creator`. Use it when the user wants the agent to infer sensible defaults, create the skill, sync it globally, validate it, and then allow refinement afterward.
 
@@ -15,8 +15,8 @@ Use `session-summary/SKILL.md` from the resolved local master skills folder only
 
 Every global sync performed by this skill MUST run through the `global-sync` skill (Mode A). `global-sync` is the single source of sync truth for the ecosystem, so the same copy-and-validate workflow is used here as everywhere else. This skill and `global-sync` travel together; if you ever share this skill, ship `global-sync` with it.
 
-1. After the local master is created and locally validated, invoke `global-sync` Mode A, pre-filled with the new skill name(s) and all configured global targets (Codex, Claude, Antigravity, Hermes). Do not re-ask the user for the target list.
-2. `global-sync` owns the copy, the Hermes `Personal/` grouping, and the per-target validation. Do not duplicate that logic here beyond the availability-guard fallback below.
+1. After the local master is created and locally validated, invoke `global-sync` Mode A, pre-filled with the new skill name(s) and all configured global targets (Codex, Claude, Antigravity, Hermes, zCode). Do not re-ask the user for the target list.
+2. `global-sync` owns the copy, the Hermes `Personal/` grouping, the zCode flat target, and the per-target validation. Do not duplicate that logic here beyond the availability-guard fallback below.
 
 **Availability guard.** Before invoking, confirm `global-sync` is loaded.
 
@@ -29,8 +29,8 @@ Every global sync performed by this skill MUST run through the `global-sync` ski
 
 Reproduce `global-sync` Mode A inline for the new skill:
 
-1. Resolve the global targets: Codex `~/.codex/skills/`, Claude `~/.claude/skills/`, Antigravity `~/.gemini/config/skills/`, Hermes `%LOCALAPPDATA%\hermes\skills\Personal\` (Uzo's machine: `C:\Users\Admin\AppData\Local\hermes\skills\Personal\`). If a target base directory is missing, stop and ask for the replacement path — never guess.
-2. For each target: create the destination skill folder if missing (Hermes → under `Personal/`), then true-copy with `Copy-Item -Recurse -Force` (not `Write`) of `SKILL.md`, `agents/openai.yaml`, and any `scripts/`, `references/`, or `assets/`.
+1. Resolve the global targets: Codex `~/.codex/skills/`, Claude `~/.claude/skills/`, Antigravity `~/.gemini/config/skills/`, Hermes `%LOCALAPPDATA%\hermes\skills\Personal\` (Uzo's machine: `C:\Users\Admin\AppData\Local\hermes\skills\Personal\`), and zCode `~/.zcode/skills/` (Uzo's machine: `C:\Users\Admin\.zcode\skills\`). If a target base directory is missing, stop and ask for the replacement path — never guess.
+2. For each target: create the destination skill folder if missing (Hermes → under `Personal/`; zCode → flat under `~/.zcode/skills/`), then true-copy with `Copy-Item -Recurse -Force` (not `Write`) of `SKILL.md`, `agents/openai.yaml`, and any `scripts/`, `references/`, or `assets/`.
 3. Ensure `...\hermes\skills\Personal\DESCRIPTION.md` exists (create with one-line frontmatter if missing).
 4. Validate every copy with `quick_validate.py` (`-X utf8`).
 5. Report that the inline fallback ran because `global-sync` was unavailable.
@@ -62,7 +62,7 @@ Treat these as direct invocation and begin the workflow:
 - `auto-create a skill`
 - `create a global skill`
 - `make a skill for all agents`
-- `sync this skill to Codex, Claude, and Antigravity`
+- `sync this skill to Codex, Claude, Antigravity, Hermes, and zCode`
 - clear equivalents where the user asks for a reusable skill and cross-agent promotion
 
 If the user invokes the non-auto `global-skills-creator`, use the guided/default workflow instead. This auto variant is specifically for cases where the user wants fast create-and-sync behavior and expects to refine afterward.
@@ -84,7 +84,7 @@ We need to define the new skill before writing it.
 6. Reference Files: Existing skills, workflows, summaries, or files the skill should read as context.
 7. Resources Needed (scripts/references/assets/none): Whether the skill folder needs extra subfolders beyond SKILL.md and agents/.
 8. Validation Needed: Any checks beyond the standard sync validation — e.g., smoke-test phrases, custom validators, or "none" if standard folder/frontmatter validation is sufficient.
-9. Create local + Codex + Claude + Antigravity copies?: Whether to sync the skill to all 4 locations or keep it local-only.
+9. Create local + all global copies?: Whether to sync the skill to all configured global locations or keep it local-only.
 ```
 
 If the user has already provided enough detail, proceed with the reasonable defaults and record them in the final status.
@@ -101,6 +101,8 @@ Preferred discovery order:
    - Codex: `~/.codex/skills/`
    - Claude: `~/.claude/skills/`
    - Antigravity/Gemini: `~/.gemini/config/skills/`
+   - Hermes: `%LOCALAPPDATA%\hermes\skills\Personal\` on Windows, or the user-confirmed Hermes skills category path
+   - zCode: `~/.zcode/skills/`
 4. If a target does not exist, stop and ask whether to create it, skip it, or use a different path.
 
 Do not assume Windows paths on macOS or Linux. Translate examples into the host OS path style.
@@ -122,11 +124,14 @@ C:\Users\Admin\.gemini\config\skills\[Skill-name]\SKILL.md
 
 Hermes global:
 C:\Users\Admin\AppData\Local\hermes\skills\Personal\[Skill-name]\SKILL.md
+
+zCode global:
+C:\Users\Admin\.zcode\skills\[Skill-name]\SKILL.md
 ```
 
 These maintainer defaults are known-good examples for Uzo's machine, not universal paths.
 
-Create or update the local master first. After the local master is complete and locally validated, hand the propagation to `global-sync` Mode A (see `Global Sync Integration`), which copies it to Codex, Claude, Antigravity, and Hermes and validates every copy.
+Create or update the local master first. After the local master is complete and locally validated, hand the propagation to `global-sync` Mode A (see `Global Sync Integration`), which copies it to Codex, Claude, Antigravity, Hermes, and zCode and validates every copy.
 
 ## Path Handling
 
@@ -137,6 +142,7 @@ Before creating or syncing, verify each resolved base directory exists:
 - Claude global skills folder
 - Antigravity/Gemini global skills folder
 - Hermes global skills folder (the `Personal/` category under the Hermes app-data skills directory)
+- zCode global skills folder
 
 If any directory is missing, stop and ask the user for the replacement path for that specific target. (When `global-sync` performs the sync, it runs these same checks; this list governs the inline fallback.)
 
@@ -160,7 +166,7 @@ Do not guess alternative global paths silently. If the user provides a replaceme
 5. Write `SKILL.md` with only `name` and `description` in frontmatter.
 6. Write `agents/openai.yaml` for Codex UI metadata.
 7. Validate the local master.
-8. Sync to the global locations by invoking `global-sync` Mode A (see `Global Sync Integration`), pre-filled with the new skill name and all four targets (Codex, Claude, Antigravity, Hermes). `global-sync` performs the copy and the per-target validation. Use the Inline Sync Fallback only if `global-sync` is unavailable and the user opts to continue.
+8. Sync to the global locations by invoking `global-sync` Mode A (see `Global Sync Integration`), pre-filled with the new skill name and all five targets (Codex, Claude, Antigravity, Hermes, zCode). `global-sync` performs the copy and the per-target validation. Use the Inline Sync Fallback only if `global-sync` is unavailable and the user opts to continue.
 9. Report files created, validations run, whether `global-sync` or the inline fallback performed the sync, replacement directories used, and any pending manual UI checks.
 
 Ecosystem consistency rule: every folder-style skill must include `agents/openai.yaml` in the local master, Codex global copy, and Claude global copy. Claude may not require this file today, but the folder structure must remain mirrored unless the user later decides to remove `agents/` from all Claude global skills at once.
@@ -175,6 +181,8 @@ If the user invokes this skill and approves creating a skill, treat that as appr
 - the Codex global copy
 - the Claude global copy
 - the Antigravity global skill copy
+- the Hermes global skill copy
+- the zCode global skill copy
 
 Codex and Claude must still follow their runtime permission model. If writing outside the workspace requires elevated approval, request it.
 
@@ -186,7 +194,7 @@ Antigravity must still follow the 2FA edit rule from `AGENTS.md` before creating
 
 ## Sync Rules
 
-Syncing is owned by `global-sync` Mode A (see `Global Sync Integration`), which copies `SKILL.md`, `agents/openai.yaml`, and any `scripts/`, `references/`, or `assets/` into each target (Codex, Claude, Antigravity, and Hermes under `Personal/`), keeps the folder structure mirrored, ensures the Hermes `Personal/DESCRIPTION.md`, and validates every copy. Do not maintain a second copy of that logic here.
+Syncing is owned by `global-sync` Mode A (see `Global Sync Integration`), which copies `SKILL.md`, `agents/openai.yaml`, and any `scripts/`, `references/`, or `assets/` into each target (Codex, Claude, Antigravity, Hermes under `Personal/`, and zCode), keeps the folder structure mirrored, ensures the Hermes `Personal/DESCRIPTION.md`, and validates every copy. Do not maintain a second copy of that logic here.
 
 The **Inline Sync Fallback** in `Global Sync Integration` is the only exception, used solely when `global-sync` is unavailable and the user opts to continue.
 
@@ -203,6 +211,7 @@ Run this validator for:
 - Claude global folder, if it is folder-style and contains `SKILL.md`
 - Antigravity global folder
 - Hermes global folder (under `Personal/`)
+- zCode global folder
 
 If validation fails, read the error, fix the skill, and rerun validation. When `global-sync` performs the sync, it runs this validation for every target; this list governs the inline fallback.
 
@@ -237,6 +246,7 @@ After creating or updating a skill, report:
 - Claude global path
 - Antigravity skill path
 - Hermes skill path (under `Personal/`)
+- zCode skill path
 - whether `global-sync` or the inline fallback performed the sync
 - validations run and results
 - replacement directories supplied by the user, or `none`
