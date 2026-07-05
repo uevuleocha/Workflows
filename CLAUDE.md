@@ -42,7 +42,22 @@ Before acting, define what "done" looks like — either the user's explicit crit
 
 ## Communication & Mode Footer
 
-Keep explanations tight; use a short analogy only when it genuinely clarifies. End each reply with a Mode footer: `Mode = N/A` when no mode is active, `Mode = <Name>` for one, or `Modes = A + B` for several (Brainstorm, Debug, LTNEY, Initialize, etc.).
+Keep explanations tight; use a short analogy only when it genuinely clarifies.
+
+End every response with a Mode footer:
+
+- If no mode is active → `Mode = N/A`
+- If one mode is active → `Mode = <Mode Name>`
+- If multiple modes are active → `Modes = Mode A + Mode B + ... + Mode Z` (include every active mode exactly once)
+
+Skills that emit the Mode footer while active (open-ended list — grows as new mode-aware skills are added):
+
+- **Brainstorm** — persists until exited
+- **Debug** — persists until exited
+- **Initialize** — one-time only (footer appears on the single initialization response, not subsequent responses)
+- **LTNEY** — persists until exited
+
+When needed, check individual skill files for how the mode should be named in the footer.
 
 ## Workspace Layout
 
