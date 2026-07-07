@@ -1,18 +1,19 @@
 ---
 name: claude-workspace-chat-migration
-description: "Safely migrate Claude Desktop chat sessions between workspaces. Use when the user asks to move/reassign Claude Code chats, sessions, transcript JSONL, sidebar project grouping, or working directory from one local workspace/project to another. Covers the two required layers: the CLI transcript JSONL (projects-folder grouping plus internal cwd) and the Claude Desktop chat store (claude-code-sessions local_*.json cwd/originCwd/title), with backups, one-session testing, manifests, and verification."
+description: "Safely migrate Claude Desktop chat sessions between workspaces. Use when the user asks to move/reassign Claude Code chats, sessions, transcript JSONL, sidebar project grouping, working directory, workspace memory, or session sidecar data from one local workspace/project to another. Covers the required state surfaces: the CLI transcript JSONL, adjacent Claude project data such as memory, session subagents, and session tool-results, and the Claude Desktop chat store with backups, one-session testing, manifests, and verification."
 ---
 
 # Claude Workspace Chat Migration
 
-Migrate Claude Desktop chat sessions from one workspace to another by making two state layers agree:
+Migrate Claude Desktop chat sessions from one workspace to another by making the local Claude state surfaces agree:
 
 1. Layer A — CLI transcript JSONL under `C:\Users\Admin\.claude\projects\<encoded-path>\<cliSessionId>.jsonl`. The encoded folder name is the workspace path with every `:`, `\`, and space replaced by `-` (e.g. `C:\Users\Admin\Uzzys Universe` becomes `C--Users-Admin-Uzzys-Universe`). The sidebar/CLI grouping for a chat is the encoded folder its transcript lives in; each record also carries a top-level `cwd` used to resume in the right directory.
-2. Layer B — Desktop chat store under `C:\Users\Admin\AppData\Roaming\Claude\claude-code-sessions\<account>\<group>\local_*.json`. Each chat has one record (linked to Layer A by `cliSessionId`) carrying `cwd`, `originCwd`, and `title` — the fields that drive the Desktop sidebar group and title.
+2. Adjacent Claude project data under the same encoded folder: workspace `memory/`, plus per-session `<cliSessionId>\subagents\` and `<cliSessionId>\tool-results\` folders. These are path-keyed state and must move with the workspace/session they belong to; they are not disposable cache.
+3. Layer B — Desktop chat store under `C:\Users\Admin\AppData\Roaming\Claude\claude-code-sessions\<account>\<group>\local_*.json`. Each chat has one record (linked to Layer A by `cliSessionId`) carrying `cwd`, `originCwd`, and `title` — the fields that drive the Desktop sidebar group and title.
 
 Use this skill only for Claude Desktop local session/workspace migration. Do not use it to edit project source code.
 
-Claude has only these two layers. There is no SQLite thread index and no global-state hints file (those are Codex concerns). Do not invent a third layer.
+Claude has these local state surfaces for workspace migration. There is no SQLite thread index and no global-state hints file (those are Codex concerns). Do not invent additional layers.
 
 ## Required Inputs
 
@@ -43,8 +44,10 @@ Examples:
 - Start with one session when testing a new migration pattern.
 - Do not modify any Claude state while Claude Desktop or any Claude Code session is running.
 - Back up every touched file before mutation.
+- Back up every touched adjacent data folder before moving it.
 - Do not globally replace paths across `C:\Users\Admin\.claude` or the Desktop chat store.
 - Edit only structured workspace metadata: the transcript's top-level `cwd`, and the Desktop record's `cwd` and `originCwd`. Do not rewrite user/assistant prose just because it mentions the old path.
+- Move adjacent `memory/`, `<cliSessionId>\subagents\`, and `<cliSessionId>\tool-results\` directories byte-for-byte. Do not rewrite their contents during relocation.
 - Preserve JSONL format: one JSON object per line.
 - Preserve the Layer B file's existing byte/encoding state. Detect whether the record already has a UTF-8 BOM and keep that state; never add or strip a BOM.
 - Keep a rollback path by preserving backups.
@@ -102,6 +105,7 @@ For the requested sessions, discover the real values from Claude's source-of-tru
 
 - discover CLI session IDs
 - discover transcript JSONL paths (encoded projects folder + `<cliSessionId>.jsonl`)
+- discover adjacent workspace/session data in the source encoded folder: `memory/`, `<cliSessionId>\subagents\`, and `<cliSessionId>\tool-results\`
 - discover the Layer B Desktop record path per session
 - discover old workspace roots per session (from the transcript `cwd` and the Desktop record `cwd`)
 - discover whether the requested sessions come from one source workspace or multiple source groups
@@ -136,15 +140,26 @@ At that point, if the migration must touch live Claude state, Claude should stop
 When preparing a batch or front-door package for another agent:
 
 1. List `C:\Users\Admin\.claude\projects\<encoded-old-workspace>\*.jsonl` — each filename stem is a `cliSessionId`.
-2. For each desired chat, find its Layer B record by scanning `...\claude-code-sessions\<account>\<group>\local_*.json` for the one whose `cliSessionId` matches; read its `title`, `cwd`, `originCwd`.
-3. Confirm the transcript's top-level `cwd` matches the old workspace.
-4. Compare each requested title against the screenshot/user list. Exclude chats the user explicitly excludes.
-5. Produce a manifest with one entry per session:
+2. List `C:\Users\Admin\.claude\projects\<encoded-old-workspace>\memory\`, if present.
+3. For every target session ID, list adjacent `C:\Users\Admin\.claude\projects\<encoded-old-workspace>\<cliSessionId>\subagents\` and `...\<cliSessionId>\tool-results\`, if present.
+4. For each desired chat, find its Layer B record by scanning `...\claude-code-sessions\<account>\<group>\local_*.json` for the one whose `cliSessionId` matches; read its `title`, `cwd`, `originCwd`.
+5. Confirm the transcript's top-level `cwd` matches the old workspace.
+6. Compare each requested title against the screenshot/user list. Exclude chats the user explicitly excludes.
+7. Produce a manifest with one entry per session:
    - `title`
    - `cli_session_id`
    - `desktop_record` (full path to the `local_*.json`)
    - optional `transcript_path` (else the helper computes it from the workspace + id)
    - whether the transcript and Desktop record were found.
+   - optional `sessions[].sidecars` discovery metadata when present:
+     - workspace-level `memory/` source and destination
+     - per-session `subagents/` and `tool-results/` source and destination
+8. If adjacent data must be moved by the helper script, also produce a top-level `adjacent_data_relocation` execution plan:
+   - `memory_move` for workspace-level `memory/`
+   - `sidecar_relocations` for per-session `subagents/` and `tool-results/`
+   - `then_delete` for deleting the old encoded folder only after true-empty verification
+
+Important: `sessions[].sidecars` is human-readable discovery/audit metadata. It is not, by itself, a helper-script execution instruction. If a manifest only records sidecars under `sessions[].sidecars`, the helper can migrate transcripts and Desktop records but will not know which adjacent folders to move.
 
 ## Execution Workflow
 
@@ -177,6 +192,18 @@ For each target session's `local_*.json`:
 4. Preserve all other keys (including `cliSessionId`, `title`, `model`, permissions) and preserve the detected BOM/no-BOM state on write.
 5. Verify the file still parses as JSON and that `cliSessionId` and `title` are unchanged.
 
+#### Adjacent Project Data: Memory and Sidecars
+
+For each source encoded workspace:
+
+1. Discover whether `memory/` exists. If present, back it up and move it to the destination encoded workspace's `memory/` folder, creating the destination parent if missing. Do not overwrite an existing destination `memory/` unless the manifest explicitly says how to merge or replace it.
+2. For each target `cliSessionId`, discover sibling `<cliSessionId>\subagents\` and `<cliSessionId>\tool-results\` folders. Back up each present folder before moving.
+3. Move each sidecar folder to the encoded workspace where that session's `<cliSessionId>.jsonl` now lives. In mixed-destination batches, do not assume one destination for every sidecar; route by the manifest's `adjacent_data_relocation.sidecar_relocations` destination.
+4. Preserve sidecar contents byte-for-byte. Do not parse, rewrite, or normalize files inside these folders.
+5. After relocation, verify every moved destination folder exists, every source folder is gone, and the source encoded workspace is truly empty before it is eligible for deletion.
+
+True-empty means `0` files and `0` subdirectories remain, not merely `0` `.jsonl` transcripts.
+
 ### Helper Script
 
 Use `scripts/migrate_claude_workspace_chat.py` for deterministic migration when available. Prefer `--dry-run` first. Save the manifest you pass to it under the workspace's `Archive/Manifests/Claude/` folder (see **Manifest Storage**).
@@ -199,6 +226,35 @@ Expected manifest shape:
 }
 ```
 
+When adjacent Claude project data must move, include a top-level `adjacent_data_relocation` block:
+
+- `memory_move`: `source`, `destination`, and expected `files`
+- `sidecar_relocations`: entries with `session_id`, `sidecar_kind`, `source`, `destination`, and `dest_encoded_folder`
+- `then_delete`: source encoded folder to delete only after true-empty verification
+
+Example:
+
+```json
+{
+  "adjacent_data_relocation": {
+    "sidecar_relocations": [
+      {
+        "session_id": "5ac10e6f-5aca-4f2c-8b6e-a6c50c7a7a19",
+        "sidecar_kind": "tool-results",
+        "source": "C:\\Users\\Admin\\.claude\\projects\\<old-encoded>\\5ac10e6f-5aca-4f2c-8b6e-a6c50c7a7a19\\tool-results",
+        "destination": "C:\\Users\\Admin\\.claude\\projects\\<new-encoded>\\5ac10e6f-5aca-4f2c-8b6e-a6c50c7a7a19\\tool-results",
+        "dest_encoded_folder": "<new-encoded>"
+      }
+    ],
+    "then_delete": "C:\\Users\\Admin\\.claude\\projects\\<old-encoded>"
+  }
+}
+```
+
+The old `third_pass_leftover_relocation.aux_relocations` name came from an earlier staged cleanup pass. The helper may keep a small fallback for archived manifests, but new manifests must use `adjacent_data_relocation.sidecar_relocations`.
+
+The helper must dry-run this block before apply, back up every source folder under `~/.claude/user-backups/<run-timestamp>/`, move the folders byte-for-byte, verify destinations and source absence, verify true-empty, and only then delete `then_delete`.
+
 Run modes:
 
 - `--dry-run`: inspect and report intended changes without writing.
@@ -212,6 +268,9 @@ After migration and before telling the user it is done:
 - The migrated transcript parses line by line, with the expected count of destination `cwd` values and zero old-workspace `cwd` values.
 - The old transcript no longer exists in the old projects dir for each migrated session.
 - Each migrated Desktop record has `cwd` and `originCwd` equal to the destination workspace, with `cliSessionId` and `title` unchanged and the original BOM/no-BOM state preserved.
+- Workspace `memory/`, if present and in scope, exists in the destination encoded workspace and no longer exists in the source encoded workspace.
+- Each target session's `subagents/` and `tool-results/` sidecar folders, if present and in scope, exist beside the destination transcript folder and no longer exist under the source encoded workspace.
+- Before deleting any source encoded workspace folder, recursively verify it contains `0` files and `0` subdirectories.
 - Non-target sessions (transcripts and Desktop records) are unchanged.
 - User reopens Claude Desktop and confirms:
   - chat appears under the destination project,

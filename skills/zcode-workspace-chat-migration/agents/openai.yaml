@@ -1,0 +1,4 @@
+interface:
+  display_name: "zCode Workspace Chat Migration"
+  short_description: "Safely migrate zCode chats between workspaces."
+  default_prompt: "Use this skill to migrate selected zCode chat sessions from one workspace to another by updating the db.sqlite session row (directory, path, and the path-derived project_id grouping key) and the setting.json recent-projects list, with backups and verification."

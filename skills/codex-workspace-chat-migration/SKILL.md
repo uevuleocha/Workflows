@@ -1,6 +1,6 @@
 ---
 name: codex-workspace-chat-migration
-description: "Safely migrate Codex Desktop chat sessions between workspaces. Use when the user asks to move/reassign Codex chats, sessions, rollout JSONL transcripts, sidebar project grouping, copied working directory, or workspace ownership from one local workspace/project to another. Covers the three required layers: session JSONL metadata, .codex-global-state.json workspace hints, and .codex/sqlite/state_5.sqlite threads cwd/sandbox_policy, with backups, one-session testing, batch manifests, and verification."
+description: "Safely migrate Codex Desktop chat sessions between workspaces. Use when the user asks to move/reassign Codex chats, sessions, rollout JSONL transcripts, sidebar project grouping, copied working directory, or workspace ownership from one local workspace/project to another. Covers the three required layers: session JSONL metadata, .codex-global-state.json workspace hints, and the live state_5.sqlite threads cwd/sandbox_policy DB, with backups, one-session testing, batch manifests, and verification."
 ---
 
 # Codex Workspace Chat Migration
@@ -9,9 +9,24 @@ Migrate Codex Desktop chat sessions from one workspace to another by making thre
 
 1. Session transcript JSONL metadata under `C:\Users\Admin\.codex\sessions\...` or `archived_sessions\...`.
 2. `C:\Users\Admin\.codex\.codex-global-state.json` top-level `thread-workspace-root-hints`.
-3. `C:\Users\Admin\.codex\sqlite\state_5.sqlite` table `threads`, columns `cwd` and `sandbox_policy`.
+3. The live `state_5.sqlite` table `threads`, columns `cwd` and `sandbox_policy`. Current Codex builds may store this at `C:\Users\Admin\.codex\state_5.sqlite`; older or secondary installs may store it at `C:\Users\Admin\.codex\sqlite\state_5.sqlite`. Always discover which DB contains the target thread rows before writing.
 
 Use this skill only for Codex Desktop local session/workspace migration. Do not use it to edit project source code.
+
+## UI-Facing Transcript And Parsed-Value Rule
+
+Codex can store or reference the same session ID in more than one transcript JSONL. The transcript discovered first by scanning `sessions/**/*.jsonl` is not always the transcript Codex Desktop opens. The UI-facing transcript is the path recorded in `state_5.sqlite.threads.rollout_path`.
+
+Front-door manifests must therefore distinguish:
+
+- `transcript_path` — the primary transcript chosen for backward compatibility.
+- `ui_rollout_path` or `rollout_path_from_sqlite` — the SQLite `threads.rollout_path` value that Codex UI uses.
+- `all_transcript_paths` — every discovered JSONL containing the target session ID, including archived/fork transcripts when present.
+- `transcript_paths_to_migrate` — the exact transcript paths the helper should write. Prefer this list when present; use it to exclude later handoff/review transcripts that merely mention the session ID.
+
+Execution must migrate `transcript_paths_to_migrate` when present. Otherwise, migrate the UI-facing rollout transcript and any other explicitly listed target transcript paths. Verification must parse JSONL and inspect structured values. Do not rely on raw text search for old paths, because JSON escaping and path case variants can hide stale parsed values.
+
+Use case-insensitive old-path matching for structured workspace fields, but always write the canonical destination path exactly as supplied by the manifest.
 
 ## Required Inputs
 
@@ -20,10 +35,28 @@ Require explicit values before applying changes:
 - Source workspace path, for example `C:\Users\Admin\OneDrive\Documents\Uzzy Ecosystem`.
 - Destination workspace path, for example `C:\Users\Admin\Tools\Codex-token-dashboard`.
 - Session ID(s) to migrate.
-- Transcript JSONL path for each session ID.
+- Transcript JSONL path for each session ID, including the SQLite `threads.rollout_path` UI-facing transcript when present.
 - Confirmation that Codex Desktop is fully closed before applying writes.
 
-If the user only provides chat titles, first map titles to session IDs and transcript paths using read-only inspection of `session_index.jsonl`, `state_5.sqlite`, and `sessions/**/*.jsonl`. Do not guess when duplicate titles exist.
+If the user only provides chat titles, first map titles to session IDs and transcript paths using read-only inspection of `session_index.jsonl`, both possible `state_5.sqlite` locations, and `sessions/**/*.jsonl`. Do not guess when duplicate titles exist.
+
+## State DB Discovery Rule
+
+Do not hard-code a single SQLite state path. Codex Desktop state has appeared in both of these locations:
+
+- `C:\Users\Admin\.codex\state_5.sqlite`
+- `C:\Users\Admin\.codex\sqlite\state_5.sqlite`
+
+Front-door discovery must inspect both paths read-only and record:
+
+- `candidate_state_dbs` - every candidate checked.
+- `selected_state_db` - the DB that contains exactly one row for each target session ID.
+- `state_db_selection_reason` - why that DB was selected.
+- per-DB row counts for the target session IDs.
+
+If only one DB contains exactly one row for every target session, use that DB. If both DBs contain target rows, prefer the newest DB only after confirming the rows match the target sessions. If the target rows are split across DBs or any target has zero/multiple rows, stop and report the mixed state before execution.
+
+Execution helpers must consume the selected DB path from the manifest, re-check exactly one row per target immediately before writing, and back up only the selected DB plus its `-wal` and `-shm` sidecars. Do not touch the other DB unless the manifest explicitly lists target rows there.
 
 ## Runtime Selection
 
@@ -122,10 +155,10 @@ Do not ask the user to supply source workspace roots when those can be discovere
 For the requested sessions, discover the real values from Codex's source-of-truth files. Do not infer or guess them. See the **Read-Only Mapping Workflow** below for the step-by-step discovery procedure.
 
 - discover session IDs
-- discover transcript JSONL paths
+- discover transcript JSONL paths, including all JSONLs containing the session ID and the SQLite `threads.rollout_path` UI-facing path
 - discover old workspace roots per session
 - discover whether any sessions are projectless
-- discover the relevant `state_5.sqlite` rows and current `cwd` / `sandbox_policy`
+- discover the relevant `state_5.sqlite` rows and current `cwd` / `sandbox_policy` / `rollout_path`
 - discover whether the requested sessions come from one source workspace or multiple source groups
 
 Use read-only inspection of:
@@ -133,8 +166,17 @@ Use read-only inspection of:
 - `C:\Users\Admin\.codex\session_index.jsonl`
 - `C:\Users\Admin\.codex\sessions`
 - `C:\Users\Admin\.codex\archived_sessions`
+- `C:\Users\Admin\.codex\state_5.sqlite`
 - `C:\Users\Admin\.codex\sqlite\state_5.sqlite`
 - `C:\Users\Admin\.codex\.codex-global-state.json` when relevant to projectless threads, hints, or heartbeat permission state
+
+For rename migrations where old and new workspace paths are known, also sweep the selected state DB for every row whose `threads.cwd` still points at the old workspace. Mark these rows in the manifest as:
+
+- `requested` - explicitly named by the user or shown in the screenshot.
+- `extra_old_bound` - not explicitly requested, but still bound to the old workspace.
+- `internal_or_system_like` - small approval/reviewer/system-looking threads that are still bound to the workspace.
+
+Ask or confirm whether extras should be included when the user did not already approve migrating all old-bound rows.
 
 ### Front-Door Output
 
@@ -162,21 +204,29 @@ At that point, if the migration must touch live Codex state, Codex should stop a
 When preparing a batch or front-door package for another agent:
 
 1. Read `C:\Users\Admin\.codex\session_index.jsonl` for current titles and IDs.
-2. Search `C:\Users\Admin\.codex\sessions` and `C:\Users\Admin\.codex\archived_sessions` for each session ID to locate transcript paths.
-3. Query `C:\Users\Admin\.codex\sqlite\state_5.sqlite` table `threads` for each ID:
+2. Search `C:\Users\Admin\.codex\sessions` and `C:\Users\Admin\.codex\archived_sessions` for each session ID to locate every transcript path containing that ID.
+3. Query both candidate `state_5.sqlite` paths and select the DB containing exactly one target row per session. Treat `rollout_path` from the selected DB as the UI-facing transcript path and include it even when another transcript was discovered first:
    - `id`
    - `title`
    - `rollout_path`
    - `cwd`
    - `sandbox_policy`
+   - `rollout_path` as `ui_rollout_path` / `rollout_path_from_sqlite`
 4. Compare each requested title against the screenshot/user list. Exclude chats the user explicitly excludes.
-5. Produce a manifest with one entry per session:
+5. Produce a manifest with one entry per session. If multiple transcript files contain the session ID, include all of them and mark the SQLite rollout path:
    - `title`
    - `id`
    - `transcript_path`
+   - `ui_rollout_path` / `rollout_path_from_sqlite`
+   - `all_transcript_paths`
+   - `transcript_paths_to_migrate`
    - `state_db_path`
+   - `candidate_state_dbs`
+   - `selected_state_db`
+   - `state_db_selection_reason`
    - `old_workspace`
    - `new_workspace`
+   - classification such as `requested`, `extra_old_bound`, or `internal_or_system_like`
    - whether `session_index`, transcript, global state, and SQLite row were found.
 
 ## Execution Workflow
@@ -194,11 +244,11 @@ Only apply after the user or handoff explicitly greenlights execution and Codex 
 For each target transcript:
 
 1. Confirm the file exists.
-2. Confirm at least one `session_meta.payload.id` equals the target session ID.
+2. Confirm at least one `session_meta.payload.id` equals the target session ID in every transcript path being changed. Include the UI-facing SQLite `threads.rollout_path` transcript even when it differs from `transcript_path`.
 3. Back up the transcript file before writing.
-4. For JSONL records where `type` is `session_meta`:
-   - update `payload.cwd` from old workspace to new workspace.
-5. For JSONL records where `type` is `turn_context`:
+4. For JSONL records where `type` is `session_meta` and `payload.id` equals the target session ID:
+   - update `payload.cwd` from old workspace to new workspace using case-insensitive old-path matching.
+5. For JSONL records where `type` is `turn_context` in a target transcript:
    - update `payload.cwd`.
    - update `payload.workspace_roots`.
    - update structured sandbox/permission entries containing the old workspace.
@@ -212,6 +262,8 @@ In `C:\Users\Admin\.codex\.codex-global-state.json`:
 1. Back up the file before writing.
 2. Add/update top-level `thread-workspace-root-hints[session_id] = destination workspace`.
 3. If present, update `electron-persisted-atom-state.heartbeat-thread-permissions-by-id[session_id].sandboxPolicy.writableRoots` to the destination workspace.
+4. If present, update `thread-writable-roots[session_id]` to the destination workspace.
+5. When the manifest explicitly marks the old project root as fully migrated, remove that exact old root from `electron-saved-workspace-roots` and `project-order`. Do not remove unrelated roots.
 4. Preserve all unrelated keys.
 5. Verify the file parses as JSON.
 
@@ -219,11 +271,11 @@ Note: Codex Desktop may rehydrate `writableRoots` on launch. Sidebar grouping de
 
 #### Layer 3: SQLite Thread Index
 
-In `C:\Users\Admin\.codex\sqlite\state_5.sqlite`:
+In the selected live `state_5.sqlite` path recorded in the manifest:
 
-1. Back up `state_5.sqlite`; also back up `-wal` and `-shm` if they exist before opening the DB.
-2. Confirm exactly one `threads` row exists for the session ID.
-3. Update only that row:
+1. Re-check that exactly one `threads` row exists for every target session ID in the selected DB.
+2. Back up `state_5.sqlite`; also back up `-wal` and `-shm` if they exist before opening the DB.
+3. Update only target rows:
    - `cwd` should use the extended path shape: `\\?\C:\...`.
    - `sandbox_policy` JSON should replace structured old workspace path strings with the destination path, including `.git`, `.agents`, and `.codex` subpaths.
 4. Use a SQLite transaction.
@@ -261,9 +313,9 @@ Run modes:
 
 After migration and before telling the user it is done:
 
-- Transcript JSONL parses line by line.
-- First or relevant `session_meta.payload.cwd` is the destination workspace.
-- `.codex-global-state.json` parses and has the destination hint.
+- Transcript JSONL parses line by line, including every listed `all_transcript_paths` and the SQLite `threads.rollout_path` transcript.
+- Parsed target `session_meta.payload.cwd` is the destination workspace; verification must parse JSON values, not raw escaped text.
+- `.codex-global-state.json` parses and has the destination hint, with no stale target old root left in `thread-writable-roots`, `electron-saved-workspace-roots`, or `project-order` unless intentionally preserved.
 - `state_5.sqlite` `PRAGMA integrity_check` returns `ok`.
 - `threads.cwd` is `\\?\<destination workspace>` for each migrated session.
 - `threads.sandbox_policy` contains destination structured paths and no old workspace structured paths.
@@ -280,4 +332,4 @@ After verification passes and before considering the migration closed, produce a
 
 ### Failure And Rollback
 
-If anything fails before commit, stop and report the failing session ID and file. If a post-write verification fails, restore from backups before attempting another approach. If the UI still moves the chat back after all three layers agree, inspect `logs_2.sqlite` around startup and search for additional project membership tables or derived caches.
+If anything fails before commit, stop and report the failing session ID and file. If a post-write verification fails, restore from backups before attempting another approach. If the UI still moves the chat back after all three layers agree, inspect parsed JSONL in the SQLite `threads.rollout_path` transcript first, then inspect `electron-saved-workspace-roots`, `project-order`, `logs_2.sqlite` around startup, and any additional project membership tables or derived caches.
