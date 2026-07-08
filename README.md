@@ -1,6 +1,6 @@
-# Skills Home
+# Uzzy Skills World
 
-This is the home for skills that Uzo uses.
+This world is the home for skills that Uzo uses.
 
 It holds local master copies of reusable skills, including skills created from scratch, skills adapted from other people's work, and skills brought in directly for use in personal workflows.
 
