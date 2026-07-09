@@ -50,7 +50,7 @@ Four values drive the summary file: **Project Name**, **Topic**, **Session Numbe
 
 How to infer each value:
 
-- **Project Name** — Derive it from what the session was actually about, scoped to the workspace. First check the existing subfolders under `<project root>\Archive\Summaries\`; if this session clearly continues one of them, reuse that exact folder name. If the workspace name itself would be redundant as the project name (e.g. the workspace is "Uzzy Skills" and every summary would trivially read "Uzzy Skills"), infer a more specific project label from the session's actual focus (e.g. "Workspace Setup").
+- **Project Name** — Derive it from what the session was actually about, scoped to the workspace. First check the existing subfolders under `<project root>\Archive\Summaries\`; if this session clearly continues one of them, reuse that exact folder name. If the workspace name itself would be redundant as the project name (e.g. the workspace is "Workflows" and every summary would trivially read "Workflows"), infer a more specific project label from the session's actual focus (e.g. "Workspace Setup").
 - **Topic** — Derive it from the concrete work done this session (e.g. `Session-Summary Inference Update`). Keep it short and specific, matching the example style below.
 - **Session Number** — Look inside the resolved `<project root>\Archive\Summaries\[Project Name]\` folder, find the highest existing summary number, and use the next integer. If the folder is empty or does not exist, this is `1`.
 - **Directory** — Default to `<project root>\Archive\Summaries\[Project Name]\` unless the user explicitly named a specific in-project path.

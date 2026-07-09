@@ -23,7 +23,7 @@ This skill copies in one direction only:
 C:\Users\Admin\OneDrive\Documents\cAlgo\Sources\(Indicators|Robots)\<ToolName>\
         |
         v
-C:\Users\Admin\OneDrive\Documents\Uzzy Ecosystem\Sources\(Indicators|Robots)\<ToolName>\
+C:\Users\Admin\Uzzys Universe\MilkyWay\Trading\Uzzy Ecosystem\Sources\(Indicators|Robots)\<ToolName>\
 ```
 
 The reverse direction (workspace to cAlgo) is never performed by this skill. If a user request implies the reverse direction, stop and clarify.
@@ -67,7 +67,7 @@ C:\Users\Admin\OneDrive\Documents\cAlgo\Sources\
 Destination root:
 
 ```text
-C:\Users\Admin\OneDrive\Documents\Uzzy Ecosystem\Sources\
+C:\Users\Admin\Uzzys Universe\MilkyWay\Trading\Uzzy Ecosystem\Sources\
 ```
 
 Subfolders:
@@ -84,7 +84,7 @@ https://github.com/uevuleocha/Uzzy-Ecosystem  (git commit history on main)
 Log:
 
 ```text
-C:\Users\Admin\OneDrive\Documents\Uzzy Ecosystem\tmp\push-log.md
+C:\Users\Admin\Uzzys Universe\MilkyWay\Trading\Uzzy Ecosystem\tmp\push-log.md
 ```
 
 ## Runtime Validation

@@ -5,7 +5,7 @@ description: Autonomously create reusable skills from a local master and sync th
 
 # Global Skills Creator Auto
 
-Autonomously create a reusable skill from a local master skills folder, then optionally promote it to configured global locations for Codex, Claude, Antigravity, Hermes, and zCode. On Uzo's machine, the default local master is the Uzzy Skills workspace. On any other machine, first discover or ask for the user's local master skills folder and global skill install paths.
+Autonomously create a reusable skill from a local master skills folder, then optionally promote it to configured global locations for Codex, Claude, Antigravity, Hermes, and zCode. On Uzo's machine, the default local master is the Workflows workspace. On any other machine, first discover or ask for the user's local master skills folder and global skill install paths.
 
 This is the automatic variant of `global-skills-creator`. Use it when the user wants the agent to infer sensible defaults, create the skill, sync it globally, validate it, and then allow refinement afterward.
 
@@ -111,7 +111,7 @@ Maintainer defaults for Uzo's machine:
 
 ```text
 Local master:
-C:\Users\Admin\Uzzys Universe\Galaxies\Tools\Uzzy Skills\skills\[Skill-name]\SKILL.md
+C:\Users\Admin\Uzzys Universe\MilkyWay\Tools\Workflows\skills\[Skill-name]\SKILL.md
 
 Codex global:
 C:\Users\Admin\.codex\skills\[Skill-name]\SKILL.md

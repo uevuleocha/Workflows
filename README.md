@@ -1,4 +1,4 @@
-# Uzzy Skills World
+# Workflows
 
 This world is the home for skills that Uzo uses.
 

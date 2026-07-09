@@ -6,7 +6,7 @@ If you cloned this skill from someone else, do not assume the original maintaine
 
 ## Local Master Rule
 
-By default, a machine should have one canonical local master skills folder — the source of truth for reusable skills before they are synced to global installs. The local master can live in a dedicated skills workspace (such as `Uzzy Skills`) or a `skills/` folder inside an existing workspace. Once chosen, treat it as the default for that machine unless the user explicitly asks for a multi-master setup.
+By default, a machine should have one canonical local master skills folder — the source of truth for reusable skills before they are synced to global installs. The local master can live in a dedicated skills workspace (such as `Workflows`) or a `skills/` folder inside an existing workspace. Once chosen, treat it as the default for that machine unless the user explicitly asks for a multi-master setup.
 
 ## Common Global Install Candidates
 

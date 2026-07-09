@@ -178,6 +178,51 @@ For rename migrations where old and new workspace paths are known, also sweep th
 
 Ask or confirm whether extras should be included when the user did not already approve migrating all old-bound rows.
 
+For rename migrations, classify old-bound rows by both request scope and user-visible impact.
+
+First determine the user's intent:
+
+- `selected_chat_migration` - the user named specific chats and does not require the old workspace/project group to disappear.
+- `workspace_group_migration` - the user wants the old workspace/project moved, renamed, consolidated, or no longer visible as a separate group.
+
+For every row still bound to the old workspace, assign:
+
+- `requested` - explicitly named by the user, shown in the screenshot, or included by the user's workspace-level migration intent.
+- `visible_old_bound` - not explicitly named, but likely visible in the sidebar because it has a normal user-facing title, appears in screenshots, or is not system/reviewer-like.
+- `internal_or_system_like` - approval, reviewer, permission, system, or helper rows that may not be normal user-facing chats.
+
+Do not use `extra_old_bound` as a quiet holding category for visible chats. If a row is visible or likely visible, classify it as `visible_old_bound` and add `visible_sidebar_blocker: true`.
+
+When `workspace_group_migration` is the user's intent, all `requested` and `visible_old_bound` rows should be included in the default execution set unless the user explicitly excludes them. Internal/system-like rows should be listed separately and require explicit approval before migration.
+
+Before handoff, clearly state:
+
+- how many rows will migrate by default;
+- how many visible old-bound rows, if any, will remain;
+- whether the old workspace/project group will still appear after execution;
+- which internal/system-like rows are paused for explicit decision.
+
+If any `visible_sidebar_blocker` would remain and the user has not explicitly approved that outcome, stop before handoff and ask for confirmation.
+
+## Redirect History, Do Not Abandon Stale Bindings
+
+A migration is complete only when all in-scope structured workspace bindings are redirected from the source workspace to the destination workspace.
+
+For `workspace_group_migration`, the scope is the whole old workspace/project group. Every visible chat, hidden/internal helper row, reviewer/approval row, transcript metadata record, global-state hint, SQLite row, sandbox policy, and sidebar/grouping index that is bound to the source workspace must be re-homed to the destination unless the user explicitly excludes it.
+
+For `selected_chat_migration`, the scope is narrower. Only the selected chat(s) and their related records move, but every structured binding tied to those chat(s) must move. This includes UI rollout transcripts, duplicate/fork transcripts selected for migration, child/helper/internal/reviewer rows, global hints, sandbox policies, and any derived index entries linked to the selected chat(s).
+
+Do not delete historical/internal rows just because they are not visible. Prefer re-homing them so history remains intact but no longer points at a stale workspace path. Deletion is destructive and requires separate explicit approval.
+
+Verification must parse structured values, not raw text search, and confirm:
+
+- no in-scope `threads.cwd` value points at the old workspace;
+- no in-scope `sandbox_policy` structured path points at the old workspace;
+- no in-scope transcript `session_meta` or `turn_context` cwd/workspace_roots value points at the old workspace;
+- no in-scope global-state hint or writable-root points at the old workspace;
+- no visible sidebar blocker remains under the old workspace;
+- any intentionally excluded internal/system rows are listed explicitly with the reason they were left behind.
+
 ### Front-Door Output
 
 Once discovery is complete:
@@ -319,6 +364,9 @@ After migration and before telling the user it is done:
 - `state_5.sqlite` `PRAGMA integrity_check` returns `ok`.
 - `threads.cwd` is `\\?\<destination workspace>` for each migrated session.
 - `threads.sandbox_policy` contains destination structured paths and no old workspace structured paths.
+- For `workspace_group_migration`, every in-scope structured old-workspace binding has been redirected unless explicitly excluded in the manifest and final report.
+- For `selected_chat_migration`, every structured binding tied to the selected chat(s), including related child/helper/internal/reviewer rows, has been redirected unless explicitly excluded in the manifest and final report.
+- Any excluded internal/system rows are listed with their IDs, current workspace binding, visibility status, and reason for exclusion.
 - Non-target SQLite rows are unchanged.
 - User reopens Codex Desktop and confirms:
   - chat appears under the destination project,

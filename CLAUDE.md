@@ -1,4 +1,4 @@
-# Agent Instructions — Uzzy Skills
+# Agent Instructions — Workflows
 
 This workspace is the **home for Uzo's skills**. It holds the **local master copies** of reusable skills — created from scratch, adapted from others' work, or brought in for personal workflows. Skill work *starts here*, then syncs outward to the global agent installs (Codex, Claude, Antigravity, Hermes, zCode). This repo may become public one day, so treat everything here as potentially world-readable.
 
@@ -63,12 +63,12 @@ When needed, check individual skill files for how the mode should be named in th
 
 ## Workspace Layout
 
-> **Layout sync status:** `current` · last verified 2026-07-07
+> **Layout sync status:** `current` · last verified 2026-07-08
 >
 > Keep this tree honest. If the real workspace and this tree disagree — a new folder/file that isn't shown here, or an entry here that no longer exists — **prompt the user before continuing substantive work**. The user may: (a) add the entry to the tree, (b) prune or replace something to keep it lean, or (c) decline the change. In every case, once the user has reviewed, reset the status line to `current` with today's date so the next agent doesn't re-raise it. Prefer a lean schema over an exhaustive one — prompt to prune before the tree sprawls; the goal is a map, not an inventory.
 
 ```
-C:\Users\Admin\Uzzys Universe\MilkyWay\Tools\Uzzy Skills\
+C:\Users\Admin\Uzzys Universe\MilkyWay\Tools\Workflows\
 ├── .claude/                     ← Claude Code workspace config (settings.local.json, … etc)
 ├── .codex/                      ← Codex workspace config (settings.local.json)
 ├── .antigravity/                ← Antigravity workspace config (settings.local.json)

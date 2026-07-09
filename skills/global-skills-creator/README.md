@@ -8,7 +8,7 @@ If you cloned this skill from someone else, do not assume the original maintaine
 
 By default, a machine should have one canonical local master skills folder. That folder is the source of truth for reusable skills before they are synced to global installs.
 
-The local master can live in a dedicated skills workspace, such as `Uzzy Skills`, `John Skills`, or another personal workspace, or it can be a `skills/` folder inside an existing workspace. The exact location is the user's choice.
+The local master can live in a dedicated skills workspace, such as `Workflows`, `John Skills`, or another personal workspace, or it can be a `skills/` folder inside an existing workspace. The exact location is the user's choice.
 
 Once the user chooses a local master skills folder, the agent should treat it as the default rule for that user's machine. Do not create or use multiple local master folders unless the user explicitly asks for a multi-master setup.
 

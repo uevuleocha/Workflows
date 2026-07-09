@@ -43,7 +43,7 @@ Resolve these before copying. On Uzo's machine the maintainer defaults are:
 
 ```text
 Local master:
-C:\Users\Admin\Uzzys Universe\Galaxies\Tools\Uzzy Skills\skills\<skill>\
+C:\Users\Admin\Uzzys Universe\MilkyWay\Tools\Workflows\skills\<skill>\
 
 Codex global:
 C:\Users\Admin\.codex\skills\<skill>\
@@ -77,7 +77,7 @@ Ensure a category `DESCRIPTION.md` exists at `...\hermes\skills\Personal\DESCRIP
 
 ```yaml
 ---
-description: Personal reusable skills synced from the Uzzy Skills local master. Cross-agent workflow skills authored for use across Claude, Codex, Antigravity, and Hermes.
+description: Personal reusable skills synced from the Workflows local master. Cross-agent workflow skills authored for use across Claude, Codex, Antigravity, and Hermes.
 ---
 ```
 
