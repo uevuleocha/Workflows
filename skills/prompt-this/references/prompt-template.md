@@ -1,0 +1,118 @@
+# Canonical Prompt Template
+
+The one shape every `prompt-this` artifact takes. **Reuse it; do not reconstruct the headings from memory.** The whole point of the fixed structure is that a reader can identify a `prompt-this` file on sight, without ambiguity.
+
+**Path:**
+
+```text
+Pending:   <Workspace>\Archive\Live\Prompts\<Subject>\N.) <Topic>.md
+Executed:  <Workspace>\Archive\Historical\Prompts\<Subject>\N.) <Topic>.md
+```
+
+Subject folders are never numbered. Before writing, capture `previous_max` — the highest numeric prefix across **both** the Live and Historical Subject folders (`0` if neither has one) — and assign `N = previous_max + 1`. Validate against that **captured** value, never against a maximum recomputed after the write, because the new file is itself part of the union by then. `N` is assigned once and preserved through finalization and reopen.
+
+The filename is Title Case with spaces and **must not contain the word "prompt"** — unless the user explicitly opts in to share that prompt publicly.
+
+Only `finalize-prompt` moves a prompt Live → Historical. There is no manual fallback.
+
+---
+
+## The template
+
+```markdown
+# <Title>
+
+Status: PENDING ⌛ — created <YYYY-MM-DD>.
+Prompt lifecycle: PENDING on <YYYY-MM-DD>. <One sentence on what this prompt asks for.>
+
+## What This Prompt Is
+
+<One paragraph. What this prompt asks an agent to do, and when to run it. Written so a
+fresh agent, opening this file cold, understands the job before reading the payload.>
+
+## Prompt
+
+<The actual prompt text — the verbatim instruction handed to the consuming agent.
+This is the payload. Everything else in this file exists to serve it.>
+
+## Context
+
+**Parent Plan:** N/A
+**Parent Task:** N/A
+**Delegation:** N/A
+
+## Instructions
+
+<Usage notes for the consuming agent: preconditions, required inputs, safety rules,
+how to run it, and what "done" looks like operationally. This is *how to use* the
+payload — not the payload itself, and not the success criteria.>
+
+## Prompt Contract
+
+<The 5-part contract authored via `prompt-contracts`, embedded verbatim:
+GOAL / CONSTRAINTS / FORMAT / DEFINITION OF DONE / FAILURE.
+
+Compact prompts may use the minimal form: GOAL + DEFINITION OF DONE + FAILURE.
+
+Because it is embedded here, the consuming agent already has the scope, the
+done-criteria, and the failure conditions the moment it opens this file.>
+
+## Verification Checklist
+
+- [ ] The consuming agent verified every required deliverable.
+- [ ] The Prompt Contract's DEFINITION OF DONE is satisfied or explicitly deferred
+      with user approval.
+- [ ] No FAILURE condition remains active.
+- [ ] Relevant tests, validators, inspections, or manual checks are recorded.
+
+## Notes
+
+<Optional. Provenance, related prompts, reopen history.>
+```
+
+---
+
+## Field rules
+
+**`## Context` — all three fields, always.** Keep `Parent Plan`, `Parent Task`, and `Delegation` present even when empty; write `N/A`. Never delete a field. A prompt does not require a parent of any kind.
+
+**`**Delegation:**` is a pointer and nothing more.** If the prompt belongs to a formal delegation, `delegate-this` or the orchestrator fills it. No routing rule, assignment-packet field, platform name, or subagent instruction ever enters a prompt file.
+
+**Four sections, four distinct jobs.** Do not collapse them:
+
+| Section                     | Answers                             |
+|-----------------------------|-------------------------------------|
+| `## Prompt`                 | What do I run?                      |
+| `## Instructions`           | How do I run it?                    |
+| `## Prompt Contract`        | What does success and failure mean? |
+| `## Verification Checklist` | How was success actually evidenced? |
+
+The contract **defines** success; the checklist **records** it. One never substitutes for the other.
+
+**No `Estimated Effort` table.** Plans and tasks mandate one. Prompts do not — the contract and checklist carry the execution controls without turning every prompt into a plan.
+
+---
+
+## Compact prompts
+
+A compact prompt uses the same path, the same `N.)` numbering, and the same lifecycle. It may:
+
+- use the minimal Prompt Contract (GOAL + DEFINITION OF DONE + FAILURE), and
+- omit `## Notes`.
+
+That is all. **`## Notes` is the only section a compact prompt may drop.** Recognizability and lifecycle pointers do not disappear merely because the payload is short.
+
+---
+
+## On finalization
+
+`finalize-prompt` rewrites the header to:
+
+```markdown
+Status: EXECUTED ✅ — created <YYYY-MM-DD>, finalized <YYYY-MM-DD>.
+Prompt lifecycle: EXECUTED on <YYYY-MM-DD>. <Past-tense summary.>
+```
+
+promotes `## Prompt Contract` to `## Prompt Contract ✅ Complete` once every DEFINITION OF DONE item is met or explicitly deferred, adds a dated note under `## Notes`, and moves the file to the Historical Subject folder with `N.)` and the filename unchanged.
+
+The `## Prompt` payload itself is **never rewritten**. It is the historical record of what was asked.

@@ -95,6 +95,31 @@ Finalize only when:
 
 If the plan lacks a `Definition of Done` section, use the plan's checklist, implementation phases, validation notes, and user confirmation as completion evidence. If those are still ambiguous, ask the user for completion criteria before finalizing unless the user explicitly confirms that the plan is done and no further criteria are needed.
 
+## Delegation Check
+
+Plans created under the current `imp-upd-plan` workflow carry a `**Delegation:**` line under `## Context`. It is a pointer, not a workflow. Read it before finalizing.
+
+- **`N/A`, or the line is absent** (the plan predates the field) → nothing to do. Finalize normally. Do not mention delegation in the finalized plan.
+- **The line names a delegation record** → the plan's work was divided among multiple agents, and that delegation must be closed too.
+
+When a delegation is named, **still finalize the plan.** Then tell the user:
+
+```text
+This plan named a delegation record:
+
+  <path>
+
+Finalizing the plan does not close the delegation. Run `finalize-delegation` to verify
+every assignment returned and was integrated, move the record to
+`Archive\Historical\Delegations\`, and update this plan's Delegation pointer.
+```
+
+Record the delegation's state in the finalized plan's notes — for example, `Delegation still dispatched at finalization; user directed to finalize-delegation.`
+
+**Never** invoke `finalize-delegation` yourself, and **never** read, edit, rename, or move the delegation record. This skill closes plans. It only points at the delegation so it cannot be silently orphaned.
+
+If `finalize-delegation` is not loaded, **still finalize the plan**, then say that the delegation remains `_dispatched` and direct the user to install or load `finalize-delegation` and run it. **Do not imply that the record may be moved or renamed by hand.** This skill has no dependency on `finalize-delegation` and must not stall waiting for it.
+
 ## Handling Unfinished Work
 
 If unfinished work remains and the user confirms it is deferred rather than completed:
@@ -206,6 +231,7 @@ After finalizing a plan:
 - confirm a `Definition of Done` section exists (or the `## Prompt Contract` DEFINITION OF DONE clause for plans carrying a contract), or record that the user explicitly waived it or the original plan used a different equivalent completion section
 - confirm the file contains `Status: FINALIZED ✅` or record why the completed-style status was not applicable
 - confirm the file contains a `Plan lifecycle: FINALIZED` note
+- confirm the `**Delegation:**` pointer was read; if it named a record, confirm the user was prompted to run `finalize-delegation` and that this skill did not touch the delegation file
 - confirm a `Definition of Done ✅ Complete` section exists, or record that the user explicitly waived it or the original plan used a different equivalent heading
 - confirm completed implementation/checklist/validation headings use `✅ Complete` where applicable
 - confirm no stale `Pending Phase`, `Active Phase`, `Debug Pending`, or `Implemented / Debug Pending` headings remain unless they are explicitly deferred or out of scope

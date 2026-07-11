@@ -1,0 +1,7 @@
+interface:
+  display_name: "Finalize Prompt"
+  short_description: "Close a pending prompt as executed"
+  default_prompt: "Use $finalize-prompt to close a pending prompt: verify every Prompt Contract DEFINITION OF DONE item and every Verification Checklist item against evidence, confirm no FAILURE condition is active, apply executed styling, and move the file from its Subject folder under Archive\\Live\\Prompts\\ to the matching Subject folder under Archive\\Historical\\Prompts\\ with its N.) prefix and filename unchanged. It checks a checklist item only where evidence supports it, never assumes or invents completion, and stops when an unsupported item has no recorded waiver. It never creates, updates, or reopens a prompt. There is no manual move or rename fallback."
+
+policy:
+  allow_implicit_invocation: true

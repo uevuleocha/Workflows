@@ -217,6 +217,8 @@ Plan lifecycle: ACTIVE on [YYYY-MM-DD]. [One sentence explaining what this plan 
 
 ## Context
 
+**Delegation:** N/A
+
 ## Prompt Contract
 
 ## Locked Decisions
@@ -256,9 +258,17 @@ Use the richer table style from existing polished finalized plans as the preferr
 ## Open Items Explicitly Out Of Scope
 ```
 
+### Delegation Field
+
+Every plan carries a `**Delegation:**` line under `## Context`. It defaults to `N/A` and is a pointer, nothing more.
+
+If this plan's work was divided among multiple agents, the `delegate-this` skill fills it with the delegation record's path. `finalize-plan` reads it at closure and prompts the user to close the delegation too. That is the field's entire purpose.
+
+Do not populate this field yourself. Do not reason about delegation, routing, platforms, or assignment packets in this skill — that logic lives in `delegate-this`, and this skill has no dependency on it. A plan with `**Delegation:** N/A`, or a plan predating this field, is complete and correct.
+
 For compact plans, allow:
 
-- `## Context`
+- `## Context` (including the `**Delegation:**` line)
 - `## Prompt Contract` (the mandatory minimal contract: GOAL + DEFINITION OF DONE + FAILURE)
 - `## Checklist`
 - `## Verification`
@@ -359,6 +369,7 @@ After creating or updating a plan:
 - confirm the filename starts with the correct `N.) ` numeric prefix when a durable plan file was created
 - confirm the filename ends in `_active.md`, or `_mini_active.md` when the user explicitly requested a mini plan
 - confirm a `## Prompt Contract` section exists (GOAL / CONSTRAINTS / FORMAT / DEFINITION OF DONE / FAILURE, or the minimal GOAL + DEFINITION OF DONE + FAILURE form for Compact and mini plans), that it was shown in chat, and that it was authored through the `prompt-contracts` skill unless that skill was unavailable
+- confirm a `**Delegation:**` line exists under `## Context`, reading `N/A` unless `delegate-this` populated it
 - if reopening a finalized plan, confirm the file was renamed from `_finalized.md` back to `_active.md`, or from `_mini_finalized.md` back to `_mini_active.md`, and that prior finalized evidence was preserved
 - skim the major headings for the chosen plan depth
 - for Standard and Deep plans, confirm the top status/lifecycle lines exist

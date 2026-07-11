@@ -96,6 +96,31 @@ Finalize only when:
 
 If the task lacks a `Definition of Done` section, ask the user for completion criteria before finalizing unless the user explicitly confirms that the task is done and no further criteria are needed.
 
+## Delegation Check
+
+Tasks created under the current `imp-upd-task` workflow carry a `**Delegation:**` line under `## Context`. It is a pointer, not a workflow. Read it before finalizing.
+
+- **`N/A`, or the line is absent** (the task predates the field) → nothing to do. Finalize normally. Do not mention delegation in the finalized task.
+- **The line names a delegation record** → the task's work was divided among multiple agents, and that delegation must be closed too.
+
+When a delegation is named, **still finalize the task.** Then tell the user:
+
+```text
+This task named a delegation record:
+
+  <path>
+
+Finalizing the task does not close the delegation. Run `finalize-delegation` to verify
+every assignment returned and was integrated, move the record to
+`Archive\Historical\Delegations\`, and update this task's Delegation pointer.
+```
+
+Record the delegation's state in the finalized task's `## Notes / Reopen History` — for example, `Delegation still dispatched at finalization; user directed to finalize-delegation.`
+
+**Never** invoke `finalize-delegation` yourself, and **never** read, edit, rename, or move the delegation record. This skill closes tasks. It only points at the delegation so it cannot be silently orphaned.
+
+If `finalize-delegation` is not loaded, **still finalize the task**, then say that the delegation remains `_dispatched` and direct the user to install or load `finalize-delegation` and run it. **Do not imply that the record may be moved or renamed by hand.** This skill has no dependency on `finalize-delegation` and must not stall waiting for it.
+
 ## Handling Unfinished Work
 
 If unfinished work remains and the user confirms it is deferred rather than completed:
@@ -205,6 +230,7 @@ After finalizing a task:
 - confirm a `Definition of Done` is present (the `## Prompt Contract` DEFINITION OF DONE clause for tasks carrying a contract, or a standalone `## Definition of Done` section on older tasks), or record that the user explicitly waived it
 - confirm the file contains `Status: DONE ✅` or record why the completed-style status was not applicable
 - confirm the file contains a `Task lifecycle: DONE` note
+- confirm the `**Delegation:**` pointer was read; if it named a record, confirm the user was prompted to run `finalize-delegation` and that this skill did not touch the delegation file
 - confirm a `Definition of Done ✅ Complete` section exists, or record that the user explicitly waived it or the original task used a different equivalent heading
 - confirm completed task/checklist/validation headings use `✅ Complete` where applicable
 - confirm no stale `Pending Phase` headings remain unless they are explicitly deferred or out of scope

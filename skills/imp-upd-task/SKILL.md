@@ -199,6 +199,8 @@ Task lifecycle: PENDING on [YYYY-MM-DD]. [One sentence explaining what this task
 
 ## Context
 
+**Delegation:** N/A
+
 ## Scope Boundaries
 
 ## What Needs To Be Done
@@ -255,6 +257,14 @@ For reopened tasks, add or update:
 
 - [YYYY-MM-DD] Reopened because [reason]. Previous completed work remains preserved below/above.
 ```
+
+## Delegation Field
+
+Every task carries a `**Delegation:**` line under `## Context`. It defaults to `N/A` and is a pointer, nothing more.
+
+If this task's work was divided among multiple agents, the `delegate-this` skill fills it with the delegation record's path. `finalize-task` reads it at closure and prompts the user to close the delegation too. That is the field's entire purpose.
+
+Do not populate this field yourself. Do not reason about delegation, routing, platforms, or assignment packets in this skill — that logic lives in `delegate-this`, and this skill has no dependency on it. A task with `**Delegation:** N/A`, or a task predating this field, is complete and correct.
 
 ## Task Style Rules
 
@@ -319,6 +329,7 @@ After creating or updating a task:
 - confirm UTF-8 text was used
 - confirm the top status and lifecycle lines exist for Standard and Deep tasks
 - confirm a `## Prompt Contract` section exists with a DEFINITION OF DONE clause (the task's authoritative Definition of Done); confirm no standalone `## Definition of Done` section was written
+- confirm a `**Delegation:**` line exists under `## Context`, reading `N/A` unless `delegate-this` populated it
 - confirm the Prompt Contract was shown in chat and, unless the `prompt-contracts` skill was unavailable, authored through it
 - confirm validation steps are present
 - for every durable task, including Compact and mini tasks, confirm the `Estimated Effort` table uses the full `Phase | Sessions | 🟣 | Complexity` shape, includes colored row markers, keeps raw Markdown pipes vertically aligned, and includes a total estimate line

@@ -32,7 +32,7 @@ Reproduce `global-sync` Mode A inline for the new skill:
 1. Resolve the global targets: Codex `~/.codex/skills/`, Claude `~/.claude/skills/`, Antigravity `~/.gemini/config/skills/`, Hermes `%LOCALAPPDATA%\hermes\skills\Personal\` (Uzo's machine: `C:\Users\Admin\AppData\Local\hermes\skills\Personal\`), and zCode `~/.zcode/skills/` (Uzo's machine: `C:\Users\Admin\.zcode\skills\`). If a target base directory is missing, stop and ask for the replacement path — never guess.
 2. For each target: create the destination skill folder if missing (Hermes → under `Personal/`; zCode → flat under `~/.zcode/skills/`), then true-copy with `Copy-Item -Recurse -Force` (not `Write`) of `SKILL.md`, `agents/openai.yaml`, and any `scripts/`, `references/`, or `assets/`.
 3. Ensure `...\hermes\skills\Personal\DESCRIPTION.md` exists (create with one-line frontmatter if missing).
-4. Validate every copy with `quick_validate.py` (`-X utf8`).
+4. Validate every copy with `quick_validate.py` (`-X utf8`), reading each result from the exit code — see `Reading the Validator's Result`.
 5. Report that the inline fallback ran because `global-sync` was unavailable.
 
 ## Project Contract
@@ -244,7 +244,28 @@ Run this validator for:
 - Hermes global folder (under `Personal/`)
 - zCode global folder
 
-If validation fails, read the error, fix the skill, and rerun validation. When `global-sync` performs the sync, it runs this validation for every target; this list governs the inline fallback.
+When `global-sync` performs the sync, it runs this validation for every target; this list governs the inline fallback.
+
+### Reading the Validator's Result
+
+**Decide pass/fail from the process exit code, capturing stdout and stderr separately. Never by comparing `quick_validate.py`'s stdout text.**
+
+The validator terminates its output with a platform-specific line ending — on Windows, `Skill is valid!\r\n`. A string comparison against `"Skill is valid!"` fails on a perfectly valid skill because of the trailing `\r`.
+
+| Exit  | stderr     | Meaning                          | Action                                     |
+|-------|------------|----------------------------------|--------------------------------------------|
+| `0`   | —          | Skill is valid                   | Proceed.                                   |
+| `1`   | empty      | Skill is invalid                 | stdout explains why. Fix the skill, rerun. |
+| `1`   | non-empty  | Validator / runtime failure      | Stop. Validity is unknown. Do not "fix".   |
+| other | —          | Validation did not complete      | Stop. Claim neither pass nor fail.         |
+
+Exit `1` is **overloaded**: an invalid skill and a crash inside the validator produce the same code. **Non-empty stderr is the discriminator.** An invalid skill writes its reason to stdout and leaves stderr empty; a crashed validator writes its traceback to stderr and leaves stdout empty.
+
+**Never merge the streams.** `2>&1` destroys the discriminator. Do not test for an English traceback substring either — that breaks under a non-English locale, a different Python implementation, or a validator that catches its own exception.
+
+Treat a crash as *unknown validity*, never as a failed skill — "fixing" a skill that was never broken is the worse error.
+
+Use stdout only to tell the *user* what went wrong. Never to decide.
 
 ## Skill Writing Guidelines
 
@@ -266,6 +287,9 @@ Do not:
 - rely on Windows default encoding for text files
 - claim global sync happened before verifying files exist
 - claim validation passed unless the validator or manual check actually ran
+- decide pass/fail by matching the validator's stdout text rather than its exit code
+- merge stdout and stderr (`2>&1`) when validating — it destroys the crash discriminator
+- treat a crashed validator (exit `1` with non-empty stderr) as a failed skill
 - copy another skill's task-specific workflow when it is only a style reference
 
 ## Final Status Format

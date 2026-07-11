@@ -1,0 +1,7 @@
+interface:
+  display_name: "Finalize Delegation"
+  short_description: "Close a dispatched delegation record"
+  default_prompt: "Use $finalize-delegation to close a dispatched delegation: verify every assignment returned and was integrated, inspect every named parent plan and/or task, rename _dispatched to _completed, move the record from Archive\\Live\\Delegations to Archive\\Historical\\Delegations, and update every named parent's Delegation pointer."
+
+policy:
+  allow_implicit_invocation: true

@@ -1,0 +1,7 @@
+interface:
+  display_name: "Prompt This"
+  short_description: "Create a durable structured prompt file"
+  default_prompt: "Use $prompt-this to turn a request into a durable prompt file under Archive\\Live\\Prompts\\ in a broad Subject folder, named 'N.) Topic.md' in Title Case. Subject and Topic are inferred and confirmed with a pre-filled block. Before writing it captures previous_max across the Live and Historical Subject folders and assigns N = previous_max + 1, validating against that captured value. Each prompt carries fixed recognizable headings, a Prompt Contract embedded verbatim, a Verification Checklist, and Parent Plan / Parent Task / Delegation pointers. It creates, updates, and reopens prompts. It never finalizes one — finalize-prompt owns PENDING to EXECUTED and the move to Historical. There is no manual move or rename fallback."
+
+policy:
+  allow_implicit_invocation: true
