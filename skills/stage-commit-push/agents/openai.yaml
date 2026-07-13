@@ -1,7 +1,7 @@
 interface:
   display_name: "Stage Commit Push"
-  short_description: "Stage, commit, and push in one deterministic run"
-  default_prompt: "Use $stage-commit-push to stage (all or named paths), commit with a drafted message and Agent trailer, and push to the current repo's remote."
+  short_description: "Safe push with optional nested-repo pointer sync"
+  default_prompt: "Use $stage-commit-push for the explicit scope. If this repo is a hub submodule, prove its commit is pushed and ask before a separate pointer-only hub commit."
 
 policy:
   allow_implicit_invocation: false

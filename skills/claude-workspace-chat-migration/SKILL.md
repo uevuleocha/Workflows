@@ -48,10 +48,36 @@ Examples:
 - Do not globally replace paths across `C:\Users\Admin\.claude` or the Desktop chat store.
 - Edit only structured workspace metadata: the transcript's top-level `cwd`, and the Desktop record's `cwd` and `originCwd`. Do not rewrite user/assistant prose just because it mentions the old path.
 - Move adjacent `memory/`, `<cliSessionId>\subagents\`, and `<cliSessionId>\tool-results\` directories byte-for-byte. Do not rewrite their contents during relocation.
+- Workspace `memory/` is **whole-workspace state**, shared by every chat in the encoded project folder — not per-selected-chat state. Only relocate it for a whole-workspace migration. A `memory_move` block requires `memory_scope: "whole_workspace"` (the whole workspace is moving) or `memory_scope: "none"` (skip it for a selected-chat migration). The helper hard-refuses any other scope — including an **absent** scope, which is never defaulted — rather than guessing. See **Memory Ownership**.
 - Preserve JSONL format: one JSON object per line.
-- Preserve the Layer B file's existing byte/encoding state. Detect whether the record already has a UTF-8 BOM and keep that state; never add or strip a BOM.
+- Preserve the Layer B file's existing byte/encoding state. Detect whether the record already has a UTF-8 BOM and keep that state; never add or strip a BOM. Read transcript JSONL BOM-safely so a pre-existing BOM does not break parsing.
 - Keep a rollback path by preserving backups.
 - Save every backup to the unified backup folder, never scattered next to originals (see **Backup Location**).
+
+## Nested Workspaces
+
+Workspaces are sometimes **nested inside another workspace** — e.g. a hub with sub-workspaces under it. This shape is common in some setups but is **not assumed universal** (this skill may be used anywhere), so the transform must be context-aware: it changes only the `cwd` values that genuinely point at the **old** location and are **not already at or under the destination**, and it never force-rewrites a value that is already correct.
+
+Classification per value (destination = `new`, source = `old`):
+
+- **Exact old root** → rewritten to `new`. This is checked *first*, so that even when `old` is itself nested under `new` (source-under-destination) the exact old root is still rewritten rather than swallowed by the already-destination guard.
+- **Already at/under `new`** → left unchanged (idempotent). This is the guard that prevents a doubled, corrupt path like `…\Workflows\MilkyWay\Tools\Workflows\skills` when `new` is nested under `old`.
+- **A different subtree of `old`** → for a plain *side-by-side* move the `old` prefix is swapped for `new`; for a *nested* move (either direction) the value is **left unchanged** rather than fabricating a `new`-relative path (`old\Family\Heart` must never become `new\Family\Heart`).
+
+`remap_cwd` enforces this, and verification rejects both residual old-workspace values **and** doubled-destination values (a doubled path begins with `new` and would otherwise pass unnoticed). The chat's true residence is guaranteed by the transcript's destination folder plus the Desktop record's `cwd`/`originCwd`, not by stamping every per-line breadcrumb.
+
+## Memory Ownership (selected-chat vs whole-workspace)
+
+Claude's workspace `memory/` folder under `~/.claude/projects/<encoded>/memory/` is **whole-workspace state**: it is shared by every chat whose transcript lives in that encoded folder, not private to any one selected chat. Moving it as an undocumented side effect of a selected-chat migration would silently drag other chats' memory to the destination.
+
+The `adjacent_data_relocation.memory_move` block therefore requires an explicit scope, and the helper hard-refuses to guess:
+
+- `memory_scope: "whole_workspace"` — only valid when the whole workspace (every chat in the encoded folder) is moving to the destination. The memory folder moves with it.
+- `memory_scope: "none"` — skip the memory move entirely. Use this for a selected-chat migration where only specific chats (and their per-session sidecars) move, leaving the shared workspace memory at the source.
+
+Any other scope value is a hard error, and so is an absent one: when a `memory_move` block is declared without `memory_scope`, the helper stops instead of assuming `whole_workspace`. Do not invent a partial/merge mode: Claude stores memory as path-keyed files this skill never rewrites during relocation, so there is no safe merge semantic.
+
+Per-session `<cliSessionId>\subagents\` and `<cliSessionId>\tool-results\` sidecars are scoped to one session by their path, so they are safe to move for a selected-chat migration without a scope declaration.
 
 ## Backup Location
 
@@ -69,17 +95,17 @@ C:\Users\Admin\.claude\user-backups\<run-timestamp>\<original filename>
 
 ## Manifest Storage
 
-Building a manifest when running this skill is encouraged — it keeps a migration explicit and auditable. It is a shared concern: the **Front-Door Workflow** creates the manifest and the **Execution Workflow** consumes it. Save the manifest into the active workspace's `Archive/Manifests/Claude/` folder (create it if missing), written workspace-relative so it works for whichever project/working directory the migration targets:
+Building a manifest when running this skill is encouraged — it keeps a migration explicit and auditable. It is a shared concern: the **Front-Door Workflow** creates the manifest and the **Execution Workflow** consumes it. Save the manifest into the active workspace's `Archive/Historical/Manifests/Claude/` folder (create it if missing), written workspace-relative so it works for whichever project/working directory the migration targets:
 
 ```
-$WORKSPACE/Archive/Manifests/Claude/
-<workspace_root>/Archive/Manifests/Claude/
-./Archive/Manifests/Claude/
+$WORKSPACE/Archive/Historical/Manifests/Claude/
+<workspace_root>/Archive/Historical/Manifests/Claude/
+./Archive/Historical/Manifests/Claude/
 ```
 
-All three notations mean the same thing: the `Archive/Manifests/Claude/` folder of the workspace currently being worked in. The platform folder is determined by the chat platform being migrated, not by the agent performing the work: a Codex or Antigravity helper executing a Claude migration still uses the `Claude` folder. Once a migration is confirmed, the manifest is no longer needed — the user can ask an agent to delete it from there.
+All three notations mean the same thing: the `Archive/Historical/Manifests/Claude/` folder of the workspace currently being worked in. The platform folder is determined by the chat platform being migrated, not by the agent performing the work: a Codex or Antigravity helper executing a Claude migration still uses the `Claude` folder. Once a migration is confirmed, the manifest is no longer needed — the user can ask an agent to delete it from there.
 
-Every manifest saved in `Archive/Manifests/Claude/` must start with the next sequential `N.) ` prefix based only on the highest existing numbered file in that platform folder. Use `N.) <descriptive-manifest-name>.json`; for example, `1.) claude_migration_manifest_chats0-4_full_batch.json`. When updating or renaming a staged manifest, preserve its existing sequence number while changing the descriptive portion to match its current scope and state. Do not leave migration manifests unnumbered.
+Every manifest saved in `Archive/Historical/Manifests/Claude/` must start with the next sequential `N.) ` prefix based only on the highest existing numbered file in that platform folder. Use `N.) <descriptive-manifest-name>.json`; for example, `1.) claude_migration_manifest_chats0-4_full_batch.json`. When updating or renaming a staged manifest, preserve its existing sequence number while changing the descriptive portion to match its current scope and state. Do not leave migration manifests unnumbered.
 
 When a migration is staged (e.g. one-session test first, then the rest), prefer updating the existing manifest in place to reflect what is done and what remains, rather than creating a second file, unless the sessions come from more than one source workspace. One source workspace means one manifest.
 
@@ -119,8 +145,8 @@ Use read-only inspection of:
 
 Once discovery is complete:
 
-1. Save (or update in place) a sequentially numbered `N.) ` manifest under the active workspace's `Archive/Manifests/Claude/` folder.
-2. Produce the migration handoff summary by explicitly invoking the `session-summary` skill (see **Session Summary Integration**). Scope it to the helper agent's portion, pre-fill the skill's inputs, and save it under `Archive/Summaries/Migration/Claude/`. Apply the availability guard if the skill is not loaded.
+1. Save (or update in place) a sequentially numbered `N.) ` manifest under the active workspace's `Archive/Historical/Manifests/Claude/` folder.
+2. Produce the migration handoff summary by explicitly invoking the `session-summary` skill (see **Session Summary Integration**). Scope it to the helper agent's portion, pre-fill the skill's inputs, and save it under `Archive/Historical/Summaries/Migration/Claude/`. Apply the availability guard if the skill is not loaded.
 3. Group sessions by real discovered old workspace when needed. If there are mixed-source sessions, represent them as separate source groups rather than flattening them into one assumed old workspace.
 
 ### Front-Door Stop Boundary
@@ -179,8 +205,10 @@ For each target session:
 2. Back up the transcript file before writing.
 3. Create the new projects dir `C:\Users\Admin\.claude\projects\<encoded-new-workspace>\` if missing.
 4. For every JSONL record with a top-level `cwd` equal to the old workspace (or under it), rewrite that `cwd` to the destination workspace. Do not touch `content` or other prose.
-5. Write the transformed transcript to `<encoded-new-workspace>\<cliSessionId>.jsonl` and verify every non-empty line still parses as JSON, with the expected count of destination `cwd` values and zero old-workspace `cwd` values.
+5. Write the transformed transcript to `<encoded-new-workspace>\<cliSessionId>.jsonl` and verify every non-empty line still parses as JSON, with the expected count of destination `cwd` values and zero residual old-workspace `cwd` values (exact root **and** descendants, e.g. `old\subdir`).
 6. Remove the old transcript from the old projects dir only after the destination is verified (the chat must live in exactly one projects folder).
+
+**Canonical JSONL reserialization is intentional.** A changed record is parsed, its `cwd` rewritten, and the object re-serialized with `json.dumps(..., separators=(",", ":"), ensure_ascii=False)`. This normalizes spacing/separator style for changed lines only; unchanged lines are copied byte-for-byte. This is deliberate — JSONL has no canonical byte layout, and a fragile byte-level patcher to preserve cosmetic whitespace would be strictly more dangerous than reserializing. Lines that did not change are never rewritten.
 
 #### Layer B: Desktop Chat Store
 
@@ -196,7 +224,7 @@ For each target session's `local_*.json`:
 
 For each source encoded workspace:
 
-1. Discover whether `memory/` exists. If present, back it up and move it to the destination encoded workspace's `memory/` folder, creating the destination parent if missing. Do not overwrite an existing destination `memory/` unless the manifest explicitly says how to merge or replace it.
+1. Discover whether `memory/` exists. If present, treat it as whole-workspace state (see **Memory Ownership**): only move it when the manifest declares `memory_scope: "whole_workspace"`. With `memory_scope: "none"` leave it at the source. Back it up and move it to the destination encoded workspace's `memory/` folder, creating the destination parent if missing. **If a destination `memory/` already exists, hard-refuse** rather than guessing how to merge or replace it — replacement requires explicit user approval and a verified backup, and this skill does not invent a merge semantic.
 2. For each target `cliSessionId`, discover sibling `<cliSessionId>\subagents\` and `<cliSessionId>\tool-results\` folders. Back up each present folder before moving.
 3. Move each sidecar folder to the encoded workspace where that session's `<cliSessionId>.jsonl` now lives. In mixed-destination batches, do not assume one destination for every sidecar; route by the manifest's `adjacent_data_relocation.sidecar_relocations` destination.
 4. Preserve sidecar contents byte-for-byte. Do not parse, rewrite, or normalize files inside these folders.
@@ -206,7 +234,7 @@ True-empty means `0` files and `0` subdirectories remain, not merely `0` `.jsonl
 
 ### Helper Script
 
-Use `scripts/migrate_claude_workspace_chat.py` for deterministic migration when available. Prefer `--dry-run` first. Save the manifest you pass to it under the workspace's `Archive/Manifests/Claude/` folder (see **Manifest Storage**).
+Use `scripts/migrate_claude_workspace_chat.py` for deterministic migration when available. Prefer `--dry-run` first. Save the manifest you pass to it under the workspace's `Archive/Historical/Manifests/Claude/` folder (see **Manifest Storage**).
 
 The helper script belongs to the **Execution Workflow** side. It is not the front door. Claude may help discover inputs and generate the manifest, but a non-Claude helper agent should run the script while Claude Desktop is fully closed.
 
@@ -221,15 +249,25 @@ Expected manifest shape:
       "title": "0.) First of Many --> Setup",
       "cli_session_id": "5ac10e6f-5aca-4f2c-8b6e-a6c50c7a7a19",
       "desktop_record": "C:\\Users\\Admin\\AppData\\Roaming\\Claude\\claude-code-sessions\\<account>\\<group>\\local_33716310-....json"
+    },
+    {
+      "title": "1.) Already Moved Session",
+      "cli_session_id": "9b1c2d3e-....",
+      "desktop_record": "C:\\Users\\Admin\\AppData\\Roaming\\Claude\\claude-code-sessions\\<account>\\<group>\\local_9b1c2d3e-....json",
+      "status": "done"
     }
   ]
 }
 ```
 
+A session entry with `"status": "done"` is skipped by the helper (`is_done()`). Use it to mark a session already migrated in a staged manifest so a re-run over the same manifest does not touch it again.
+
 When adjacent Claude project data must move, include a top-level `adjacent_data_relocation` block:
 
-- `memory_move`: `source`, `destination`, and expected `files`
-- `sidecar_relocations`: entries with `session_id`, `sidecar_kind`, `source`, `destination`, and `dest_encoded_folder`
+- `memory_move`: `source`, `destination`, `memory_scope` (`whole_workspace` or `none`; **mandatory** — an absent scope is a hard stop), a **mandatory** `expected_files` block with expected `files`/`directories` counts, and optionally `allow_missing_source: true` (see the missing-source rule below)
+- `sidecar_relocations`: entries with `session_id`, `sidecar_kind`, `source`, `destination`, `dest_encoded_folder`, a **mandatory** `expected_files` block with expected `files`/`directories` counts, and optionally `allow_missing_source: true`
+
+**Missing-source rule:** a declared relocation whose source does not exist is a **hard stop** — it never silently succeeds as a no-op. The only exemption is an entry that explicitly sets `allow_missing_source: true` **and** declares `expected_files` with both `files: 0` and `directories: 0`; that combination is treated as an intentional, manifest-declared no-op and reported as skipped. `allow_missing_source` with any non-zero (or undeclared) expected count is itself a hard stop.
 - `then_delete`: source encoded folder to delete only after true-empty verification
 
 Example:
@@ -237,13 +275,20 @@ Example:
 ```json
 {
   "adjacent_data_relocation": {
+    "memory_move": {
+      "source": "C:\\Users\\Admin\\.claude\\projects\\<old-encoded>\\memory",
+      "destination": "C:\\Users\\Admin\\.claude\\projects\\<new-encoded>\\memory",
+      "memory_scope": "whole_workspace",
+      "expected_files": { "files": 3, "directories": 0 }
+    },
     "sidecar_relocations": [
       {
         "session_id": "5ac10e6f-5aca-4f2c-8b6e-a6c50c7a7a19",
         "sidecar_kind": "tool-results",
         "source": "C:\\Users\\Admin\\.claude\\projects\\<old-encoded>\\5ac10e6f-5aca-4f2c-8b6e-a6c50c7a7a19\\tool-results",
         "destination": "C:\\Users\\Admin\\.claude\\projects\\<new-encoded>\\5ac10e6f-5aca-4f2c-8b6e-a6c50c7a7a19\\tool-results",
-        "dest_encoded_folder": "<new-encoded>"
+        "dest_encoded_folder": "<new-encoded>",
+        "expected_files": { "files": 12, "directories": 1 }
       }
     ],
     "then_delete": "C:\\Users\\Admin\\.claude\\projects\\<old-encoded>"
@@ -253,7 +298,7 @@ Example:
 
 The old `third_pass_leftover_relocation.aux_relocations` name came from an earlier staged cleanup pass. The helper may keep a small fallback for archived manifests, but new manifests must use `adjacent_data_relocation.sidecar_relocations`.
 
-The helper must dry-run this block before apply, back up every source folder under `~/.claude/user-backups/<run-timestamp>/`, move the folders byte-for-byte, verify destinations and source absence, verify true-empty, and only then delete `then_delete`.
+The helper must dry-run this block before apply, back up every source folder under `~/.claude/user-backups/<run-timestamp>/`, move the folders byte-for-byte, **verify each destination's file/directory count against the manifest's mandatory `expected_files` block** (a mismatch is a hard error, and an absent or empty `expected_files` block is itself a hard error — verification is never silently skipped; a missing declared source is also a hard error unless the entry sets `allow_missing_source: true` with declared counts of exactly 0 files and 0 directories, in which case it is reported as an intentional skipped no-op), verify destinations and source absence, verify true-empty, and only then delete `then_delete`.
 
 Run modes:
 
@@ -265,11 +310,12 @@ Run modes:
 After migration and before telling the user it is done:
 
 - The new projects dir `<encoded-new-workspace>` exists and contains `<cliSessionId>.jsonl` for each migrated session.
-- The migrated transcript parses line by line, with the expected count of destination `cwd` values and zero old-workspace `cwd` values.
+- The migrated transcript parses line by line, with zero old-workspace `cwd` values. Residual detection is **descendant-aware**: a value at or under the old workspace (including `old\subdir`) counts as residual, not only the exact old root, so a stale descendant cannot pass silently. If the manifest recorded an expected count of destination `cwd` values, confirm it.
 - The old transcript no longer exists in the old projects dir for each migrated session.
 - Each migrated Desktop record has `cwd` and `originCwd` equal to the destination workspace, with `cliSessionId` and `title` unchanged and the original BOM/no-BOM state preserved.
-- Workspace `memory/`, if present and in scope, exists in the destination encoded workspace and no longer exists in the source encoded workspace.
-- Each target session's `subagents/` and `tool-results/` sidecar folders, if present and in scope, exist beside the destination transcript folder and no longer exist under the source encoded workspace.
+- Workspace `memory/`, if present and in scope, exists in the destination encoded workspace and no longer exists in the source encoded workspace, and its destination file/directory count matches the manifest's mandatory `expected_files` block.
+- Each target session's `subagents/` and `tool-results/` sidecar folders, if present and in scope, exist beside the destination transcript folder and no longer exist under the source encoded workspace, with destination counts matching the manifest's mandatory `expected_files` blocks.
+- Every relocation reported as skipped is either `memory_scope: "none"` or an explicit `allow_missing_source: true` entry with declared zero counts — no relocation silently no-opped on a missing source.
 - Before deleting any source encoded workspace folder, recursively verify it contains `0` files and `0` subdirectories.
 - Non-target sessions (transcripts and Desktop records) are unchanged.
 - User reopens Claude Desktop and confirms:
@@ -279,7 +325,7 @@ After migration and before telling the user it is done:
 
 ### Execution Summary
 
-After verification passes and before considering the migration closed, produce an execution report by explicitly invoking the `session-summary` skill (see **Session Summary Integration**). Scope it to the helper agent's portion: the handoff it received plus every change it applied, verified, or rolled back. Pre-fill the skill's inputs and save under `Archive/Summaries/Migration/Claude/` so the user (and the front-door agent) can review it. Apply the availability guard if the skill is not loaded.
+After verification passes and before considering the migration closed, produce an execution report by explicitly invoking the `session-summary` skill (see **Session Summary Integration**). Scope it to the helper agent's portion: the handoff it received plus every change it applied, verified, or rolled back. Pre-fill the skill's inputs and save under `Archive/Historical/Summaries/Migration/Claude/` so the user (and the front-door agent) can review it. Apply the availability guard if the skill is not loaded.
 
 ### Failure And Rollback
 
@@ -298,7 +344,7 @@ Both workflows close by producing an explicit session summary through the `sessi
 
 **Save location and naming (both workflows).** Invoke `session-summary` pre-filled so the user does not have to complete its input template:
 
-- Directory: `<workspace_root>/Archive/Summaries/Migration/Claude/`
+- Directory: `<workspace_root>/Archive/Historical/Summaries/Migration/Claude/`
 - Create the `Claude` platform folder if it does not exist.
 - Sequence number: the next integer after the highest existing `N.)` file in the `Claude` platform folder only.
 - Filename: the `session-summary` convention `x.) [Project] [Topic] Summary [N].md`.

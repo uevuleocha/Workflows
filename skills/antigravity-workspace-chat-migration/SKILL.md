@@ -45,11 +45,18 @@ Antigravity itself should not run the Execution Workflow against its own live st
 - Do not modify any Antigravity state while Antigravity Desktop is running. Abort if the target conversation has a non-empty `.db-wal` (the WAL guard).
 - Back up every touched file before mutation, to the unified backup folder.
 - Edit the blob via protobuf **decode → modify → re-encode** only. Never raw byte-replace a protobuf (length-prefixes).
-- Edit only the structured fields: **Field 18 (Project UUID)** and the **workspace URI** value. Do not rewrite user/assistant prose, summaries, or unrelated `file:///` paths.
+- **Field 18 hard-fail:** if Field 18 is missing, is not bytes, is not 36 bytes long, or does not **parse as a canonical UUID** (real `uuid.UUID` parsing, not a length/dash heuristic), the helper hard-fails rather than silently skipping the conversation or reporting false success. A missing `trajectory_metadata_blob` row is a graceful hard stop, never an unpacking crash. The manifest's `destination_project_uuid` is UUID-parsed the same way before anything runs. After write, the persisted blob is re-read and Field 18 is verified byte-for-byte.
+- Edit only the structured fields: **Field 18 (Project UUID)** and the **workspace URI**, which is replaced **only at the enumerated, schema-evidenced field paths** (`1.1` and `7`). An exact URI match at any non-enumerated path, or any field that merely *contains* the URI (an ambiguous partial match), is a hard stop — never rewritten. Do not rewrite user/assistant prose, summaries, or unrelated `file:///` paths. **Arbitrary whole-app-data replacement is explicitly prohibited** — a recursive walk replacing arbitrary matching byte values is not acceptable.
 - Do NOT edit `agyhub_summaries_proto.pb` — it regenerates from the blobs.
-- The destination **Project UUID must already exist** in the Project Registry. If it does not, stop and tell the user to open the destination folder in Antigravity once, then re-run discovery.
+- The destination **Project UUID must already exist** in the Project Registry. All destination resources (not just the first `gitFolder.folderUri`) are verified against the expected workspace URI. Incomplete or false destination-resource verification is a **hard stop before any change is applied** (`--apply` refuses; `--dry-run` reports the failure prominently), not a warning.
 - Use SQLite transactions; run `PRAGMA integrity_check` after writing a conversation DB.
 - Keep a rollback path by preserving backups.
+
+## Nested Workspaces
+
+Workspaces are sometimes **nested inside another workspace** — e.g. a hub with sub-workspaces under it. This shape is common in some setups but is **not assumed universal** (this skill may be used anywhere).
+
+Antigravity is **structurally immune** to the nested-workspace over-rewrite class: it moves a conversation by reassigning its Project UUID (Field 18) to the **exact** destination UUID (with an already-destination idempotency guard), and it rewrites the workspace URI only on an **exact** match at schema-enumerated field paths — hard-stopping on any substring/ambiguous match rather than rewriting. The driver re-discovers the source URI each run and skips when it already equals the destination. Because nothing is prefix-spliced, no doubled or fabricated path can arise even when the destination URI *contains* the source URI (as it does when the destination nests under the source).
 
 ## Backup Location
 
@@ -65,12 +72,12 @@ C:\Users\Admin\.gemini\user-backups\<run-timestamp>\<original filename>
 
 ## Manifest Storage
 
-The **Front-Door Workflow** creates the manifest; the **Execution Workflow** consumes it. Save it under the active workspace's `Archive/Manifests/Antigravity/` folder:
+The **Front-Door Workflow** creates the manifest; the **Execution Workflow** consumes it. Save it under the active workspace's `Archive/Historical/Manifests/Antigravity/` folder:
 
 ```
-$WORKSPACE/Archive/Manifests/Antigravity/
-<workspace_root>/Archive/Manifests/Antigravity/
-./Archive/Manifests/Antigravity/
+$WORKSPACE/Archive/Historical/Manifests/Antigravity/
+<workspace_root>/Archive/Historical/Manifests/Antigravity/
+./Archive/Historical/Manifests/Antigravity/
 ```
 
 The platform folder is the chat platform being migrated (`Antigravity`), regardless of which agent performs the work. Every manifest must start with the next sequential `N.) ` prefix based only on the highest existing numbered file in that platform folder, e.g. `1.) antigravity_migration_manifest.json`. When updating or renaming a staged manifest, preserve its sequence number. Do not leave migration manifests unnumbered. One destination project means one manifest.
@@ -92,8 +99,8 @@ Use from inside any agent. Gather inputs, discover the real metadata, build the 
 
 ### Front-Door Output
 
-1. Save (or update in place) a sequentially numbered manifest under `Archive/Manifests/Antigravity/`.
-2. Produce the migration handoff summary by explicitly invoking the `session-summary` skill (see **Session Summary Integration**), saved under `Archive/Summaries/Migration/Antigravity/`. Apply the availability guard if it is not loaded.
+1. Save (or update in place) a sequentially numbered manifest under `Archive/Historical/Manifests/Antigravity/`.
+2. Produce the migration handoff summary by explicitly invoking the `session-summary` skill (see **Session Summary Integration**), saved under `Archive/Historical/Summaries/Migration/Antigravity/`. Apply the availability guard if it is not loaded.
 
 ### Front-Door Stop Boundary
 
@@ -118,12 +125,12 @@ For each target conversation:
 2. Back up `<id>.db` (+ `.db-wal` / `.db-shm` if present) and `state.vscdb`.
 3. Open the conversation DB; read `trajectory_metadata_blob`; decode with `blackboxprotobuf`.
 4. **Reassign Field 18** to the destination Project UUID (both UUIDs are 36-byte strings → no length change).
-5. **Rewrite the workspace URI:** discover the conversation's current workspace URI (most-frequent `file:///` value) and replace it everywhere in the message with the destination workspace URI (blob `file:///c:/...` variant). Leave unrelated `file:///` file paths and all prose untouched.
+5. **Rewrite the workspace URI:** discover the conversation's current workspace URI (most-frequent `file:///` value) and replace it with the destination workspace URI (blob `file:///c:/...` variant) **only at the enumerated permitted field paths (`1.1` and `7`)**. An exact match anywhere else, or an ambiguous partial match anywhere, hard-stops the migration. Leave unrelated `file:///` file paths and all prose untouched.
 6. Re-encode the blob, `UPDATE` the row, commit, and run `PRAGMA integrity_check` (must be `ok`).
 
 ### Electron cascadeMap (Layer 2, optional)
 
-In `state.vscdb` `ItemTable` key `google.antigravity` → `antigravity.workspaceCascadeMap`, add/update `<destination URI (vscdb c%3A variant)> → <conversation id>` if absent. Secondary; safe to include.
+In `state.vscdb` `ItemTable` key `google.antigravity` → `antigravity.workspaceCascadeMap`, add/update `<destination URI (vscdb c%3A variant)> → <conversation id>` if absent. This is a secondary convenience touch — it maps the destination URI to a single representative conversation ID (`conv_ids[0]`). The schema maps one URI to one conversation ID and has not been proven to support multi-ID values; do not invent a multi-ID registry shape without schema evidence.
 
 ### Do NOT touch the derived index
 
@@ -131,7 +138,7 @@ Leave `agyhub_summaries_proto.pb` alone — Antigravity rebuilds it from the con
 
 ### Helper Script
 
-Use `scripts/migrate_antigravity_workspace_chat.py` for deterministic migration. Prefer `--dry-run` first. Requires `blackboxprotobuf` in the Python runtime. Save the manifest under `Archive/Manifests/Antigravity/`.
+Use `scripts/migrate_antigravity_workspace_chat.py` for deterministic migration. Prefer `--dry-run` first. Requires `blackboxprotobuf` in the Python runtime. Save the manifest under `Archive/Historical/Manifests/Antigravity/`.
 
 Expected manifest shape:
 
@@ -157,7 +164,7 @@ Run modes: `--dry-run` (inspect/report, no writes) and `--apply` (write after ba
 
 ### Execution Summary
 
-After verification passes, produce an execution report by explicitly invoking the `session-summary` skill (see **Session Summary Integration**), scoped to the helper's portion, saved under `Archive/Summaries/Migration/Antigravity/`.
+After verification passes, produce an execution report by explicitly invoking the `session-summary` skill (see **Session Summary Integration**), scoped to the helper's portion, saved under `Archive/Historical/Summaries/Migration/Antigravity/`.
 
 ### Failure And Rollback
 
@@ -175,5 +182,5 @@ Both workflows close by producing an explicit session summary through the `sessi
 
 **Save location and naming (both workflows).** Invoke `session-summary` pre-filled:
 
-- Directory: `<workspace_root>/Archive/Summaries/Migration/Antigravity/`
+- Directory: `<workspace_root>/Archive/Historical/Summaries/Migration/Antigravity/`
 - Filename: the `session-summary` convention `x.) [Project] [Topic] Summary [N].md`.

@@ -1,14 +1,9 @@
 #!/usr/bin/env python3
-"""
-Video-to-Action - YouTube tutorial extraction via the Gemini API (Uzzy adaptation).
+"""Deterministic YouTube-to-report extraction through the Gemini API.
 
-Sends a public YouTube URL to Gemini video understanding and runs structured
-extraction phases (overview, step-by-step, technical), then compiles the results
-into a procedure document. The script only extracts; acting on extracted steps
-is the orchestrating agent's job and requires separate user authorization.
-
-Requires: Python 3.10+, `google-genai`, `python-dotenv`, and GEMINI_API_KEY.
-Run `video_to_action.py --check-setup` to verify prerequisites without any API call.
+The script is the sole writer of each run's report.md and prompts.md. It never
+invokes report-this or session-summary; it only conforms structurally to the
+local report package. Real runs require orchestrator-supplied phase choices.
 """
 
 import argparse
@@ -16,150 +11,115 @@ import json
 import os
 import re
 import sys
+import tempfile
 from datetime import datetime
 from pathlib import Path
 
-# ── Constants ────────────────────────────────────────────────────────────────
-
 DEFAULT_MODEL = "gemini-3.5-flash"
-DEFAULT_OUTPUT_DIR = Path("Archive") / "Video-to-action"
-
+DEFAULT_OUTPUT_DIR = Path("Archive") / "Historical" / "Video-to-action"
 SETUP_TASK_HINT = (
-    "Setup is incomplete. See the pending video-to-action setup/learning task in "
-    "your workspace (Archive\\Tasks\\) for API key creation, safe storage, and "
-    "dependency installation steps."
+    "Setup is incomplete. See the pending video-to-action setup task under "
+    "Archive\\Live\\Tasks\\<Subject>\\ for key and dependency setup."
 )
 
-OVERVIEW_PROMPT = """\
-Analyze this YouTube video and provide a structured breakdown.
+PROCEDURE_PROMPT = r'''Analyze this YouTube video and produce BOTH an overview
+and detailed steps in one response. Use this exact order.
 
-Begin your response with exactly this line, followed by a blank line:
+## Overview
 
-Here is a structured breakdown of the video:
-
-Then output the following five sections, each with its heading in this exact form \
-and order — keep the "N.)" numbering and the heading text verbatim:
+Begin with exactly: Here is a structured breakdown of the video:
 
 ### 1.) Video Title and Length
-* **Video Title:** {title — see the title rule below}
-* **Approximate Length:** {approximate duration}
+* **Video Title:** {use the exact supplied title; never infer or alter it}
+* **Length:** {use the exact supplied duration verbatim}
 
 ### 2.) Summary
-{2-3 sentences on what the video teaches}
+{2-3 concrete sentences describing what the video teaches}
 
 ### 3.) Prerequisites
-{tools, software, or knowledge needed before starting, as bullet points}
+{tools, software, or knowledge needed, as bullets}
 
 ### 4.) Main Sections
-{the major sections/chapters with approximate timestamp ranges, as bullet points}
+{chronological chapters with approximate timestamp ranges, as bullets}
 
 ### 5.) Key Outcomes
-{what the viewer can do after watching, as bullet points}
+{what the viewer can do after watching, as bullets}
 
-Title rule: the exact VIDEO TITLE is provided to you in the instruction above. Use \
-it verbatim and do not infer, alter, or add any marker. Separately, and ONLY if you \
-can actually read the real title from the video's metadata, add one extra bullet \
-immediately under the Approximate Length line: `* **Metadata title (from video \
-metadata):** "..."` and note whether it matches the supplied title. If you cannot \
-access the video's metadata (the current expected behaviour), omit that bullet \
-entirely — do not state that metadata is unavailable.
+## Steps
 
-Be specific and concrete. Don't say "the presenter shows techniques" — say what the \
-techniques are.\
-"""
-
-STEPS_PROMPT = """\
-Extract detailed step-by-step instructions from this video.
-
-Format every step as a Markdown section using this exact shape, separated from the \
-next step by a horizontal rule (`---`):
+Format every step as follows and separate steps with `---`:
 
 ### STEP {n}: {short title}
-* **TIMESTAMP:** {MM:SS}-{MM:SS} (the approximate start-to-end range for this step)
-* **ACTION:** {what to do, in imperative form, e.g. "Click File > New" or "Set the value to 0.5"}
-* **DETAILS:** {specific values, settings, parameters shown; if the presenter says \
-"adjust to taste" or similar, record the value they actually used in the demo}
-* **VISUAL REFERENCE:** {what the screen/result should look like after this step}
-* **COMMON MISTAKES:** {a pitfall for this step — include one when the presenter \
-states it, or when a practitioner would clearly recognize a well-founded pitfall for \
-this step. Mark inferred pitfalls "(inferred)". Write "None notable" only when nothing \
-meaningful applies.}
+* **TIMESTAMP:** {MM:SS-MM:SS}
+* **ACTION:** {specific imperative action}
+* **DETAILS:** {exact values, settings, and demonstrated choices}
+* **VISUAL REFERENCE:** {expected screen or result}
+* **COMMON MISTAKES:** {stated pitfall, well-founded `(inferred)` pitfall, or
+  `None notable` only when nothing meaningful applies}
 
-Be extremely specific about values, menu paths, and settings. When a step shows code, \
-commands, or JSON, reproduce it inside a fenced Markdown code block (triple backticks), \
-never inline.
+Put code, commands, or JSON in fenced Markdown blocks. Prefix uncertain subtle
+visual actions with `LOW CONFIDENCE:` and direct the reader to the timestamp.
+If and only if video metadata exposes a title, add a metadata-title bullet and
+compare it with the supplied title; otherwise omit that bullet entirely.'''
 
-If a step relies on a subtle visual technique that may not be fully captured (precise \
-mouse movements, brush strokes, gestures), prefix that step's ACTION with \
-"LOW CONFIDENCE:" and describe it as best you can.\
-"""
+DEEP_SUMMARY_PROMPT = r'''Create a long, faithful, chronological deep summary of
+this YouTube video. Only summarize content actually present in the video. Map
+acts to timestamped chapters or meaningful chronological beats.
 
-TECHNICAL_PROMPT = """\
-Extract all code, commands, configurations, and technical details from this video.
+Return ONLY ACT sections using this exact heading contract:
 
-Extract:
-1. All CODE SNIPPETS shown (reconstruct from what's visible on screen)
-2. All TERMINAL COMMANDS run
-3. All CONFIGURATION values or settings changed
-4. All FILE PATHS referenced
-5. All DEPENDENCIES or PACKAGES installed
-6. Any API keys, environment variables, or config needed (note if they're \
-placeholder values)
+## 🎭 ACT I: {specific chronological title}
+**Timestamp:** {approximate range}
+{Detailed faithful narrative of what happens, what is explained, and why it
+matters. Clearly label any inference.}
 
-Reproduce every code snippet, command, and configuration inside a fenced Markdown \
-code block (triple backticks), never inline. For code: provide the complete snippet, \
-not fragments. If code is partially visible, note what's inferred and mark it \
-"LOW CONFIDENCE:". For commands: provide the exact command, including flags and \
-arguments.\
-"""
+Continue with `## 🎭 ACT II:`, `## 🎭 ACT III:`, and as many sequential acts as
+needed. End exactly with:
 
-PHASE_DEFS = [
-    {"key": "overview", "title": "Overview extraction", "prompt": OVERVIEW_PROMPT},
-    {"key": "steps", "title": "Step-by-step extraction", "prompt": STEPS_PROMPT},
-    {"key": "technical", "title": "Technical extraction", "prompt": TECHNICAL_PROMPT},
-]
+## 🎭 FINAL ACT: Key Takeaways
+{Thorough synthesis of the video's conclusions, lessons, and cautions.}
 
+Do not include session pickup, active-plan status, next-session context, or any
+other work-session template content. Do not fabricate inaccessible details.'''
 
-# ── Preflight ────────────────────────────────────────────────────────────────
+TECHNICAL_PROMPT = r'''Extract all code, commands, configurations, and technical
+details actually shown in this coding/software video.
+
+Include code snippets, terminal commands, configuration values, file paths,
+dependencies, packages, and required environment variables. Put every snippet,
+command, and configuration in fenced Markdown blocks. Mark partial or inferred
+content `LOW CONFIDENCE:`. Never expose real secret values.'''
+
+PHASE_DEFS = {
+    "procedure": {"key": "procedure", "title": "Procedure", "prompt": PROCEDURE_PROMPT},
+    "deep_summary": {
+        "key": "deep_summary", "title": "Deep Summary", "prompt": DEEP_SUMMARY_PROMPT,
+    },
+    "technical": {"key": "technical", "title": "Technical", "prompt": TECHNICAL_PROMPT},
+}
+
 
 def load_env_files() -> None:
-    """Load .env from the current working directory, then the script's folder.
-
-    Values already present in the environment are never overwritten.
-    """
     from dotenv import load_dotenv
-
-    cwd_env = Path.cwd() / ".env"
-    if cwd_env.is_file():
-        load_dotenv(cwd_env)
-    script_env = Path(__file__).resolve().parent / ".env"
-    if script_env.is_file():
-        load_dotenv(script_env)
+    for candidate in (Path.cwd() / ".env", Path(__file__).resolve().parent / ".env"):
+        if candidate.is_file():
+            load_dotenv(candidate)
 
 
 def check_setup(verbose: bool = True) -> bool:
-    """Verify dependencies and API key without making any API call.
-
-    Never prints the key itself - only whether it is present.
-    """
     ok = True
-
     try:
         from google import genai  # noqa: F401
     except ImportError:
         ok = False
         if verbose:
-            print("MISSING: the 'google-genai' package is not installed "
-                  "(pip install google-genai).")
-
+            print("MISSING: google-genai (pip install google-genai).")
     try:
         import dotenv  # noqa: F401
     except ImportError:
         ok = False
         if verbose:
-            print("MISSING: the 'python-dotenv' package is not installed "
-                  "(pip install python-dotenv).")
-
+            print("MISSING: python-dotenv (pip install python-dotenv).")
     if ok:
         load_env_files()
         if os.environ.get("GEMINI_API_KEY"):
@@ -168,440 +128,423 @@ def check_setup(verbose: bool = True) -> bool:
         else:
             ok = False
             if verbose:
-                print("MISSING: GEMINI_API_KEY is not set in the environment "
-                      "or a discoverable .env file.")
-
+                print("MISSING: GEMINI_API_KEY is not set.")
     if verbose:
-        if ok:
-            print("Setup check passed. No API call was made.")
-        else:
-            print(SETUP_TASK_HINT)
+        print("Setup check passed. No API call was made." if ok else SETUP_TASK_HINT)
     return ok
 
 
-# ── Prompt documentation ─────────────────────────────────────────────────────
+def selected_phase_defs(deep_summary: bool, technical: bool,
+                        coding_video: bool) -> list[dict]:
+    if technical and not coding_video:
+        raise ValueError("--technical requires --coding-video")
+    phases = [PHASE_DEFS["procedure"]]
+    if deep_summary:
+        phases.append(PHASE_DEFS["deep_summary"])
+    if technical:
+        phases.append(PHASE_DEFS["technical"])
+    return phases
+
 
 def build_prompts_doc() -> str:
-    """Build prompts.md content from the live prompt constants.
-
-    Generating the doc from the constants (rather than hand-maintaining it)
-    guarantees prompts.md can never drift from what Gemini actually receives.
-    """
     sections = [
-        "# Video-to-Action — Orchestrator Prompts (Template)",
-        "",
-        "Auto-generated from the prompt constants in `scripts/video_to_action.py` by",
-        "running `python scripts/video_to_action.py --dump-prompts`. Do not edit by",
-        "hand — regenerate after changing the prompts. This is the canonical TEMPLATE;",
-        "each run also writes a per-run lowercase `prompts.md` into its run folder",
-        "capturing the actual prompts sent (which may include a user-supplied title",
-        "injected into Phase 1). Each phase below is sent to the Gemini model verbatim",
-        "as the text part of the request, alongside the YouTube video. Phase 3 runs",
-        "only with `--phases 3`.",
-        "",
-        "## Phase 1 — Overview extraction",
-        "",
-        "```text",
-        OVERVIEW_PROMPT,
-        "```",
-        "",
-        "## Phase 2 — Step-by-step extraction",
-        "",
-        "```text",
-        STEPS_PROMPT,
-        "```",
-        "",
-        "## Phase 3 — Technical extraction (only with --phases 3)",
-        "",
-        "```text",
-        TECHNICAL_PROMPT,
-        "```",
-        "",
+        "# Video-to-Action — Orchestrator Prompts (Template)", "",
+        "Auto-generated from `scripts/video_to_action.py` by `--dump-prompts`.",
+        "The Procedure call always runs. Deep Summary is opt-in. Technical is",
+        "opt-in and requires an explicit coding/software relevance confirmation.", "",
     ]
+    for key in ("procedure", "deep_summary", "technical"):
+        pd = PHASE_DEFS[key]
+        qualifier = {
+            "procedure": "always",
+            "deep_summary": "opt-in",
+            "technical": "opt-in; coding/software only",
+        }[key]
+        sections += [f"## {pd['title']} ({qualifier})", "", "```text",
+                     pd["prompt"], "```", ""]
     return "\n".join(sections)
 
 
 def dump_prompts() -> Path:
-    """Write PROMPTS.md (the canonical template) next to SKILL.md. No API call."""
     target = Path(__file__).resolve().parent.parent / "PROMPTS.md"
     target.write_text(build_prompts_doc(), encoding="utf-8")
     return target
 
 
-# ── Helpers ──────────────────────────────────────────────────────────────────
-
 def parse_offset(value: str) -> str:
-    """Accept seconds ('90'), MM:SS ('1:30'), or HH:MM:SS and return 'Ns' form."""
     value = value.strip()
     if re.fullmatch(r"\d+", value):
         return f"{value}s"
     parts = value.split(":")
     if len(parts) in (2, 3) and all(re.fullmatch(r"\d+", p) for p in parts):
         seconds = 0
-        for p in parts:
-            seconds = seconds * 60 + int(p)
+        for part in parts:
+            seconds = seconds * 60 + int(part)
         return f"{seconds}s"
-    raise argparse.ArgumentTypeError(
-        f"invalid time offset '{value}' (use seconds, MM:SS, or HH:MM:SS)")
+    raise argparse.ArgumentTypeError("use seconds, MM:SS, or HH:MM:SS")
 
+
+def normalize_duration(value: str) -> str:
+    """Validate MM:SS or HH:MM:SS and return a zero-padded value."""
+    value = value.strip()
+    short = re.fullmatch(r"(\d{1,2}):([0-5]\d)", value)
+    if short:
+        return f"{int(short.group(1)):02d}:{int(short.group(2)):02d}"
+    long = re.fullmatch(r"(\d{1,3}):([0-5]\d):([0-5]\d)", value)
+    if long:
+        return (f"{int(long.group(1)):02d}:{int(long.group(2)):02d}:"
+                f"{int(long.group(3)):02d}")
+    raise argparse.ArgumentTypeError("duration must be MM:SS or HH:MM:SS")
+
+
+def demote_embedded_headings(text: str, block: str) -> str:
+    """Demote selected H2 headings outside fenced code blocks only."""
+    lines = text.splitlines()
+    in_fence = False
+    fence_marker = None
+    output = []
+    for line in lines:
+        stripped = line.lstrip()
+        marker = stripped[:3]
+        if marker in ("```", "~~~"):
+            if not in_fence:
+                in_fence = True
+                fence_marker = marker
+            elif marker == fence_marker:
+                in_fence = False
+                fence_marker = None
+            output.append(line)
+            continue
+        if not in_fence:
+            if block == "procedure" and line in ("## Overview", "## Steps"):
+                line = "#" + line
+            elif block == "deep_summary" and (
+                    line.startswith("## 🎭 ACT ") or
+                    line.startswith("## 🎭 FINAL ACT:")):
+                line = "#" + line
+        output.append(line)
+    return "\n".join(output)
 
 def sanitize_title(text: str, fallback: str = "video") -> str:
-    """Make a readable, Windows-safe folder name from a title.
-
-    Preserves letters, digits, spaces, parentheses and hyphens. Replaces each
-    Windows-illegal character (< > : " / \\ | ? * and control chars) with a hyphen,
-    drops other punctuation, collapses repeated separators, trims trailing dots and
-    spaces (illegal at the end of a Windows name), and caps the length so the run
-    path stays well under the ~260-char limit.
-    """
-    # Windows-illegal characters and control chars become hyphens (not dropped, so
-    # word boundaries survive, e.g. "How to: Build" -> "How to- Build").
     text = re.sub(r'[<>:"/\\|?*\x00-\x1f]', "-", text)
-    # Drop remaining punctuation that isn't a word char, space, parenthesis or hyphen.
     text = re.sub(r"[^\w\s()-]", "", text)
-    # Collapse whitespace and repeated hyphens.
     text = re.sub(r"\s+", " ", text)
-    text = re.sub(r"-{2,}", "-", text).strip()
-    # Cap length, then trim trailing space/dot/hyphen (dots/spaces are illegal at end).
-    text = text[:70].rstrip(" .-")
+    text = re.sub(r"-{2,}", "-", text).strip()[:70].rstrip(" .-")
     return text or fallback
 
 
 def is_youtube_url(url: str) -> bool:
     return bool(re.match(
         r"https?://(www\.)?(youtube\.com/watch\?v=|youtu\.be/|youtube\.com/shorts/)",
-        url))
+        url,
+    ))
 
 
-# ── Core ─────────────────────────────────────────────────────────────────────
+def inject_ground_truth(prompt: str, title: str, duration: str,
+                        include_title: bool) -> str:
+    duration_rule = (
+        f"This video's exact total length is {duration}; use it verbatim as the "
+        f"Length, and ensure every timestamp falls within 00:00–{duration}."
+    )
+    if include_title:
+        title_rule = (f'The exact video title is: "{title}". Use it verbatim. '
+                      "It is user-supplied and authoritative.")
+        return f"{title_rule}\n{duration_rule}\n\n{prompt}"
+    return f"{duration_rule}\n\n{prompt}"
+
+
+def build_effective_prompts(phase_defs: list[dict], title: str,
+                            duration: str) -> list[dict]:
+    effective = []
+    for pd in phase_defs:
+        prompt = pd["prompt"]
+        if pd["key"] in ("procedure", "deep_summary"):
+            prompt = inject_ground_truth(
+                prompt, title, duration, include_title=pd["key"] == "procedure")
+        effective.append({**pd, "prompt": prompt})
+    return effective
+
 
 def run_phase(client, model: str, url: str, prompt: str,
               start: str | None, end: str | None, low_res: bool) -> str:
-    """Run one extraction phase against the video. Returns the response text."""
     from google.genai import types
-
-    metadata_kwargs = {}
+    metadata = {}
     if start:
-        metadata_kwargs["start_offset"] = start
+        metadata["start_offset"] = start
     if end:
-        metadata_kwargs["end_offset"] = end
-
-    file_part_kwargs = {
-        "file_data": types.FileData(file_uri=url),
-    }
-    if metadata_kwargs:
-        file_part_kwargs["video_metadata"] = types.VideoMetadata(**metadata_kwargs)
-
+        metadata["end_offset"] = end
+    file_args = {"file_data": types.FileData(file_uri=url)}
+    if metadata:
+        file_args["video_metadata"] = types.VideoMetadata(**metadata)
     config = None
     if low_res:
         config = types.GenerateContentConfig(
-            media_resolution=types.MediaResolution.MEDIA_RESOLUTION_LOW,
-        )
-
+            media_resolution=types.MediaResolution.MEDIA_RESOLUTION_LOW)
     response = client.models.generate_content(
         model=model,
-        contents=types.Content(parts=[
-            types.Part(**file_part_kwargs),
-            types.Part(text=prompt),
-        ]),
+        contents=types.Content(parts=[types.Part(**file_args), types.Part(text=prompt)]),
         config=config,
     )
     return response.text or ""
 
 
-def compile_procedure(url: str, intent: str, model: str,
-                      phases_run: list, results: dict, errors: list) -> str:
-    """Compile phase results into the procedure markdown document.
+def execute_phases(effective: list[dict], runner) -> tuple[dict, list]:
+    results, errors = {}, []
+    for pd in effective:
+        try:
+            text = runner(pd)
+            if not text.strip():
+                raise RuntimeError("empty response")
+            results[pd["key"]] = text
+        except Exception as exc:  # noqa: BLE001
+            errors.append({"phase": pd["key"], "error": f"{type(exc).__name__}: {exc}"})
+    return results, errors
 
-    This document is the single human-readable run record. It carries the run
-    metadata (source, timestamp, intent, model, phases run, status) in its
-    header, then the extracted content, errors, and notes.
-    """
-    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    if not results:
-        status = "failed (no phases succeeded)"
-    elif errors:
-        status = f"partial ({len(errors)} phase error(s))"
-    else:
-        status = "complete"
+
+def compile_report(title: str, duration: str, url: str, intent: str, model: str,
+                   phases_run: list[str], results: dict, errors: list) -> str:
+    status = "failed" if not results else ("partial" if errors else "complete")
     lines = [
-        "# Extracted Procedure",
-        "",
-        f"**Source**: {url}",
-        f"**Extracted**: {now}",
-        f"**Intent**: {intent}",
-        f"**Model**: {model}",
-        f"**Phases run**: {', '.join(phases_run) if phases_run else 'none'}",
-        f"**Status**: {status}",
-        "",
+        f"# {title} — Video Extraction Report", "", "## Report Metadata", "",
+        f"- **Source:** {url}",
+        f"- **Duration:** {duration}",
+        f"- **Extracted:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+        f"- **Intent:** {intent}", f"- **Model:** {model}",
+        f"- **Calls selected:** {', '.join(phases_run)}",
+        f"- **Status:** {status}", "", "## Procedure", "",
+        demote_embedded_headings(
+            results.get("procedure", "Procedure extraction failed; see Extraction Errors."),
+            "procedure"), "",
     ]
-    if "overview" in results:
-        lines += ["## Overview", "", results["overview"], ""]
-    if "steps" in results:
-        lines += ["## Steps", "", results["steps"], ""]
     if "technical" in results:
-        lines += ["## Code, Commands & Configuration", "", results["technical"], ""]
+        lines += ["### Code, Commands & Configuration", "", results["technical"], ""]
+    lines += ["## Detailed Summary", ""]
+    deep_summary_selected = "deep_summary" in phases_run
+    if "deep_summary" in results:
+        lines += [demote_embedded_headings(results["deep_summary"], "deep_summary"), ""]
+    elif deep_summary_selected:
+        lines += ["Deep Summary extraction failed; see Extraction Errors.", ""]
+    else:
+        lines += ["Not selected for this run.", ""]
     if errors:
         lines += ["## Extraction Errors", ""]
-        for e in errors:
-            lines.append(f"- Phase `{e['phase']}` failed: {e['error']}")
+        lines += [f"- Phase `{e['phase']}` failed: {e['error']}" for e in errors]
         lines.append("")
     lines += [
-        "## Notes",
-        "",
-        "- Extracted by Gemini video understanding. Code shown on screen may be "
-        "partially visible or contain typos; verify before use.",
-        "- Items marked LOW CONFIDENCE involve visual techniques that may not be "
-        "fully captured. Watch the referenced timestamp directly for those steps.",
-        "- Acting on these steps requires separate user authorization; this "
-        "document is an extraction, not an instruction to execute.",
-        "",
+        "## Notes", "",
+        "- Gemini produced all extracted video content; the orchestrating agent did not synthesize it.",
+        "- Verify code and LOW CONFIDENCE items against the referenced timestamps.",
+        "- Acting on extracted steps requires separate user authorization.", "",
     ]
     return "\n".join(lines)
-
-
-def build_effective_prompts(phase_defs: list, title: str | None) -> list:
-    """Return the phase prompts actually used this run, injecting a user-supplied
-    title into the overview phase when one is given."""
-    effective = []
-    for pd in phase_defs:
-        prompt = pd["prompt"]
-        if pd["key"] == "overview" and title:
-            prompt = (
-                f'The exact title of this video is: "{title}". Use it verbatim as '
-                f'the `### 1.) Video Title and Length` value; it is user-supplied and '
-                f'authoritative — do not infer or alter it and do not add any marker. '
-                f'(You may still perform the separate metadata check described '
-                f'below.)\n\n' + prompt
-            )
-        effective.append({"key": pd["key"], "title": pd["title"], "prompt": prompt})
-    return effective
 
 
 def build_run_prompts_doc(url: str, model: str, resolution: str, clip: str,
-                          title: str | None, effective: list) -> str:
-    """Build the per-run prompts.md: the exact prompts sent to Gemini this run."""
+                          title: str, duration: str, effective: list[dict]) -> str:
     lines = [
-        "# Prompts sent this run",
-        "",
-        f"**Source**: {url}",
-        f"**Model**: {model}",
-        f"**Resolution**: {resolution}",
-        f"**Clip**: {clip}",
-        f"**Title supplied**: {title if title else '(none — model infers the title)'}",
-        "",
-        "The exact phase prompts sent to Gemini for THIS run. The canonical template",
-        "lives in `PROMPTS.md` at the skill root; this file reflects any per-run",
-        "changes, such as an injected title.",
-        "",
+        "# Prompts sent this run", "", f"**Source:** {url}", f"**Model:** {model}",
+        f"**Resolution:** {resolution}", f"**Clip:** {clip}",
+        f"**Title supplied:** {title}", f"**Duration supplied:** {duration}",
+        f"**Calls selected:** {', '.join(pd['key'] for pd in effective)}", "",
     ]
-    headings = {
-        "overview": "Phase 1 — Overview extraction",
-        "steps": "Phase 2 — Step-by-step extraction",
-        "technical": "Phase 3 — Technical extraction",
-    }
     for pd in effective:
-        lines += [f"## {headings.get(pd['key'], pd['key'])}", "",
-                  "```text", pd["prompt"], "```", ""]
+        lines += [f"## {pd['title']}", "", "```text", pd["prompt"], "```", ""]
     return "\n".join(lines)
 
 
-def save_outputs(output_base: Path, url: str, intent: str, model: str,
-                 phases_run: list, results: dict, errors: list,
-                 effective: list, resolution: str, clip: str,
-                 title: str | None) -> Path:
-    """Save procedure.md, the per-run prompts.md, and the latest-run pointer.
-
-    procedure.md is the single human-readable record; prompts.md captures the exact
-    prompts sent this run; latest.json is a small pointer for quick lookups.
-    """
-    run_ts = datetime.now().strftime("%Y%m%d-%H%M%S")
-    folder = f"{run_ts} - {sanitize_title(title)}" if title else run_ts
-    output_dir = output_base / folder
+def save_outputs(output_base: Path, title: str, duration: str, url: str, intent: str, model: str,
+                 effective: list[dict], results: dict, errors: list,
+                 resolution: str, clip: str, run_ts: str | None = None) -> Path:
+    run_ts = run_ts or datetime.now().strftime("%Y%m%d-%H%M%S")
+    output_dir = output_base / f"{run_ts} - {sanitize_title(title)}"
     output_dir.mkdir(parents=True, exist_ok=True)
-
-    proc_path = output_dir / "procedure.md"
-    proc_path.write_text(
-        compile_procedure(url, intent, model, phases_run, results, errors),
-        encoding="utf-8")
-
-    prompts_path = output_dir / "prompts.md"
-    prompts_path.write_text(
-        build_run_prompts_doc(url, model, resolution, clip, title, effective),
-        encoding="utf-8")
-
-    # Windows-safe latest-run pointer (JSON metadata file, not a symlink)
-    latest_path = output_base / "latest.json"
-    latest_path.write_text(
-        json.dumps(
-            {
-                "latest_run": run_ts,
-                "run_dir": str(output_dir),
-                "url": url,
-                "title": title,
-                "intent": intent,
-                "completed": bool(results),
-                "timestamp": datetime.now().isoformat(),
-            },
-            indent=2,
-            ensure_ascii=False,
-        ),
+    phases = [pd["key"] for pd in effective]
+    report_path = output_dir / "report.md"
+    report_path.write_text(
+        compile_report(title, duration, url, intent, model, phases, results, errors),
         encoding="utf-8",
     )
+    (output_dir / "prompts.md").write_text(
+        build_run_prompts_doc(
+            url, model, resolution, clip, title, duration, effective),
+        encoding="utf-8",
+    )
+    (output_base / "latest.json").write_text(json.dumps({
+        "latest_run": run_ts, "run_dir": str(output_dir), "url": url,
+        "title": title, "duration": duration, "intent": intent,
+        "completed": bool(results),
+        "timestamp": datetime.now().isoformat(),
+    }, indent=2, ensure_ascii=False), encoding="utf-8")
+    return report_path
 
-    return proc_path
 
-
-def run_extraction(url: str, intent: str, phases: int, model: str,
-                   start: str | None, end: str | None, low_res: bool,
-                   output_base: Path, title: str | None = None) -> int:
-    """Run the extraction phases and save outputs. Returns an exit code."""
+def run_extraction(url: str, intent: str, model: str, start: str | None,
+                   end: str | None, low_res: bool, output_base: Path, title: str,
+                   duration: str, deep_summary: bool, technical: bool, coding_video: bool) -> int:
     from google import genai
-
+    phases = selected_phase_defs(deep_summary, technical, coding_video)
+    effective = build_effective_prompts(phases, title, duration)
     client = genai.Client()
-
-    phase_defs = PHASE_DEFS[:phases]
-    effective = build_effective_prompts(phase_defs, title)
+    print(f"Video-to-Action — {len(effective)} selected call(s), model {model}")
+    def runner(pd):
+        print(f"  Call: {pd['title']} ...")
+        return run_phase(client, model, url, pd["prompt"], start, end, low_res)
+    results, errors = execute_phases(effective, runner)
     resolution = "low" if low_res else "default"
-    clip = f"{start or 'start'} -> {end or 'end'}" if (start or end) else "full video"
-    results: dict = {}
-    errors: list = []
+    clip = f"{start or 'start'} -> {end or 'end'}" if start or end else "full video"
+    report_path = save_outputs(
+        output_base, title, duration, url, intent, model, effective,
+                               results, errors, resolution, clip)
+    print(f"Saved: {report_path}")
+    return 0 if results else 1
 
-    print(f"Video-to-Action — {len(phase_defs)} phases, model {model}")
-    print(f"  URL: {url}")
-    if start or end:
-        print(f"  Clip: {start or 'start'} -> {end or 'end'}")
-    if low_res:
-        print("  Resolution: low (~100 tokens/sec of video)")
-    else:
-        print("  Resolution: default (~300 tokens/sec of video)")
-    if title:
-        print(f'  Title: supplied by user ("{title}")')
-    else:
-        print("  Title: model will infer")
-    print()
 
-    for pd in effective:
-        print(f"  Phase: {pd['title']} ...")
+def run_self_test() -> bool:
+    fixture_root = Path.cwd() / "tmp"
+    fixture_root.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(dir=fixture_root) as temp:
+        base = Path(temp)
+        assert normalize_duration("4:05") == "04:05"
+        assert normalize_duration("1:02:03") == "01:02:03"
+        for invalid in ("4", "4:5", "04:60", "1:60:00", "abc"):
+            try:
+                normalize_duration(invalid)
+                raise AssertionError(f"invalid duration accepted: {invalid}")
+            except argparse.ArgumentTypeError:
+                pass
+
+        phase_counts = [
+            len(selected_phase_defs(False, False, False)),
+            len(selected_phase_defs(True, False, False)),
+            len(selected_phase_defs(True, True, True)),
+        ]
+        assert phase_counts == [1, 2, 3]
         try:
-            text = run_phase(client, model, url, pd["prompt"], start, end, low_res)
-            if not text.strip():
-                raise RuntimeError("empty response from the API")
-            results[pd["key"]] = text
-            print(f"    OK ({len(text)} chars)")
-        except Exception as exc:  # noqa: BLE001
-            errors.append({
-                "phase": pd["key"],
-                "error": f"{type(exc).__name__}: {exc}",
-                "timestamp": datetime.now().isoformat(),
-            })
-            print(f"    FAILED: {type(exc).__name__}: {exc}")
+            selected_phase_defs(False, True, False)
+            raise AssertionError("technical relevance gate failed")
+        except ValueError:
+            pass
 
-    if not results:
-        print("\nAll phases failed. Nothing to compile. Common causes: private or "
-              "unlisted video, invalid model id, exhausted daily quota, or an "
-              "authentication problem.")
-        save_outputs(output_base, url, intent, model,
-                     [p["key"] for p in effective], results, errors,
-                     effective, resolution, clip, title)
-        return 1
+        duration = "14:34"
+        procedure_result = (
+            "## Overview\n### Overview child\n#### Overview detail\n"
+            "```markdown\n## Overview\n## Steps\n```\n"
+            "## Steps\n### STEP 1: Fixture\n#### Step detail"
+        )
+        acts = (
+            "## 🎭 ACT I: Start\n### Act child\n#### Act detail\n"
+            "```markdown\n## 🎭 ACT II: Code sample\n```\n"
+            "## 🎭 FINAL ACT: Key Takeaways"
+        )
 
-    proc_path = save_outputs(
-        output_base, url, intent, model,
-        [p["key"] for p in effective], results, errors,
-        effective, resolution, clip, title)
+        omitted_effective = build_effective_prompts(
+            selected_phase_defs(False, False, False), "Omitted Fixture", duration)
+        omitted_path = save_outputs(
+            base, "Omitted Fixture", duration, "https://youtu.be/fixture",
+            "summarize", DEFAULT_MODEL, omitted_effective,
+            {"procedure": procedure_result}, [], "default", "full video",
+            run_ts="20000101-000001")
+        omitted_text = omitted_path.read_text(encoding="utf-8")
+        assert "Not selected for this run." in omitted_text
 
-    print(f"\nSaved: {proc_path}")
-    if errors:
-        print(f"Completed with {len(errors)} failed phase(s); see Extraction "
-              "Errors in the procedure document.")
-    return 0
+        failed_effective = build_effective_prompts(
+            selected_phase_defs(True, True, True), "Failed Fixture", duration)
 
+        def failed_runner(pd):
+            if pd["key"] == "deep_summary":
+                raise RuntimeError("fixture failure")
+            return procedure_result if pd["key"] == "procedure" else "fixture technical"
 
-# ── CLI ──────────────────────────────────────────────────────────────────────
+        failed_results, failed_errors = execute_phases(failed_effective, failed_runner)
+        failed_path = save_outputs(
+            base, "Failed Fixture", duration, "https://youtu.be/fixture",
+            "summarize", DEFAULT_MODEL, failed_effective, failed_results,
+            failed_errors, "default", "full video", run_ts="20000101-000002")
+        failed_text = failed_path.read_text(encoding="utf-8")
+        assert "Deep Summary extraction failed; see Extraction Errors." in failed_text
+        assert "Not selected for this run." not in failed_text
 
-def main():
-    parser = argparse.ArgumentParser(
-        description="Video-to-Action — extract procedures from public YouTube "
-                    "videos via the Gemini API")
-    parser.add_argument("url", nargs="?", default=None,
-                        help="Public YouTube video URL")
-    parser.add_argument("--intent", default="summarize",
-                        choices=["follow", "summarize", "learn"],
-                        help="What the extraction is for (default: summarize). "
-                             "Note: 'follow' still only extracts; execution needs "
-                             "separate authorization.")
-    parser.add_argument("--phases", type=int, default=2, choices=[2, 3],
-                        help="Extraction passes: 2 for general content, 3 to add "
-                             "the technical pass for coding/software videos "
-                             "(default: 2)")
-    parser.add_argument("--model", default=os.environ.get(
-                            "VIDEO_TO_ACTION_MODEL", DEFAULT_MODEL),
-                        help=f"Gemini model id (default: {DEFAULT_MODEL}, or "
-                             "VIDEO_TO_ACTION_MODEL env var)")
-    parser.add_argument("--start", type=parse_offset, default=None,
-                        help="Analyze from this offset (seconds, MM:SS, or HH:MM:SS)")
-    parser.add_argument("--end", type=parse_offset, default=None,
-                        help="Analyze up to this offset (seconds, MM:SS, or HH:MM:SS)")
-    parser.add_argument("--resolution", default="default",
-                        choices=["default", "low"],
-                        help="Media resolution: 'low' cuts video token cost ~3x "
-                             "and extends the length cap (default: default)")
+        success_effective = build_effective_prompts(
+            selected_phase_defs(True, False, False), "Success Fixture", duration)
+        success_path = save_outputs(
+            base, "Success Fixture", duration, "https://youtu.be/fixture",
+            "summarize", DEFAULT_MODEL, success_effective,
+            {"procedure": procedure_result, "deep_summary": acts}, [],
+            "default", "full video", run_ts="20000101-000003")
+        success_text = success_path.read_text(encoding="utf-8")
+        success_prompts = success_path.with_name("prompts.md").read_text(encoding="utf-8")
+
+        assert "## Procedure" in success_text and "## Detailed Summary" in success_text
+        assert "\n### Overview\n" in success_text and "\n### Steps\n" in success_text
+        assert "\n### 🎭 ACT I: Start\n" in success_text
+        assert "\n### 🎭 FINAL ACT: Key Takeaways\n" in success_text
+        assert "### Overview child" in success_text and "#### Overview detail" in success_text
+        assert "### STEP 1: Fixture" in success_text and "#### Step detail" in success_text
+        assert "### Act child" in success_text and "#### Act detail" in success_text
+        assert "```markdown\n## Overview\n## Steps\n```" in success_text
+        assert "```markdown\n## 🎭 ACT II: Code sample\n```" in success_text
+        assert f"- **Duration:** {duration}" in success_text
+        duration_rule = (
+            f"This video's exact total length is {duration}; use it verbatim as the "
+            f"Length, and ensure every timestamp falls within 00:00–{duration}."
+        )
+        assert duration_rule in success_effective[0]["prompt"]
+        assert duration_rule in success_effective[1]["prompt"]
+        assert f"**Duration supplied:** {duration}" in success_prompts
+        assert success_effective[0]["prompt"] in success_prompts
+        assert success_effective[1]["prompt"] in success_prompts
+
+        for report_path in (omitted_path, failed_path, success_path):
+            assert report_path.name == "report.md"
+            report_text = report_path.read_text(encoding="utf-8")
+            assert "## Procedure" in report_text
+            assert "## Detailed Summary" in report_text
+
+    print("Self-test passed: duration, prompts, nesting, fences, and report states.")
+    return True
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Extract a deterministic video report")
+    parser.add_argument("url", nargs="?")
+    parser.add_argument("--intent", default="summarize", choices=["follow", "summarize", "learn"])
+    parser.add_argument("--model", default=os.environ.get("VIDEO_TO_ACTION_MODEL", DEFAULT_MODEL))
+    parser.add_argument("--start", type=parse_offset)
+    parser.add_argument("--end", type=parse_offset)
+    parser.add_argument("--resolution", default="default", choices=["default", "low"])
     parser.add_argument("--output-dir", default=os.environ.get(
-                            "VIDEO_TO_ACTION_OUTPUT_DIR", str(DEFAULT_OUTPUT_DIR)),
-                        help="Base directory for run outputs (default: "
-                             "Archive\\Video-to-action under the current directory, "
-                             "or VIDEO_TO_ACTION_OUTPUT_DIR env var)")
-    parser.add_argument("--check-setup", action="store_true",
-                        help="Verify dependencies and API key, make no API call, "
-                             "then exit")
-    parser.add_argument("--dump-prompts", action="store_true",
-                        help="Regenerate PROMPTS.md (the canonical prompt template) "
-                             "next to SKILL.md and exit; makes no API call")
-    parser.add_argument("--title", default=None,
-                        help="Exact video title (REQUIRED for an extraction run). "
-                             "Supplied by the orchestrating agent from user input "
-                             "(typed, pasted, or read from a screenshot). Used verbatim "
-                             "in procedure.md and, sanitized, in the run folder name.")
+        "VIDEO_TO_ACTION_OUTPUT_DIR", str(DEFAULT_OUTPUT_DIR)))
+    parser.add_argument("--title")
+    parser.add_argument("--duration", type=normalize_duration)
+    parser.add_argument("--deep-summary", action="store_true")
+    parser.add_argument("--technical", action="store_true")
+    parser.add_argument("--coding-video", action="store_true")
+    parser.add_argument("--check-setup", action="store_true")
+    parser.add_argument("--dump-prompts", action="store_true")
+    parser.add_argument("--self-test", action="store_true")
     args = parser.parse_args()
-
     if args.dump_prompts:
-        target = dump_prompts()
-        print(f"Wrote {target}")
-        sys.exit(0)
-
+        print(f"Wrote {dump_prompts()}")
+        return
+    if args.self_test:
+        sys.exit(0 if run_self_test() else 1)
     if args.check_setup:
-        sys.exit(0 if check_setup(verbose=True) else 1)
-
-    if not args.url:
-        parser.error("a YouTube URL is required (or use --check-setup)")
-    if not is_youtube_url(args.url):
-        parser.error("the URL does not look like a YouTube video URL "
-                     "(youtube.com/watch, youtu.be, or youtube.com/shorts)")
+        sys.exit(0 if check_setup() else 1)
+    if not args.url or not is_youtube_url(args.url):
+        parser.error("a valid public YouTube URL is required")
     if not args.title or not args.title.strip():
-        parser.error('a title is required: pass --title "..." (the orchestrating '
-                     "agent supplies it from user input; this skill no longer "
-                     "infers titles)")
-
+        parser.error('an exact title is required: pass --title "..."')
+    if not args.duration:
+        parser.error("--duration is required (MM:SS or HH:MM:SS)")
+    if args.technical and not args.coding_video:
+        parser.error("--technical requires --coding-video")
     if not check_setup(verbose=False):
         check_setup(verbose=True)
         sys.exit(1)
-
-    try:
-        sys.exit(run_extraction(
-            url=args.url,
-            intent=args.intent,
-            phases=args.phases,
-            model=args.model,
-            start=args.start,
-            end=args.end,
-            low_res=(args.resolution == "low"),
-            output_base=Path(args.output_dir),
-            title=args.title,
-        ))
-    except KeyboardInterrupt:
-        print("\nExtraction cancelled by user. No further API calls will be made.")
-        sys.exit(130)
+    sys.exit(run_extraction(
+        args.url, args.intent, args.model, args.start, args.end,
+        args.resolution == "low", Path(args.output_dir), args.title.strip(),
+        args.duration, args.deep_summary, args.technical, args.coding_video,
+    ))
 
 
 if __name__ == "__main__":

@@ -1,9 +1,9 @@
 ---
-name: imp-upd-task
-description: Create or update pending workspace housekeeping and admin task files with checklists, Definition of Done, scope boundaries, validation steps, mandatory colored estimated-effort tables at every task depth, and pending/done lifecycle handling. Use when the user asks for /imp-upd-task, create task, update task, task checklist, housekeeping task, admin task, or clear equivalents.
+name: task-this
+description: Create or update pending workspace housekeeping and admin task files with checklists, Definition of Done, scope boundaries, validation steps, mandatory colored estimated-effort tables at every task depth, and pending/done lifecycle handling. Use when the user asks for /task-this, create task, update task, task checklist, housekeeping task, admin task, or clear equivalents.
 ---
 
-# Imp Upd Task
+# Task This
 
 Create or update a workspace task file for general housekeeping and admin work. A task here is non-product backbone work that keeps files, folders, skills, plans, summaries, documentation, workflows, or workspace structure organized and in sync.
 
@@ -41,8 +41,8 @@ This skill operates under the project's canonical contract (e.g. `CLAUDE.md`, `A
 
 Treat these as direct invocation and begin the workflow:
 
-- `/imp-upd-task`
-- `use imp-upd-task`
+- `/task-this`
+- `use task-this`
 - `create task`
 - `update task`
 - `task checklist`
@@ -72,7 +72,13 @@ When the user wants to update an existing `_done.md` task, reopen it gracefully:
 1. Add a new phase, checklist section, or dated update section that explains why the task is active again.
 2. Preserve the previous completed work and completion evidence.
 3. Rename the task file from `_done.md` back to `_pending.md`.
-4. Update the status and lifecycle lines to show that the task was reopened.
+4. **Move the file back from `Historical` to `Live`.** A done task lives in
+   `Archive\Historical\Tasks\[Subject]\`; reopening moves it to
+   `Archive\Live\Tasks\[Subject]\`, preserving the same `[Subject]` folder and the
+   same `N.) ` number. A reopened (pending) task must live on the `Live` side so a
+   "scan Live for active work" pass still finds it — never leave a reopened task
+   stranded in `Historical`.
+5. Update the status and lifecycle lines to show that the task was reopened.
 
 Do not delete prior completed sections just because a task has been reopened.
 
@@ -112,13 +118,19 @@ Ask before writing when:
 
 ## Default Path And Naming
 
-Default directory:
+Default directory (the `[Subject]` folder is the broad category, e.g. `Skills/`,
+`Housekeeping/`, `Legacy/`; it is never numbered):
 
 ```text
-<project root>\Archive\Tasks\
+<project root>\Archive\Live\Tasks\[Subject]\
 ```
 
-Task files always live under `Archive/` (in `Archive/Tasks/`). If the workspace contract specifies a different task directory, use that contract path instead. Otherwise default to `<project root>\Archive\Tasks\` — do not create a separate top-level `Tasks/` directory outside `Archive/`.
+Task files always live under `Archive/`, nested inside a `[Subject]` folder (in
+`Archive/Live/Tasks/[Subject]/`). If the workspace contract specifies a different
+task directory, use that contract path instead. Otherwise default to
+`<project root>\Archive\Live\Tasks\[Subject]\` — do not create a separate
+top-level `Tasks/` directory outside `Archive/`, and do not save tasks flat
+directly under `Tasks/` without a Subject folder.
 
 Filename format:
 
@@ -132,7 +144,20 @@ Mini task filename format, only when the user explicitly asks for a "mini task":
 N.) {area_or_component}_{main_task}_mini_task_pending.md
 ```
 
-`N` is the next available integer in the task directory, starting from `1`. If the task directory is empty, use `1`. If existing task files already use the `N.) ` prefix, increment past the highest existing number. The numeric prefix survives the `_pending.md` → `_done.md` rename — do not renumber on finalization.
+`N` is assigned **once at creation** as the next integer past the highest `N.) `
+number found across **both** `Archive\Live\Tasks\[Subject]\` **and**
+`Archive\Historical\Tasks\[Subject]\` combined — the Subject's full Live +
+Historical namespace. Glob both folders, take the global max, add 1. If neither
+folder holds a numbered file, use `1`. This combined-namespace rule prevents
+collisions when the Live folder drains and would otherwise restart at `1` while
+Historical still holds that number.
+
+The number is **immutable for the life of the file**: it survives the
+`_pending.md` ↔ `_done.md` rename and the Live ↔ Historical moves on finalize and
+reopen. Never renumber on finalization or reopening, and never reclaim gaps.
+
+**Folders are never numbered — only files carry the `N.) ` prefix**, restarting
+at `1` per `[Subject]` folder across the combined namespace.
 
 Generate the body of the filename from the task area/component and main task. Use lowercase letters, digits, and underscores for the body. Do not ask the user for the filename unless the derived name would be ambiguous or misleading.
 
@@ -140,13 +165,14 @@ Generate the body of the filename from the task area/component and main task. Us
 
 Before writing a new task, make sure these are known or safely inferable:
 
-1. Task Area / Component
-2. Main Task
-3. What Needs To Be Done
-4. Definition of Done
-5. Output Task Directory
-6. Scope Boundaries
-7. Task Depth
+1. Subject (the broad category folder, e.g. `Skills`, `Housekeeping`)
+2. Task Area / Component
+3. Main Task
+4. What Needs To Be Done
+5. Definition of Done
+6. Output Task Directory
+7. Scope Boundaries
+8. Task Depth
 
 Use this prompt shape when information is missing:
 
@@ -154,18 +180,20 @@ Use this prompt shape when information is missing:
 We need to define this task before writing it.
 
 How these fields determine the task path:
+- Subject decides the broad category folder under `Archive/Live/Tasks`, usually `Archive/Live/Tasks/[Subject]` (the folder is never numbered).
 - Task Area / Component becomes the leading part of the filename.
 - Main Task becomes the rest of the filename body.
-- Together they produce `N.) {area_or_component}_{main_task}_pending.md` under the workspace's task directory (`<project root>\Archive\Tasks\` by default), where `N` is the next available integer (start at `1`).
+- Together they produce `N.) {area_or_component}_{main_task}_pending.md` under the Subject folder (`<project root>\Archive\Live\Tasks\[Subject]\` by default), where `N` is the next integer past the highest number across the Subject's combined `Live` + `Historical` folders.
 - If the user explicitly asked for a mini task, use `N.) {area_or_component}_{main_task}_mini_task_pending.md` instead.
 
-1. Task Area / Component:
-2. Main Task:
-3. What Needs To Be Done:
-4. Definition of Done:
-5. Output Task Directory:
-6. Scope Boundaries:
-7. Task Depth:
+1. Subject:
+2. Task Area / Component:
+3. Main Task:
+4. What Needs To Be Done:
+5. Definition of Done:
+6. Output Task Directory:
+7. Scope Boundaries:
+8. Task Depth:
 ```
 
 Definition of Done means the series of constraints and technical specifications required for the agent or user to conclude that a task is complete.
@@ -266,6 +294,46 @@ If this task's work was divided among multiple agents, the `delegate-this` skill
 
 Do not populate this field yourself. Do not reason about delegation, routing, platforms, or assignment packets in this skill — that logic lives in `delegate-this`, and this skill has no dependency on it. A task with `**Delegation:** N/A`, or a task predating this field, is complete and correct.
 
+## Child Numbering (Outside Delegation)
+
+Tasks can be **children** of a parent task even outside any delegation — for
+example, when one large task is split into a parent and sub-tasks. This skill
+understands the lowercase child-numbering grammar enough to **allocate the next
+child suffix** and **obey a reserved prefix**; it does **not** absorb the
+delegation workflow.
+
+Grammar (shared with `delegate-this`):
+
+- independent / parent task: `N.)`
+- independent mini task with no parent: `N.)`
+- child task (mini or not): `Na.)`, `Nb.)` … `Nz.)`, then `Naa.)`, `Nab.)` …
+- the parent's permanent `N` is inherited by every child **in the Task family**.
+
+**Separate namespace anchor.** The Task family's master `N` comes from the
+Plan/Task Subject namespace only. It is independent of any Delegation record
+number or Summary family number — those are separate artifact-type namespaces
+with their own anchors, connected to the Task by explicit path pointers, not by
+a shared number. Do not scan the Delegation or Summary folders to choose a Task
+number, and do not expect the numbers to match.
+
+How to assign a child prefix when parenthood applies:
+
+1. **Infer parenthood** from explicit user direction ("this is a sub-task of …")
+   or clear context. **Ask when parenthood is ambiguous** — do not guess.
+2. **Scan the parent's existing lowercase children** across **both**
+   `Archive\Live\Tasks\[Subject]\` and `Archive\Historical\Tasks\[Subject]\`
+   (files matching `Na.)` … `Nz.)`, `Naa.)` … for the same parent `N`) to see
+   which suffixes are taken.
+3. **Allocate the next suffix** in alphabetical order, skipping any taken.
+4. **Obey an orchestrator-reserved prefix exactly** when one is supplied (for
+   example, when `delegate-this` reserved `1a.)` for this task). Never invent or
+   renumber a reserved prefix.
+
+The child prefix is **permanent**. It survives `_pending.md` ↔ `_done.md`
+renames and Live ↔ Historical moves; `finalize-task` preserves it through
+finalization and reopening. An independent mini task with no parent uses the
+plain `N.)` form, not a child suffix.
+
 ## Task Style Rules
 
 Task files should be easy to scan and act on inside an editor.
@@ -305,11 +373,11 @@ Do not mark a task complete unless the user confirms completion or the session e
 
 ## Output Rules
 
-Task files belong in the workspace's task directory, which lives under `Archive/` (`<project root>\Archive\Tasks\` by default). If the workspace contract defines a different task directory, use that instead.
+Task files belong in the workspace's task directory, which lives under `Archive/`, nested inside a `[Subject]` folder (`<project root>\Archive\Live\Tasks\[Subject]\` by default). If the workspace contract defines a different task directory, use that instead.
 
 If the output directory is missing, create it only when file creation is allowed.
 
-**Archive folder rule.** Tasks always live under `Archive/` (in `Archive/Tasks/`). If the `Archive/` folder does not yet exist in the workspace, create it yourself — along with the needed `Tasks/` subfolder — when file creation is allowed. Never redirect the task into any other folder (such as `Documentation/` or a separate top-level `Tasks/` outside `Archive/`) as a fallback. The task folder always nests inside `Archive/`.
+**Archive folder rule.** Tasks always live under `Archive/`, inside a `[Subject]` folder (in `Archive/Live/Tasks/[Subject]/`). If the `Archive/` folder does not yet exist in the workspace, create it yourself — along with the needed `Live/Tasks/[Subject]/` subfolders — when file creation is allowed. Never redirect the task into any other folder (such as `Documentation/` or a separate top-level `Tasks/` outside `Archive/`) as a fallback, and never save a task flat under `Tasks/` without a Subject folder. The task folder always nests inside `Archive/`.
 
 After creating or updating a task, report the task path and summarize the change. Do not paste the entire task into chat unless the user asks.
 
@@ -325,11 +393,15 @@ If the user asked for the task only in chat, do not create, update, rename, or f
 After creating or updating a task:
 
 - confirm the file exists
+- confirm the file is nested inside a `[Subject]` folder under `Archive\Live\Tasks\` — never saved flat directly under `Tasks\`
+- confirm the `N.) ` number is the max across the Subject's combined `Live` + `Historical` folders plus one, and that the `[Subject]` folder itself is unnumbered
+- if reopening a done task, confirm it was moved from `Archive\Historical\Tasks\[Subject]\` back to `Archive\Live\Tasks\[Subject]\` with its `N.) ` number unchanged and prior completed evidence preserved
 - confirm the filename ends in `_pending.md`, `_done.md`, `_mini_task_pending.md`, or `_mini_task_done.md` as appropriate
 - confirm UTF-8 text was used
 - confirm the top status and lifecycle lines exist for Standard and Deep tasks
 - confirm a `## Prompt Contract` section exists with a DEFINITION OF DONE clause (the task's authoritative Definition of Done); confirm no standalone `## Definition of Done` section was written
 - confirm a `**Delegation:**` line exists under `## Context`, reading `N/A` unless `delegate-this` populated it
+- if the task is a **child** of a parent task, confirm its lowercase child prefix (`Na.)`, `Nb.)`, …) is the next free suffix for that parent across the combined Live + Historical Subject folders — or exactly matches an orchestrator-reserved prefix — and that parenthood was inferred from clear direction/context (not guessed when ambiguous)
 - confirm the Prompt Contract was shown in chat and, unless the `prompt-contracts` skill was unavailable, authored through it
 - confirm validation steps are present
 - for every durable task, including Compact and mini tasks, confirm the `Estimated Effort` table uses the full `Phase | Sessions | 🟣 | Complexity` shape, includes colored row markers, keeps raw Markdown pipes vertically aligned, and includes a total estimate line

@@ -104,7 +104,7 @@ While in LTNEY mode, the agent should:
 
 LTNEY mode alone does not create durable artifacts. It can discuss what a plan or task might contain, but it must not create or update a file by itself.
 
-When LTNEY is explicitly combined with an artifact-owning skill such as `imp-upd-plan` or `imp-upd-task`, that skill may create or update its own artifact only when the user clearly asked for that workflow. In that case, LTNEY controls the style and safety posture, not whether the other named skill is allowed to run.
+When LTNEY is explicitly combined with an artifact-owning skill such as `plan-this` or `task-this`, that skill may create or update its own artifact only when the user clearly asked for that workflow. In that case, LTNEY controls the style and safety posture, not whether the other named skill is allowed to run.
 
 ## Allowed Output
 
@@ -119,7 +119,7 @@ Allowed LTNEY output includes:
 - implementation strategy discussion without code
 - questions that clarify scope or intent
 - high-level next-step options
-- references to which skill should be used later, such as `green-light`, `imp-upd-plan`, `imp-upd-task`, `debug`, `inspect`, or `session-summary`
+- references to which skill should be used later, such as `green-light`, `plan-this`, `task-this`, `debug`, `inspect`, or `session-summary`
 
 ## Forbidden Output
 
@@ -143,7 +143,7 @@ Do not produce or perform any of the following while LTNEY is active unless anot
 - workflow updates
 - product source-file edits or generated product-code snippets
 
-If the user wants to move from LTNEY-only discussion into execution, they should explicitly invoke the appropriate workflow, such as `green-light`, `imp-upd-plan`, `imp-upd-task`, `debug`, `inspect`, or a skill-creation workflow.
+If the user wants to move from LTNEY-only discussion into execution, they should explicitly invoke the appropriate workflow, such as `green-light`, `plan-this`, `task-this`, `debug`, `inspect`, or a skill-creation workflow.
 
 ## Diligence Rule
 
@@ -164,9 +164,9 @@ Use LTNEY when the user wants discussion only, or when the user wants another na
 
 Use `green-light` when the user explicitly approves moving from discussion into execution. `green-light` supersedes LTNEY only for the named greenlit task and does not end LTNEY mode globally.
 
-Use `imp-upd-plan` when the user wants a durable active implementation plan written under `<project root>\Archive\Plans\`. LTNEY does not block `imp-upd-plan` when both are explicitly invoked; it requires the agent to stay diligent and avoid unrelated execution.
+Use `plan-this` when the user wants a durable active implementation plan written under `<project root>\Archive\Live\Plans\`. LTNEY does not block `plan-this` when both are explicitly invoked; it requires the agent to stay diligent and avoid unrelated execution.
 
-Use `imp-upd-task` when the user wants a durable housekeeping task written under `<project root>\Archive\Tasks\`. LTNEY does not block `imp-upd-task` when both are explicitly invoked; it requires the agent to keep the task scoped and avoid unrelated execution.
+Use `task-this` when the user wants a durable housekeeping task written under `<project root>\Archive\Live\Tasks\`. LTNEY does not block `task-this` when both are explicitly invoked; it requires the agent to keep the task scoped and avoid unrelated execution.
 
 Use `debug` later when the user wants structured bug diagnosis or root-cause investigation.
 

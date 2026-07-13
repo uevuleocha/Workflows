@@ -1,7 +1,7 @@
 interface:
   display_name: "Delegate This"
   short_description: "Route work across agents and platforms"
-  default_prompt: "Use $delegate-this to divide a substantial objective across multiple agents. Mode A writes a durable cross-platform delegation record with one self-contained packet per authorized platform, and always requires a parent plan and/or task. Mode B coordinates native subagents directly: it is parent-optional and creates no durable delegation record merely for dispatch."
+  default_prompt: "Use $delegate-this to divide a substantial objective across multiple agents. It resolves an execution workspace, then creates the whole delegation artifact family (parent, delegation, mini artifacts, session-summary/return-report family) inside it using lowercase child numbering (N.), Na.), Nb.) ...). Mode A writes a durable cross-platform delegation record with one self-contained packet per authorized platform, reserves every child prefix before dispatch, mandates a return report per assignment, gives every packet a Checkpoint Policy, routes Hermes in a provider-neutral way, and defaults multi-agent skill work to centralized synchronization. Mode B coordinates native subagents directly: it is parent-optional and creates no durable delegation record merely for dispatch."
 
 policy:
   allow_implicit_invocation: true

@@ -1,111 +1,157 @@
 ---
 name: stage-commit-push
-description: Deterministic stage, commit, and push workflow for the current Git repo. Say "all" to stage everything currently diffed, or name specific files/paths to scope it to just those. Use when the user explicitly invokes /stage-commit-push, use stage-commit-push, "stage commit push", "stage, commit, and push", or clear equivalents asking for a repeatable push workflow, as opposed to the read-only /git-diff check.
+description: Deterministic, explicitly invoked stage/commit/push workflow with scoped staging, remote safety gates, and optional user-approved pointer-only synchronization when the current repository is a parent hub submodule.
 ---
 
 # Stage Commit Push
 
-A single, reliable workflow for staging, committing, and pushing changes to a Git remote, so the same steps happen the same way every time regardless of which agent runs it.
-
-This skill mutates the user's real Git staging area, creates a commit, and pushes to a remote. It pairs well with `/git-diff` for a prior read-only look, but does not require it.
-
-## Project Contract
-
-This skill operates under the project's canonical contract (e.g. `CLAUDE.md`, `AGENTS.md`, or `GEMINI.md`). Safety rules, path scope, and product-code workflow defined there apply unchanged.
+Stage, commit, and push one repository deterministically. When the repository is
+a submodule of an ancestor hub, optionally synchronize only its gitlink in a
+separate, user-approved hub commit after proving the nested commit is pushed.
 
 ## Invocation
 
-Treat these as direct invocation and begin the workflow:
-
-- `/stage-commit-push`
-- `use stage-commit-push`
-- `use the stage-commit-push skill`
-- `stage commit push`
-- `stage, commit, and push`
-- clear equivalents asking for a repeatable stage/commit/push workflow
-
-This skill only ever runs on explicit invocation — never trigger it implicitly from a general "push this" remark without the user naming the skill or clearly asking for the full stage+commit+push sequence.
+Run only for `/stage-commit-push`, `use stage-commit-push`, `stage commit push`,
+`stage, commit, and push`, or an equally explicit full-workflow request.
 
 ## Scope Modes
 
-1. **All.** The user says `all`, `everything`, or `push everything`. Stage every current tracked change, modification, and untracked file: `git add -A`.
-2. **Particular.** The user names specific file(s), path(s), or folder(s). Stage only those, pathspec-scoped: `git add -A -- <path1> <path2> ...`, so nothing else — including anything another agent or process may have pre-staged — rides along.
+1. **All:** stage the current repository with `git add -A`.
+2. **Particular:** stage only user-named paths with
+   `git add -A -- <path>...`.
 
-If the request is ambiguous (neither a clear "all" nor a clear list of paths), ask once before staging anything.
+If scope is ambiguous, ask before mutation. In Particular mode, an unnamed
+submodule pointer is never eligible for staging or synchronization.
 
-## Repo Determination (mandatory)
+## Repository Determination
 
-This workspace can sit inside a nested hub/workspace repo structure (a hub tracks only final-tier workspace READMEs; each workspace is its own independent repo). Because of that:
+1. Resolve the current repository with `git rev-parse --show-toplevel` and state
+   it before mutation.
+2. Walk ancestors outside that root and inspect candidate repositories'
+   `.gitmodules` plus tracked mode `160000` entries.
+3. Treat the current repository as nested only when its canonical path exactly
+   matches a registered submodule path in an ancestor repository. Record the hub
+   root, submodule name, and hub-relative path.
+4. Do not infer nesting merely because another `.git` directory exists above it.
+5. Never mix nested-repository content and hub changes in one commit.
 
-1. Resolve the actual repo root via `git rev-parse --show-toplevel` for the current directory (or the directory the user names).
-2. State which repo you are operating in before staging, committing, or pushing.
-3. If the user's intent spans two repos (for example, a shared README that must be committed in both the workspace repo and the hub repo), treat each repo as its own separate run and say so explicitly. Never mix changes from two repos into one commit.
+## Pre-Flight for Any Repository
 
-## Pre-Flight Checks (mandatory, before staging)
+Before staging:
 
-1. `git fetch origin`.
-2. If `origin/<branch>` is ahead of or diverged from local `<branch>`, hard-stop: report the remote commits, stage/commit/push nothing, and let the user decide how to update local `<branch>` first.
-3. Check for pre-existing unpushed local commits: `git log origin/<branch>..<branch>`. A push delivers the whole chain, so if any exist, list their hashes and messages and get explicit user approval before proceeding — this run's push would ship them too.
+1. Resolve branch and upstream; require a configured `origin` and upstream unless
+   the host contract explicitly defines another approved remote.
+2. Run `git fetch origin`.
+3. Hard-stop if the remote is ahead or the histories diverged.
+4. List `git log <upstream>..HEAD`; require explicit user approval before a push
+   that would include pre-existing unpushed commits.
+5. Snapshot pre-existing staged paths. Particular mode must not let unrelated
+   pre-staged paths ride along; stop and ask rather than resetting user state.
 
-## Commit Message And Signing
+## Nested Repository Push
 
-Draft a concise commit message from the actual staged diff — imperative mood, why over what, 1-2 sentences — following the same drafting discipline used for any other commit in this workspace.
+1. Stage only the chosen scope.
+2. Verify the staged path list exactly matches scope.
+3. Draft an imperative commit message based on the staged diff.
+4. Append `Agent: <Platform>` where Platform is the executing agent platform
+   (for example Hermes, Codex, Claude, Antigravity, or zCode), never the model.
+5. Commit and push the nested repository.
+6. Prove the pushed commit is reachable from its configured upstream after a
+   fetch, for example with `git merge-base --is-ancestor HEAD <upstream>` and
+   matching/reachable remote evidence. A successful `git push` message alone is
+   not sufficient if the upstream is ambiguous.
 
-Append a signing trailer identifying the agent that ran this skill, matching the convention already used by `push-tool`:
+If the current repository is not a registered submodule, report success and stop.
+
+## Hub Pointer Synchronization
+
+Pointer synchronization is a second repository operation, never an implicit
+extension of the nested commit.
+
+### User gate
+
+Before any hub staging or commit, obtain explicit approval unless the user
+already opted into hub pointer synchronization for this run. The initial
+stage/commit/push invocation authorizes the nested repository only; it does not
+silently authorize a hub commit.
+
+### Eligibility gates
+
+Proceed only if all are true:
+
+- the nested `HEAD` was proved pushed to its upstream;
+- the hub still tracks the exact named path as mode `160000`;
+- the hub worktree's submodule path resolves to the just-pushed nested repository;
+- `git status --porcelain=v2 -z` and a direct nested status check prove the
+  nested worktree has no lowercase-`m` uncommitted-content condition;
+- in Particular mode, the user explicitly named or separately approved this
+  submodule pointer;
+- the hub has an `origin`, branch, and upstream;
+- `git fetch origin` shows the hub remote is not ahead or diverged;
+- the user approved any pre-existing unpushed hub commits;
+- no unrelated path is already staged in the hub.
+
+Lowercase `m` is not syncable. A hub records only a committed SHA, never nested
+working-tree content. Leave `m` visible and stop; do not try to capture it.
+
+### Pointer-only hub operation
+
+1. Record the hub's staged-path list and full porcelain status.
+2. Stage exactly one path:
+   `git -C <hub> add -- <hub-relative-submodule-path>`.
+3. Verify the staged diff contains exactly that one path and that its mode is
+   `160000` before and after. Use `git diff --cached --name-only -z` and
+   `git diff --cached --raw`.
+4. Verify the staged new gitlink SHA equals the proved-pushed nested `HEAD`.
+5. Commit separately with a scoped message such as
+   `Bump <name> submodule pointer to <sha7>` and the executing-platform trailer.
+6. Push the hub branch to its upstream.
+7. Fetch and verify the remote hub now records the expected gitlink SHA.
+
+Never use `git add -A` or `git add .` for pointer synchronization. Never stage a
+second path. If another path appears staged, stop before commit and preserve user
+state; do not reset it without approval.
+
+## Failure and Recovery
+
+- If the nested push fails, do not touch the hub.
+- If pushed-commit proof fails, do not touch the hub.
+- If a hub pre-flight or user gate fails, leave the successful nested push intact
+  and report the pointer as not synchronized.
+- If hub push fails after the pointer-only commit, report the local hub commit as
+  unpushed; do not rewrite, amend, force-push, or hide it.
+- Never pull, merge, rebase, reset, clean, skip hooks, or force-push as an
+  improvised recovery.
+
+## Reporting
+
+Report the two repositories separately:
 
 ```text
-Agent: <AgentName>
+Nested repository:
+- Repo: <path>
+- Scope: <all | named paths>
+- Commit: <sha> — <subject>
+- Pushed/proved at: <upstream>
+
+Hub pointer synchronization:
+- Status: <not applicable | declined | blocked | committed and pushed>
+- Hub: <path>
+- Pointer path: <path>
+- Pointer commit: <sha or N/A>
+- Verified remote gitlink: <sha or N/A>
 ```
-
-`<AgentName>` is the agent actually executing the run (e.g. `Claude`, `Codex`, `Antigravity`) — not a hard-coded value.
-
-## Workflow
-
-1. Determine scope (All vs Particular) from the user's request; ask once if ambiguous.
-2. Resolve and state the repo (Repo Determination).
-3. Run pre-flight checks (fetch, diverge hard-stop, pre-existing-commits gate).
-4. Stage per the scope rules above.
-5. Draft the commit message and append the `Agent: <AgentName>` trailer.
-6. Commit, using a heredoc-style message to preserve formatting.
-7. Push to `origin <branch>`.
-8. Report: repo, scope (files staged), commit hash and message, agent, and push confirmation.
-
-This skill runs end-to-end once scope is given — invoking it with a clear scope ("all" or named paths) is itself the user's approval to commit and push; there is no extra confirmation round-trip before step 6, mirroring `push-tool`'s one-shot execution style. The only stops are the pre-flight hard-stop and pre-existing-commits gate in step 3.
-
-## Safety Rules
-
-- Never `git add -A` or `git add .` in Particular mode — always pathspec-scoped to the named files/paths.
-- Never force-push, rewrite git history, or skip hooks.
-- Never push when the remote is ahead of or diverged from local — hard-stop only, no improvised pull/rebase/merge.
-- Never push pre-existing unpushed commits without the user's explicit approval at pre-flight.
-- Never commit changes from two repos into one commit.
-- Always state which repo is being operated on before any mutating command.
-
-## Out Of Scope
-
-- Resolving merge conflicts — stop and ask the user.
-- Creating branches, pull requests, or tags.
-- Any destructive Git operation (reset --hard, force-push, history rewrite).
-
-## Reporting Format
-
-```text
-Staged, committed, and pushed in <repo>.
-- Scope: <all | specific paths listed>
-- Commit: <short hash> - "<message>"
-- Agent: <AgentName>
-- Pushed to: origin/<branch>
-```
-
-Remote-ahead hard-stop: report the remote commits found at pre-flight, state that nothing was staged, committed, or pushed, and stop — the user decides how to update local first.
 
 ## Validation
 
-After a run:
+- Confirm the nested staged list matched scope and the commit carried the correct
+  executing-platform trailer.
+- Confirm the nested commit is reachable from the upstream before hub mutation.
+- Confirm the hub commit, when made, changes exactly one `160000` gitlink.
+- Confirm scoped mode never stages an unnamed pointer.
+- Confirm lowercase `m` blocks pointer synchronization.
+- Confirm remote-ahead, diverged, pre-existing-commit, and unrelated-staged-change
+  gates were respected independently in both repositories.
 
-- Confirm the repo root matches intent.
-- Confirm the staged file list matches the requested scope (all vs named paths).
-- Confirm the commit was created with the drafted message and `Agent: <AgentName>` trailer.
-- Confirm the push succeeded and report the new remote hash.
-
-When creating or updating this skill itself, validate the folder-style skill with the `quick_validate.py` script that ships with your skill-creator install, running Python in UTF-8 mode (`-X utf8`).
+When updating this skill, run the folder-style skill validator with Python UTF-8
+mode and test two-repository behavior only in disposable repositories.

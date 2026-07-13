@@ -63,7 +63,7 @@ Examples:
 ## Safety Rules
 
 - Start with one session when testing a new migration pattern.
-- Do not modify any Hermes state while Hermes Desktop is running. Abort if `state.db-wal` is non-empty at apply time (the WAL guard — Hermes runs in WAL mode with multiple processes holding the DB open).
+- Do not modify any Hermes state while Hermes Desktop is running. The process guard checks for a running `hermes.exe` before apply and is **fail-closed**: if the probe itself fails (exception, timeout, or empty output), the helper stops rather than treating the unknown result as "not running". **The WAL guard refuses *every* non-empty `state.db-wal`, not merely a WAL whose size is changing** — a fixed-size non-empty WAL is still an application's pending work and is equally unsafe.
 - Back up every touched file before mutation.
 - Back up `state.db` plus its `-wal` and `-shm` sidecars before opening for write.
 - Do not globally replace paths across `C:\Users\Admin\AppData\Local\hermes`.
@@ -72,6 +72,12 @@ Examples:
 - Keep a rollback path by preserving backups.
 - Save every backup to the unified backup folder, never scattered next to originals (see **Backup Location**).
 - Never touch `projects.db` — no project deletion, no project archive, no `primary_path` updates. Cleanup of dead projects is a separate manual user action, not part of this skill.
+
+## Nested Workspaces
+
+Workspaces are sometimes **nested inside another workspace** — e.g. a hub with sub-workspaces under it. This shape is common in some setups but is **not assumed universal** (this skill may be used anywhere).
+
+Hermes is **structurally immune** to the nested-workspace over-rewrite class: it writes `cwd` and `git_repo_root` to the **exact** destination value (`new`) with an exact idempotency guard (`already_destination`), and never performs prefix arithmetic on the stored path. There is no prefix to double and no suffix to fabricate, so a value already at the destination is recognized and left alone regardless of whether the source and destination are nested or side by side.
 
 ## Backup Location
 
@@ -208,8 +214,11 @@ The Execution Workflow consumes the manifest and handoff package prepared by the
 
 Before any write:
 
-1. Confirm Hermes is closed: check that no `Hermes.exe` process is running, and that `state.db-wal` is stale or absent.
-2. **WAL guard:** open `state.db` read-only and confirm the target rows exist. If `state.db-wal` is being actively written (modification time advancing), abort — Hermes is still running.
+1. Confirm Hermes is closed: the **process guard** checks for a running `hermes.exe`. If one is detected, abort — the migration cannot proceed. The guard is fail-closed: if the probe raises or returns unusable output, abort as well; an unknown probe result is never read as "not running".
+2. **WAL guard:** the helper refuses **every** non-empty `state.db-wal`, not only a growing one. An empty or absent WAL is safe (Hermes checkpoints on shutdown).
+3. **Read-only preflight:** `--dry-run` and the preflight verification always open `state.db` with `mode=ro`; the state DB is never opened for write unless `--apply` is explicitly passed.
+4. **Exact manifest before-state:** for every target session, if the manifest declares `old_cwd` or `old_git_repo_root`, the helper reads the live row and hard-fails if the actual values differ — the manifest must match reality before the migration proceeds.
+5. **Exact destination state:** after the write, every target row's `cwd` must equal the destination workspace exactly, and `git_repo_root` must equal the per-session `new_git_repo_root` (or the destination workspace if unset). A wrong repo root that happens to match an old path is not accepted as "already_destination".
 
 ### Single-Layer Apply Workflow
 
@@ -272,7 +281,7 @@ After verification passes and before considering the migration closed, produce a
 
 ### Failure And Rollback
 
-If anything fails before a session is fully written, stop and report the failing session ID. If a post-write verification fails, restore from backups before attempting another approach.
+If anything fails before a session is fully written, stop and report the failing session ID. **Coordinated backup restoration:** if a post-write verification fails (exact cwd/git_repo_root mismatch, integrity check, or non-target digest drift), the helper automatically restores `state.db` (and its `-wal`/`-shm` sidecars) from the run's backup — the DB returns to pre-migration state in one pass. Only after restoration is confirmed may the operator try a different approach.
 
 **If the migrated chat is absent from the sidebar (or still under the old group) after the writes:** the cause is almost always that the `sessions` row was not fully updated or Hermes was still running at apply time. Diagnose in order:
 

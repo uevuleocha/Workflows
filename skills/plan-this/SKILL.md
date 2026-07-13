@@ -1,9 +1,9 @@
 ---
-name: imp-upd-plan
+name: plan-this
 description: Create or update active implementation plans with checklists, batched/phased outlines, verification steps, mandatory colored estimated-effort tables at every plan depth, and scope boundaries. Use when the user asks for an implementation plan, active plan update, phased checklist, batched outline, "make a plan", "update the plan", "update active plan", or similar planning work. This skill does not finalize plans.
 ---
 
-# Imp Upd Plan
+# Plan This
 
 Create or update an active implementation plan. Plans are durable working artifacts for future implementation sessions, not short chat summaries.
 
@@ -41,8 +41,8 @@ This skill operates under the project's canonical contract (e.g. `CLAUDE.md`, `A
 
 Treat these as direct invocation and begin the workflow:
 
-- `/imp-upd-plan`
-- `use imp-upd-plan`
+- `/plan-this`
+- `use plan-this`
 - `implementation plan`
 - `update the plan`
 - `update active plan`
@@ -60,7 +60,7 @@ Review only the sources needed to create or update the plan accurately:
 1. The project's canonical contract (e.g. `CLAUDE.md`)
 2. User-named reference files
 3. User-referenced active plan, if any
-4. Existing plans under `<project root>\Archive\Plans\` when needed to decide create vs update
+4. Existing plans under `<project root>\Archive\Live\Plans\` when needed to decide create vs update
 5. Relevant source files only when needed to understand scope, anchors, or feasibility
 
 Do not perform a broad repository audit unless the plan request genuinely requires it.
@@ -91,7 +91,7 @@ Ask before writing when:
 - the target filename, directory, project/component, scope boundaries, or plan depth is unclear
 - the user provides a vague request such as "make/update a plan for this" without enough context to choose create vs update confidently
 
-When matching existing plans, inspect `<project root>\Archive\Plans\` for `_active.md` and `_finalized.md` files and compare project/component names, primary files, task phrases, and current plan titles.
+When matching existing plans, inspect `<project root>\Archive\Live\Plans\` for `_active.md` and `_finalized.md` files and compare project/component names, primary files, task phrases, and current plan titles.
 
 ## Plan Lifecycle
 
@@ -111,17 +111,24 @@ When the user wants to update an existing `_finalized.md` plan, reopen it gracef
 1. Preserve the previous finalized work, completion evidence, and finalization notes.
 2. Add a new phase, checklist section, or dated update section that explains why the plan is active again.
 3. Rename the plan file from `_finalized.md` back to `_active.md`.
-4. Update the status and lifecycle lines to show that the plan was reopened.
-5. Leave finalization for a later explicit `finalize-plan` pass after the user verifies the reopened work.
+4. **Move the file back from `Historical` to `Live`.** A finalized plan lives in
+   `Archive\Historical\Plans\[Subject]\`; reopening moves it to
+   `Archive\Live\Plans\[Subject]\`, preserving the same `[Subject]` folder and the
+   same `N.) ` number. An active/pending plan must live on the `Live` side so a
+   "scan Live for active work" pass still finds it — never leave a reopened plan
+   stranded in `Historical`.
+5. Update the status and lifecycle lines to show that the plan was reopened.
+6. Leave finalization for a later explicit `finalize-plan` pass after the user verifies the reopened work.
 
 Do not delete prior completed sections just because a finalized plan has been reopened.
 
 ## Create Mode
 
-Default directory:
+Default directory (the `[Subject]` folder is the broad category, e.g. `Skills/`,
+`Trading/`; it is never numbered):
 
 ```text
-<project root>\Archive\Plans\[Project]\
+<project root>\Archive\Live\Plans\[Subject]\
 ```
 
 Filename format:
@@ -136,7 +143,22 @@ Mini plan filename format, only when the user explicitly asks for a "mini plan":
 N.) {primary_file_or_component}_{main_task}_mini_active.md
 ```
 
-`N` is the next available integer in the target plan directory, starting from `1`. If the directory is empty, use `1`. If existing plan files already use the `N.) ` prefix, increment past the highest existing number. The numeric prefix survives `_active.md` -> `_finalized.md` and `_finalized.md` -> `_active.md` lifecycle renames. Do not renumber existing plans during finalization or reopening.
+`N` is assigned **once at creation** as the next integer past the highest `N.) `
+number found across **both** `Archive\Live\Plans\[Subject]\` **and**
+`Archive\Historical\Plans\[Subject]\` combined — the Subject's full Live +
+Historical namespace. Glob both folders, take the global max, add 1. If neither
+folder holds a numbered file, use `1`. This combined-namespace rule prevents
+collisions when the Live folder drains and would otherwise restart at `1` while
+Historical still holds that number.
+
+The number is **immutable for the life of the file**: it survives `_active.md` ↔
+`_finalized.md` lifecycle renames and the Live ↔ Historical moves on finalize and
+reopen. Never renumber on finalization or reopening, and never reclaim gaps.
+
+**Folders are never numbered — only files carry the `N.) ` prefix.** The
+`[Subject]` folder is a plain name (`Skills/`, `Trading/`, `Legacy/`); the numeric
+index lives only on the files inside it, and `N.)` is unique per Subject across
+the combined namespace.
 
 Generate the body of the filename from `Primary File or Main Component` and `Main Task`. Use lowercase letters, digits, and underscores for the body. Do not ask the user for the filename unless the derived name would be ambiguous or misleading.
 
@@ -157,7 +179,7 @@ If an update conflicts with the existing plan, record the new user decision clea
 
 Before writing a new plan, make sure these are known or safely inferable:
 
-1. Project / Component
+1. Subject (the broad category folder, e.g. `Skills`, `Trading`)
 2. Main Task
 3. Primary File or Main Component
 4. Reference Files, optional
@@ -171,13 +193,13 @@ Use this prompt shape when information is missing:
 We need to define this implementation plan.
 
 How these fields determine the plan path:
-- Project / Component decides the folder under `Archive/Plans`, usually `Archive/Plans/[Project]`.
+- Subject decides the broad category folder under `Archive/Live/Plans`, usually `Archive/Live/Plans/[Subject]` (the folder is never numbered).
 - Primary File or Main Component becomes the filename prefix.
 - Main Task becomes the filename body.
-- Together they produce `N.) {primary_file_or_component}_{main_task}_active.md`, where `N` is the next available integer in the target plan directory.
+- Together they produce `N.) {primary_file_or_component}_{main_task}_active.md`, where `N` is the next integer past the highest number across the Subject's combined `Live` + `Historical` folders.
 - If the user explicitly asked for a mini plan, use `N.) {primary_file_or_component}_{main_task}_mini_active.md` instead.
 
-1. Project / Component:
+1. Subject:
 2. Main Task:
 3. Primary File or Main Component:
 4. Reference Files (optional):
@@ -266,6 +288,46 @@ If this plan's work was divided among multiple agents, the `delegate-this` skill
 
 Do not populate this field yourself. Do not reason about delegation, routing, platforms, or assignment packets in this skill — that logic lives in `delegate-this`, and this skill has no dependency on it. A plan with `**Delegation:** N/A`, or a plan predating this field, is complete and correct.
 
+### Child Numbering (Outside Delegation)
+
+Plans can be **children** of a parent plan even outside any delegation — for
+example, when one large plan is split into a parent and sub-plans. This skill
+understands the lowercase child-numbering grammar enough to **allocate the next
+child suffix** and **obey a reserved prefix**; it does **not** absorb the
+delegation workflow.
+
+Grammar (shared with `delegate-this`):
+
+- independent / parent plan: `N.)`
+- independent mini plan with no parent: `N.)`
+- child plan (mini or not): `Na.)`, `Nb.)` … `Nz.)`, then `Naa.)`, `Nab.)` …
+- the parent's permanent `N` is inherited by every child **in the Plan family**.
+
+**Separate namespace anchor.** The Plan family's master `N` comes from the
+Plan/Task Subject namespace only. It is independent of any Delegation record
+number or Summary family number — those are separate artifact-type namespaces
+with their own anchors, connected to the Plan by explicit path pointers, not by
+a shared number. Do not scan the Delegation or Summary folders to choose a Plan
+number, and do not expect the numbers to match.
+
+How to assign a child prefix when parenthood applies:
+
+1. **Infer parenthood** from explicit user direction ("this is a sub-plan of …")
+   or clear context. **Ask when parenthood is ambiguous** — do not guess.
+2. **Scan the parent's existing lowercase children** across **both**
+   `Archive\Live\Plans\[Subject]\` and `Archive\Historical\Plans\[Subject]\`
+   (files matching `Na.)` … `Nz.)`, `Naa.)` … for the same parent `N`) to see
+   which suffixes are taken.
+3. **Allocate the next suffix** in alphabetical order, skipping any taken.
+4. **Obey an orchestrator-reserved prefix exactly** when one is supplied (for
+   example, when `delegate-this` reserved `1a.)` for this plan). Never invent or
+   renumber a reserved prefix.
+
+The child prefix is **permanent**. It survives `_active.md` ↔ `_finalized.md`
+renames and Live ↔ Historical moves; `finalize-plan` preserves it through
+finalization and reopening. An independent mini plan with no parent uses the
+plain `N.)` form, not a child suffix.
+
 For compact plans, allow:
 
 - `## Context` (including the `**Delegation:**` line)
@@ -275,7 +337,7 @@ For compact plans, allow:
 - `## Estimated Effort` using the mandatory full `Phase | Sessions | 🟣 | Complexity` table
 - `## Assumptions`
 
-For complex ecosystem work, prefer the polished style used by existing finalized plans in `<project root>\Archive\Plans\`. For large product-code architecture work, also use the full style of existing deep plans when that better fits the project.
+For complex ecosystem work, prefer the polished style used by existing finalized plans in `<project root>\Archive\Live\Plans\`. For large product-code architecture work, also use the full style of existing deep plans when that better fits the project.
 
 ## Plan Style Rules
 
@@ -346,11 +408,11 @@ If the user asks for finalization, direct them to the `finalize-plan` skill.
 
 ## Output Rules
 
-Plans belong under `<project root>\Archive\Plans\`.
+Plans belong under `<project root>\Archive\Live\Plans\`.
 
 If the output directory is missing, create it only when file creation is allowed.
 
-**Archive folder rule.** Plans always live under `Archive/` (in `Archive/Plans/[Project]/`). If the `Archive/` folder does not yet exist in the workspace, create it yourself — along with the needed `Plans/[Project]/` subfolders — when file creation is allowed. Never redirect the plan into any other folder (such as `Documentation/`) as a fallback. The plan folder always nests inside `Archive/`.
+**Archive folder rule.** Plans always live under `Archive/` (in `Archive/Live/Plans/[Subject]/`). If the `Archive/` folder does not yet exist in the workspace, create it yourself — along with the needed `Live/Plans/[Subject]/` subfolders — when file creation is allowed. Never redirect the plan into any other folder (such as `Documentation/`) as a fallback. The plan folder always nests inside `Archive/`.
 
 After creating or updating a plan, report the plan path and summarize the change. Do not paste the entire plan into chat unless the user asks.
 
@@ -370,7 +432,8 @@ After creating or updating a plan:
 - confirm the filename ends in `_active.md`, or `_mini_active.md` when the user explicitly requested a mini plan
 - confirm a `## Prompt Contract` section exists (GOAL / CONSTRAINTS / FORMAT / DEFINITION OF DONE / FAILURE, or the minimal GOAL + DEFINITION OF DONE + FAILURE form for Compact and mini plans), that it was shown in chat, and that it was authored through the `prompt-contracts` skill unless that skill was unavailable
 - confirm a `**Delegation:**` line exists under `## Context`, reading `N/A` unless `delegate-this` populated it
-- if reopening a finalized plan, confirm the file was renamed from `_finalized.md` back to `_active.md`, or from `_mini_finalized.md` back to `_mini_active.md`, and that prior finalized evidence was preserved
+- if the plan is a **child** of a parent plan, confirm its lowercase child prefix (`Na.)`, `Nb.)`, …) is the next free suffix for that parent across the combined Live + Historical Subject folders — or exactly matches an orchestrator-reserved prefix — and that parenthood was inferred from clear direction/context (not guessed when ambiguous)
+- if reopening a finalized plan, confirm the file was renamed from `_finalized.md` back to `_active.md`, or from `_mini_finalized.md` back to `_mini_active.md`, that it was moved back from `Archive\Historical\Plans\[Subject]\` to `Archive\Live\Plans\[Subject]\` with its `N.) ` prefix (including any lowercase child suffix) unchanged, and that prior finalized evidence was preserved
 - skim the major headings for the chosen plan depth
 - for Standard and Deep plans, confirm the top status/lifecycle lines exist
 - for every durable plan, including Compact and mini plans, confirm the `Estimated Effort` table uses the full `Phase | Sessions | 🟣 | Complexity` shape, includes colored row markers, keeps raw Markdown pipes vertically aligned, and includes a total estimate line

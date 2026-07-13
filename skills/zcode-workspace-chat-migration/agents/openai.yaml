@@ -1,4 +1,4 @@
 interface:
   display_name: "zCode Workspace Chat Migration"
   short_description: "Safely migrate zCode chats between workspaces."
-  default_prompt: "Use this skill to migrate selected zCode chat sessions from one workspace to another by updating the db.sqlite session row (directory, path, and the path-derived project_id grouping key) and the setting.json recent-projects list, with backups and verification."
+  default_prompt: "Use this skill to migrate selected zCode chat sessions from one workspace to another by updating the PRIMARY tasks-index.sqlite tasks row (workspace_key, workspace_path, and meta_json.workspacePath — THE sidebar grouping key), SECONDARY db.sqlite session row (directory, path, and the path-derived project_id), and cleanup/parity stores (setting.json picker, db.sqlite message.data per-turn context, Local Storage cache). With fail-closed process and dual-WAL guards on both databases, escaped SQL LIKE patterns, mandatory exact before-state recording and pre-overwrite comparison for both databases, and verification. zCode must be fully closed for the execution side. The grouping key is tasks-index.sqlite, NOT db.sqlite."

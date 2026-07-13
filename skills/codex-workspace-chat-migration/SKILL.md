@@ -54,7 +54,7 @@ Front-door discovery must inspect both paths read-only and record:
 - `state_db_selection_reason` - why that DB was selected.
 - per-DB row counts for the target session IDs.
 
-If only one DB contains exactly one row for every target session, use that DB. If both DBs contain target rows, prefer the newest DB only after confirming the rows match the target sessions. If the target rows are split across DBs or any target has zero/multiple rows, stop and report the mixed state before execution.
+If only one DB contains exactly one row for every target session, use that DB. If both DBs contain exact target rows, do not tiebreak by mtime or any other guess: stop, report both candidates, and have the manifest set `selected_state_db` explicitly. If the target rows are split across DBs or any target has zero/multiple rows, stop and report the mixed state before execution.
 
 Execution helpers must consume the selected DB path from the manifest, re-check exactly one row per target immediately before writing, and back up only the selected DB plus its `-wal` and `-shm` sidecars. Do not touch the other DB unless the manifest explicitly lists target rows there.
 
@@ -83,33 +83,45 @@ Examples:
 - Keep a rollback path by preserving backups.
 - Save every backup to the unified backup folder, never scattered next to originals (see **Backup Location**).
 
+## Nested Workspaces
+
+Workspaces are sometimes **nested inside another workspace** — e.g. a hub with sub-workspaces under it. This shape is common in some setups but is **not assumed universal** (this skill may be used anywhere), so the path transform must be context-aware: it changes only the values that genuinely point at the **old** location and are **not already at or under the destination**, and never force-rewrites a value that is already correct.
+
+Classification per value (destination = `new`, source = `old`):
+
+- **Exact old root** → rewritten to `new` (checked first, so a source-under-destination exact root is still rewritten).
+- **Already at/under `new`** → left unchanged (idempotent) — the guard that prevents a doubled, corrupt path when `new` is nested under `old`.
+- **A different subtree of `old`** → *side-by-side* move swaps the prefix; *nested* move (either direction) leaves the value unchanged rather than fabricating a `new`-relative path.
+
+`replace_path` remaps whole path **values** prefix-anchored — not a global substring rewrite. This both stops the nested doubling and prevents sibling-prefix corruption (`…Universe` inside `…Universe2`); the trade-off is that a workspace path embedded mid-string is intentionally left alone. The SQLite pass additionally rejects any doubled-destination `cwd` after write.
+
 ## Backup Location
 
 All backups this skill makes — whether written by the helper script's `backup()` or made manually by an agent during a one-session fix — go to a single unified folder under the Codex directory, grouped per run:
 
 ```
-C:\Users\Admin\.codex\user-backups\<run-timestamp>\<original filename>
+C:\Users\Admin\.codex\user-backups\<run-timestamp>\<slot>-<original filename>
 ```
 
 - Equivalent notation: `~/.codex/user-backups/<run-timestamp>/`.
 - `<run-timestamp>` is one subfolder per migration run, e.g. `codex-workspace-chat-migration-20260616-073846`.
-- Keep the original filename inside that subfolder so a whole run can be deleted as a single unit.
+- Each backup keeps the original filename behind a numbered `<slot>-` prefix so two originals that share a basename (for example `state_5.sqlite` from both candidate directories) can never flatten onto one backup file, and a whole run can still be deleted as a single unit.
 - Rationale: one safe, unified place. When the migration is confirmed, the user can ask an agent to delete a run's subfolder (or the whole `user-backups` folder) — nothing else needs hunting down.
-- The helper script does this automatically. When backing up manually, copy into the same `~/.codex/user-backups/<run-timestamp>/` folder.
+- The helper script does this automatically and records an explicit **backup manifest**: one `{"original": <absolute original path>, "backup": <backup path>}` pair per file. Restoration uses only the recorded original path — never a location guessed from the backup's basename — and each restored file is verified byte-for-byte against its backup. When backing up manually, copy into the same `~/.codex/user-backups/<run-timestamp>/` folder and keep your own original→backup notes.
 
 ## Manifest Storage
 
-Building a manifest when running this skill is encouraged — it keeps a migration explicit and auditable. It is a shared concern: the **Front-Door Workflow** creates the manifest and the **Execution Workflow** consumes it. Save the manifest into the active workspace's `Archive/Manifests/Codex/` folder (create it if missing), written workspace-relative so it works for whichever project/working directory the migration targets:
+Building a manifest when running this skill is encouraged — it keeps a migration explicit and auditable. It is a shared concern: the **Front-Door Workflow** creates the manifest and the **Execution Workflow** consumes it. Save the manifest into the active workspace's `Archive/Historical/Manifests/Codex/` folder (create it if missing), written workspace-relative so it works for whichever project/working directory the migration targets:
 
 ```
-$WORKSPACE/Archive/Manifests/Codex/
-<workspace_root>/Archive/Manifests/Codex/
-./Archive/Manifests/Codex/
+$WORKSPACE/Archive/Historical/Manifests/Codex/
+<workspace_root>/Archive/Historical/Manifests/Codex/
+./Archive/Historical/Manifests/Codex/
 ```
 
-All three notations mean the same thing: the `Archive/Manifests/Codex/` folder of the workspace currently being worked in. The platform folder is determined by the chat platform being migrated, not by the agent performing the work: a Claude or Antigravity helper executing a Codex migration still uses the `Codex` folder. Once a migration is confirmed, the manifest is no longer needed — the user can ask an agent to delete it from there.
+All three notations mean the same thing: the `Archive/Historical/Manifests/Codex/` folder of the workspace currently being worked in. The platform folder is determined by the chat platform being migrated, not by the agent performing the work: a Claude or Antigravity helper executing a Codex migration still uses the `Codex` folder. Once a migration is confirmed, the manifest is no longer needed — the user can ask an agent to delete it from there.
 
-Every manifest saved in `Archive/Manifests/Codex/` must start with the next sequential `N.) ` prefix based only on the highest existing numbered file in that platform folder. Use `N.) <descriptive-manifest-name>.json`; for example, `1.) codex_workspace_chat_migration_manifest.json`. When updating or renaming a staged manifest, preserve its existing sequence number while changing the descriptive portion to match its current scope and state. Do not leave migration manifests unnumbered.
+Every manifest saved in `Archive/Historical/Manifests/Codex/` must start with the next sequential `N.) ` prefix based only on the highest existing numbered file in that platform folder. Use `N.) <descriptive-manifest-name>.json`; for example, `1.) codex_workspace_chat_migration_manifest.json`. When updating or renaming a staged manifest, preserve its existing sequence number while changing the descriptive portion to match its current scope and state. Do not leave migration manifests unnumbered.
 
 ## Session Summary Integration
 
@@ -124,7 +136,7 @@ Both workflows close by producing an explicit session summary through the `sessi
 
 **Save location and naming (both workflows).** Invoke `session-summary` pre-filled so the user does not have to complete its input template:
 
-- Directory: `<workspace_root>/Archive/Summaries/Migration/Codex/`
+- Directory: `<workspace_root>/Archive/Historical/Summaries/Migration/Codex/`
 - Create the `Codex` platform folder if it does not exist.
 - Sequence number: the next integer after the highest existing `N.)` file in the `Codex` platform folder only.
 - Filename style: `N.) <Agent> <Topic> <Handoff|Execution Report> Summary N.md` (Codex/front-door uses `Handoff`; helper/execution uses `Execution Report`).
@@ -227,8 +239,8 @@ Verification must parse structured values, not raw text search, and confirm:
 
 Once discovery is complete:
 
-1. Save a sequentially numbered `N.) ` manifest under the active workspace's `Archive/Manifests/Codex/` folder.
-2. Produce the migration handoff summary by explicitly invoking the `session-summary` skill (see **Session Summary Integration**). Scope it to Codex's portion of the chat, pre-fill the skill's inputs, and save it under `Archive/Summaries/Migration/Codex/`. Apply the availability guard if the skill is not loaded.
+1. Save a sequentially numbered `N.) ` manifest under the active workspace's `Archive/Historical/Manifests/Codex/` folder.
+2. Produce the migration handoff summary by explicitly invoking the `session-summary` skill (see **Session Summary Integration**). Scope it to Codex's portion of the chat, pre-fill the skill's inputs, and save it under `Archive/Historical/Summaries/Migration/Codex/`. Apply the availability guard if the skill is not loaded.
 3. Group sessions by real discovered old workspace when needed. If there are mixed-source sessions, represent them as separate source groups rather than flattening them into one assumed old workspace.
 4. Clearly identify whether a target session is projectless and record the real projectless source cwd if so.
 
@@ -280,6 +292,15 @@ Use this workflow only when a non-Codex helper agent is running and Codex Deskto
 
 The Execution Workflow consumes the manifest and handoff package prepared by the Front-Door Workflow. It performs the real migration writes, verification, and reporting.
 
+### Pre-flight Guards (apply only)
+
+Before any write when `--apply` is requested:
+
+1. **Process guard (fail-closed):** check that no Codex Desktop process (`Codex.exe`) is running. If one is detected, abort — the migration cannot safely proceed while Codex holds open its state files. If the probe itself fails (exception, timeout, or empty/unusable output), abort as well: an unknown probe result is never interpreted as "Codex is not running".
+2. **Non-empty-WAL guard:** check the selected `state_5.sqlite`'s WAL file (`state_5.sqlite-wal`). If it exists and is non-empty, abort — Codex may still be running or may not have committed pending transactions. An empty or absent WAL is safe (Codex checkpoints on shutdown).
+3. Back up every file that will be touched **before** opening any of them for write.
+4. Confirm the selected state DB is unambiguous. If multiple candidate DBs contain exactly one target row per session, the helper **hard-stops** with the candidate list rather than guessing by mtime. The manifest must explicitly set `selected_state_db` to resolve ambiguity.
+
 ### Three-Layer Apply Workflow
 
 Only apply after the user or handoff explicitly greenlights execution and Codex Desktop is closed.
@@ -329,7 +350,7 @@ In the selected live `state_5.sqlite` path recorded in the manifest:
 
 ### Helper Script
 
-Use `scripts/migrate_codex_workspace_chat.py` for deterministic migration when available. Prefer `--dry-run` first. Save the manifest you pass to it under the workspace's `Archive/Manifests/Codex/` folder (see **Manifest Storage**).
+Use `scripts/migrate_codex_workspace_chat.py` for deterministic migration when available. Prefer `--dry-run` first. Save the manifest you pass to it under the workspace's `Archive/Historical/Manifests/Codex/` folder (see **Manifest Storage**).
 
 The helper script belongs to the **Execution Workflow** side. It is not the front door. Codex may help discover inputs and generate the manifest, but a non-Codex helper agent should run the script while Codex Desktop is fully closed.
 
@@ -349,6 +370,13 @@ Expected manifest shape:
 }
 ```
 
+Optional top-level keys the helper consumes:
+
+- `selected_state_db` — explicit path with `\\?\\` form; selects exactly one DB when candidates are ambiguous.
+- `candidate_state_dbs` — list of every candidate DB inspected; recorded for audit.
+- `cleanup_old_project_root` (boolean) — remove the old workspace path from `electron-saved-workspace-roots` and `project-order` once every target session is confirmed migrated. Default: false (preserve non-target roots).
+- `cleanup_old_workspace_root` (boolean) — alias for `cleanup_old_project_root`. When either is true, only the exact old-root strings are cleaned; unrelated roots are never removed.
+
 Run modes:
 
 - `--dry-run`: inspect and report intended changes without writing.
@@ -358,10 +386,10 @@ Run modes:
 
 After migration and before telling the user it is done:
 
-- Transcript JSONL parses line by line, including every listed `all_transcript_paths` and the SQLite `threads.rollout_path` transcript.
+- Transcript JSONL parses line by line, including every listed `all_transcript_paths` and the SQLite `threads.rollout_path` transcript. The helper re-parses every transcript after write **at its recorded authoritative path** — never a basename guessed under `~/.codex` — to confirm the migration was persisted; a missing recorded path is a verification failure. It is not enough that `migrate_transcript` reported success; the on-disk file must contain the session's `session_meta` with a hard parse.
 - Parsed target `session_meta.payload.cwd` is the destination workspace; verification must parse JSON values, not raw escaped text.
-- `.codex-global-state.json` parses and has the destination hint, with no stale target old root left in `thread-writable-roots`, `electron-saved-workspace-roots`, or `project-order` unless intentionally preserved.
-- `state_5.sqlite` `PRAGMA integrity_check` returns `ok`.
+- `.codex-global-state.json` **re-parses after write**: every migrated session's `thread-workspace-root-hints` entry must **exist and equal the destination workspace** on-disk — an absent hint is a verification failure, not a pass. The file must never contain an empty `electron-persisted-atom-state` key inserted by the migration — the helper only writes keys it actually modified.
+- `state_5.sqlite` `PRAGMA integrity_check` returns `ok`; the selected DB was unambiguous (no silent mtime tiebreak).
 - `threads.cwd` is `\\?\<destination workspace>` for each migrated session.
 - `threads.sandbox_policy` contains destination structured paths and no old workspace structured paths.
 - For `workspace_group_migration`, every in-scope structured old-workspace binding has been redirected unless explicitly excluded in the manifest and final report.
@@ -376,8 +404,8 @@ After migration and before telling the user it is done:
 
 ### Execution Summary
 
-After verification passes and before considering the migration closed, produce an execution report by explicitly invoking the `session-summary` skill (see **Session Summary Integration**). Scope it to the helper agent's portion: the Codex handoff it received plus every change it applied, verified, or rolled back. Pre-fill the skill's inputs and save under `Archive/Summaries/Migration/Codex/` so Codex can review it. Apply the availability guard if the skill is not loaded.
+After verification passes and before considering the migration closed, produce an execution report by explicitly invoking the `session-summary` skill (see **Session Summary Integration**). Scope it to the helper agent's portion: the Codex handoff it received plus every change it applied, verified, or rolled back. Pre-fill the skill's inputs and save under `Archive/Historical/Summaries/Migration/Codex/` so Codex can review it. Apply the availability guard if the skill is not loaded.
 
 ### Failure And Rollback
 
-If anything fails before commit, stop and report the failing session ID and file. If a post-write verification fails, restore from backups before attempting another approach. If the UI still moves the chat back after all three layers agree, inspect parsed JSONL in the SQLite `threads.rollout_path` transcript first, then inspect `electron-saved-workspace-roots`, `project-order`, `logs_2.sqlite` around startup, and any additional project membership tables or derived caches.
+If anything fails before commit, stop and report the failing session ID and file. **Coordinated backup restoration:** if a post-write verification fails (transcript re-parse, global-state re-parse, or SQLite integrity), the helper automatically restores every file to its **recorded original path** from the run's explicit original→backup manifest (never matching by basename), verifying each restored file byte-for-byte, so the state DB, global state, and every touched transcript return to pre-migration state — the migration is fully rolled back in one pass rather than requiring manual reassembly of individual files. Any file that cannot be restored and verified is reported loudly rather than skipped. Only after restoration is confirmed may the operator try a different approach. If the UI still moves the chat back after all three layers agree, inspect parsed JSONL in the SQLite `threads.rollout_path` transcript first, then inspect `electron-saved-workspace-roots`, `project-order`, `logs_2.sqlite` around startup, and any additional project membership tables or derived caches.

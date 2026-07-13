@@ -11,8 +11,8 @@ Turn the user's request into a **durable, structured prompt file** — one an ag
 
 | Artifact | Create / update | Finalize          | Lifecycle          |
 |----------|-----------------|-------------------|--------------------|
-| Plan     | `imp-upd-plan`  | `finalize-plan`   | active → finalized |
-| Task     | `imp-upd-task`  | `finalize-task`   | pending → done     |
+| Plan     | `plan-this`  | `finalize-plan`   | active → finalized |
+| Task     | `task-this`  | `finalize-task`   | pending → done     |
 | Prompt   | `prompt-this`   | `finalize-prompt` | pending → executed |
 
 This skill owns **creation, update, and reopen** only. It never marks a prompt executed and never moves a file Live → Historical. That belongs to `finalize-prompt`.
@@ -44,8 +44,8 @@ Treat these as direct invocation and begin the workflow:
 
 **When not to use this skill:**
 
-- The user wants an implementation plan → `imp-upd-plan`.
-- The user wants a housekeeping/admin task → `imp-upd-task`.
+- The user wants an implementation plan → `plan-this`.
+- The user wants a housekeeping/admin task → `task-this`.
 - The user wants documentation → `doc-this`.
 - The user wants to **close** a prompt → `finalize-prompt`. Direct them there; do not finalize here.
 

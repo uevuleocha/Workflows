@@ -64,8 +64,8 @@ Field-by-field behavior:
 
 - **a.) Main File** - user-filled. The primary file the session will focus on.
 - **b.) Secondary Files** - user-filled. Additional files the agent should load into working context.
-- **c.) Summaries** - user-filled. Summary files under `<project root>\Archive\Summaries\` or elsewhere to read for context.
-- **d.) Implementation Plans** - user-filled. Active plans under `<project root>\Archive\Plans\` to read.
+- **c.) Summaries** - user-filled. Summary files under `<project root>\Archive\Historical\Summaries\` or elsewhere to read for context.
+- **d.) Implementation Plans** - user-filled. Active plans under `<project root>\Archive\Live\Plans\` to read.
 - **e.) Miscellaneous Files** - user-filled. Any other files the agent should read.
 - **f.) Instructions or Prompts** - user-filled. The prompt, skill invocation, or instruction for what the agent should do after loading context.
 - **g.) Blueprint Read** - auto-filled by agent. Confirms which blueprint files the agent read from disk or had present in loaded conversation/project instructions. Not user-filled.

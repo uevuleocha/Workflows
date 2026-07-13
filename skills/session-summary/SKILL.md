@@ -44,24 +44,24 @@ If the user only wants a quick chat answer, do not create a file.
 
 ## Required Inputs
 
-Four values drive the summary file: **Project Name**, **Topic**, **Session Number**, and **Directory**.
+Four values drive the summary file: **Subject**, **Topic**, **Session Number**, and **Directory**.
 
 **Inference is mandatory and compulsory.** Before asking the user anything, you MUST attempt to infer all four values from the session and the workspace. Do not present a blank template, and do not ask the user to supply a value you could have derived yourself. Presenting empty fields, or asking without having first inferred, is a protocol violation. Your job is to do the legwork so the user can simply approve — not to make the user fill out a form.
 
 How to infer each value:
 
-- **Project Name** — Derive it from what the session was actually about, scoped to the workspace. First check the existing subfolders under `<project root>\Archive\Summaries\`; if this session clearly continues one of them, reuse that exact folder name. If the workspace name itself would be redundant as the project name (e.g. the workspace is "Workflows" and every summary would trivially read "Workflows"), infer a more specific project label from the session's actual focus (e.g. "Workspace Setup").
+- **Subject** — the broad category folder for this summary. Derive it from what the session was actually about, scoped to the workspace. First check the existing subfolders under `<project root>\Archive\Historical\Summaries\`; if this session clearly continues one of them, reuse that exact folder name. If the workspace name itself would be redundant as the Subject (e.g. the workspace is "Workflows" and every summary would trivially read "Workflows"), infer a more specific Subject from the session's actual focus (e.g. "Workspace Setup"). The Subject folder is never numbered — only the files inside it carry the `N.) ` prefix.
 - **Topic** — Derive it from the concrete work done this session (e.g. `Session-Summary Inference Update`). Keep it short and specific, matching the example style below.
-- **Session Number** — Look inside the resolved `<project root>\Archive\Summaries\[Project Name]\` folder, find the highest existing summary number, and use the next integer. If the folder is empty or does not exist, this is `1`.
-- **Directory** — Default to `<project root>\Archive\Summaries\[Project Name]\` unless the user explicitly named a specific in-project path.
+- **Session Number** — Look inside the resolved `<project root>\Archive\Historical\Summaries\[Subject]\` folder, find the highest existing summary number, and use the next integer. If the folder is empty or does not exist, this is `1`.
+- **Directory** — Default to `<project root>\Archive\Historical\Summaries\[Subject]\` unless the user explicitly named a specific in-project path.
 
 Reference examples:
 
-- Project name, e.g. `Skills`, `Skill Maintenance`, `Uzzy TRUTH`, `cTrader MCP`
+- Subject, e.g. `Skills`, `Skill Maintenance`, `Uzzy TRUTH`, `cTrader MCP`
 - Topic, e.g. `Codex Migration session-summary Integration`, `New Skills + Global-Sync + Hermes Target`, `Zone Evaluation & Invalidation Logic Audit`, `V2 Control-Based Card Build`
 - Session Number, e.g. `2`, `5`, `36`, `2`
 - Directory choice:
-  - Default: `<project root>\Archive\Summaries\[Project Name]\`
+  - Default: `<project root>\Archive\Historical\Summaries\[Subject]\`
   - A specific in-project directory the user named: use it exactly
   - A directory outside the project root: stop and ask before proceeding
 
@@ -70,7 +70,7 @@ Reference examples:
 ```text
 Here are my inferred values — green-light to use them as-is, or change any single line:
 
-1. Project Name: [inferred value]
+1. Subject: [inferred value]
 2. Topic: [inferred value]
 3. Session Number: [inferred value]
 4. Directory: [Default -> <resolved absolute path>]
@@ -78,9 +78,9 @@ Here are my inferred values — green-light to use them as-is, or change any sin
 
 ```text
 Key:
-5.) If user says Default, use <project root>\Archive\Summaries\[Project Name]\
+5.) If user says Default, use <project root>\Archive\Historical\Summaries\[Subject]\
 6.) x.) [Topic].md
-7.) <project root>\Archive\Summaries\[Project Name]\
+7.) <project root>\Archive\Historical\Summaries\[Subject]\
 8.) Where "x.)" = [Session Number]
 ```
 
@@ -121,7 +121,7 @@ If direct file edits are not allowed in the current agent mode, explain that the
 Default directory format:
 
 ```text
-<project root>\Archive\Summaries\[Project Name]\
+<project root>\Archive\Historical\Summaries\[Subject]\
 ```
 
 Filename format:
@@ -130,17 +130,17 @@ Filename format:
 x.) [Topic].md
 ```
 
-Where `x` is the Session Number (starting from `1` for the first summary). `[Project Name]` is not repeated in the filename — the parent folder (`Archive\Summaries\[Project Name]\`) already identifies the project.
+Where `x` is the Session Number (starting from `1` for the first summary). `[Subject]` is not repeated in the filename — the parent folder (`Archive\Historical\Summaries\[Subject]\`) already identifies the project.
 
 Example:
 
 ```text
-<project root>\Archive\Summaries\Uzzy TRUTH\9.) QS LCA Extraction.md
+<project root>\Archive\Historical\Summaries\Uzzy TRUTH\9.) QS LCA Extraction.md
 ```
 
 If the directory does not exist, create it only after the required inputs are confirmed and file creation is allowed.
 
-**Archive folder rule.** Session summaries always live under `Archive/` (in `Archive/Summaries/[Project Name]/`). If the `Archive/` folder does not yet exist in the workspace, create it yourself — along with the needed `Summaries/[Project Name]/` subfolders — when file creation is allowed. Never redirect the summary into any other folder (such as `Documentation/`) as a fallback. The summary folder always nests inside `Archive/`.
+**Archive folder rule.** Session summaries always live under `Archive/` (in `Archive/Historical/Summaries/[Subject]/`). If the `Archive/` folder does not yet exist in the workspace, create it yourself — along with the needed `Summaries/[Subject]/` subfolders — when file creation is allowed. Never redirect the summary into any other folder (such as `Documentation/`) as a fallback. The summary folder always nests inside `Archive/`.
 
 After writing the file, do not paste the full finished summary into chat. Tell the user the file path.
 
@@ -191,7 +191,7 @@ Use this structure unless the user explicitly asks for a different one:
 
 **Topic:** [Topic]  
 **Date:** [YYYY-MM-DD]  
-**Project:** [Project Name]  
+**Subject:** [Subject]
 **Plan File:** `[absolute path or none]`  
 **Primary File:** `[absolute path or none]`  
 **Reference Files:** [short list of important references]
@@ -317,6 +317,67 @@ If the user asks for "EVERY SINGLE THING", interpret that as:
 - Include all review corrections
 - Include all unresolved items
 - Do not include irrelevant filler or generic chat
+
+## Delegated Return Reports (Session-Summary Family)
+
+A **delegated return report** is a session-summary family member that a
+returning agent writes when its delegation assignment completes. It is reserved
+and mandated by `delegate-this`, but its **shape** lives here because it is a
+session summary.
+
+A return report:
+
+- uses **session-summary structure** — the 🎭 ACTS narrative, metadata header,
+  Definition of Done ACT, and final-state block — exactly as a normal summary;
+- carries a **lowercase child prefix** (`Na.)`, `Nb.)`, …) from the **Summary
+  family** master `N` (the Summary Subject namespace), reserved by the
+  orchestrator. The orchestrator/master summary is `N.)`; return reports inherit
+  that Summary master number (e.g. `9.)` → reports `9a.)`, `9b.)`, …);
+- has a filename that **ends in `Report.md`** (for example,
+  `9a.) claude_packet1_wave1_Report.md`);
+- lives under `<project root>\Archive\Historical\Summaries\<Subject>\`, beside
+  the orchestrator/master summary;
+- adds one delegation-specific section: an **append-only `## Feedback`
+  ledger**, placed after the session-summary body (after the `## Next Session
+  Pickup` block).
+
+**Separate namespace anchor.** The Summary family's master `N` comes from the
+Summary Subject namespace only — it is independent of the delegation's Plan/Task
+number and of the Delegation record's own number. The families are connected by
+explicit path pointers, not a shared number; do not expect the Summary master
+`N` to match the Plan or Delegation `N`.
+
+### Feedback ledger rules
+
+The `## Feedback` section is append-only:
+
+- **Existing report content is immutable.** Never rewrite a returned
+  deliverable, ACT, or earlier line of the report.
+- **Earlier feedback entries are immutable.** Once written, a feedback line is
+  never edited or deleted — corrections are added as new lines.
+- **Feedback is appendable only while the delegation is active.** The
+  orchestrator (and, when relevant, the returning worker) may append feedback
+  lines while the delegation is `_dispatched`.
+- **The entire report freezes when `finalize-delegation` closes the
+  delegation.** After the record becomes `_completed`, no further feedback may
+  be appended — the report is a closed historical artifact.
+
+Example:
+
+```markdown
+## Feedback
+
+- [2026-07-11] Orchestrator: deliverable matched DoD; one nit — rename helper.
+- [2026-07-11] Worker: helper renamed; re-validated, clean.
+```
+
+### Thin dependency
+
+This skill owns the **report/feedback shape** only. It does **not** know about
+delegation routing, packets, or lifecycle moves — that is `delegate-this`
+(reserve + mandate) and `finalize-delegation` (freeze on close). When asked to
+write a return report, use the reserved prefix supplied by the orchestrator,
+use session-summary structure, append `## Feedback`, and stop there.
 
 ## Antigravity Safety Note
 

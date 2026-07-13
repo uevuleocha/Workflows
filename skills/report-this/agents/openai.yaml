@@ -1,0 +1,7 @@
+interface:
+  display_name: "Report This"
+  short_description: "Create or reopen durable issue and analytical reports"
+  default_prompt: "Use $report-this to create, update, or reopen a durable report in the correct Mode A or Mode B structure, with permanent combined Live/Historical numbering and the dismissible lifecycle footer."
+
+policy:
+  allow_implicit_invocation: true

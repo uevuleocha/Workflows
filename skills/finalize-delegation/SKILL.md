@@ -134,9 +134,26 @@ Use these conventions where the matching sections exist:
 - `## Return and Integration Instructions` → `## Return and Integration Instructions ✅ Complete`
 - `## Global Stop Conditions` → leave as-is; it is a historical record of the constraints, not a checklist
 
-Add a dated note under a `## Notes` section (create it at the end if absent) recording that the delegation was finalized under `finalize-delegation`, naming the parent artifact and its state, and recording any user override from the Parent Artifact Gate.
+Add a dated note under a `## Notes` section (create it at the end if absent) recording that the delegation was finalized under `finalize-delegation`, naming the parent artifact and its state, recording any user override from the Parent Artifact Gate, and noting that the session-summary / return-report family is now frozen.
 
 Do **not** rewrite `## Assignment Packets`, `## Shared Context`, or `## Global Constraints`. Those are what the receiving agents acted on.
+
+## Return-Report Freeze
+
+Closing the delegation **freezes the entire session-summary / return-report
+family**. Every return report (the files ending in `Report.md` at the reserved
+child prefixes `Na.)`, `Nb.)`, …) and its append-only `## Feedback` ledger
+becomes a closed historical artifact:
+
+- No further `## Feedback` lines may be appended to any return report after the
+  delegation is `_completed`.
+- Existing report content and earlier feedback entries were already immutable;
+  finalization does not change them, it just locks the ledger from new appends.
+- The orchestrator/master summary (`N.)`) is likewise frozen.
+
+This skill does **not** rewrite or renumber the return reports or their
+prefixes. The reserved child prefixes are permanent and are preserved verbatim.
+`session-summary` owns the report shape; this skill only enforces the freeze.
 
 ## File Rename And Move Rules
 
@@ -149,7 +166,7 @@ To:    <Workspace>\Archive\Historical\Delegations\<Subject>\N.) <Topic>_complete
 
 Rules:
 
-- **Preserve `N` exactly.** Do not renumber, and never reclaim a gap. `N` is lifecycle-agnostic and permanent — it was assigned once, across both the Live and Historical Subject folders, and it survives this move and any future reopen.
+- **Preserve `N` exactly.** Do not renumber, and never reclaim a gap. `N` is lifecycle-agnostic and permanent — it was assigned once, across both the Live and Historical Subject folders, and it survives this move and any future reopen. The same applies to every **lowercase child prefix** (`Na.)`, `Nb.)`, …) on the delegation's mini artifacts and return reports: preserve them verbatim, never strip a suffix, never renumber.
 - **Preserve the Subject folder name exactly, and never number it.** Subject folders are never numbered on either side.
 - Create `Archive\Historical\Delegations\<Subject>\` if it does not exist, when file creation is allowed.
 - If `N.)` collides with an existing file in the Historical Subject folder, **stop and ask.** Do not overwrite, delete, or silently renumber.
@@ -249,6 +266,7 @@ After finalizing a delegation:
 - confirm the assignment packets are byte-for-byte unchanged from the dispatched record
 - confirm **every** named parent's `Delegation` pointer names the new Historical path
 - confirm every named parent was inspected, and that each open parent carried its own explicit override recorded in the notes
+- confirm the session-summary / return-report family is frozen: no return report (files ending in `Report.md` at the reserved child prefixes) remains appendable, and no child prefix was stripped or renumbered
 - confirm no unresolved conflict remains
 - confirm UTF-8 text was used
 - report any user overrides, abandoned assignments, or unresolved items

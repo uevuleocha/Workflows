@@ -1,77 +1,85 @@
 # Video-to-Action — Orchestrator Prompts (Template)
 
-Auto-generated from the prompt constants in `scripts/video_to_action.py` by
-running `python scripts/video_to_action.py --dump-prompts`. Do not edit by
-hand — regenerate after changing the prompts. This is the canonical TEMPLATE;
-each run also writes a per-run lowercase `prompts.md` into its run folder
-capturing the actual prompts sent (which may include a user-supplied title
-injected into Phase 1). Each phase below is sent to the Gemini model verbatim
-as the text part of the request, alongside the YouTube video. Phase 3 runs
-only with `--phases 3`.
+Auto-generated from `scripts/video_to_action.py` by `--dump-prompts`.
+The Procedure call always runs. Deep Summary is opt-in. Technical is
+opt-in and requires an explicit coding/software relevance confirmation.
 
-## Phase 1 — Overview extraction
+## Procedure (always)
 
 ```text
-Analyze this YouTube video and provide a structured breakdown.
+Analyze this YouTube video and produce BOTH an overview
+and detailed steps in one response. Use this exact order.
 
-Begin your response with exactly this line, followed by a blank line:
+## Overview
 
-Here is a structured breakdown of the video:
-
-Then output the following five sections, each with its heading in this exact form and order — keep the "N.)" numbering and the heading text verbatim:
+Begin with exactly: Here is a structured breakdown of the video:
 
 ### 1.) Video Title and Length
-* **Video Title:** {title — see the title rule below}
-* **Approximate Length:** {approximate duration}
+* **Video Title:** {use the exact supplied title; never infer or alter it}
+* **Length:** {use the exact supplied duration verbatim}
 
 ### 2.) Summary
-{2-3 sentences on what the video teaches}
+{2-3 concrete sentences describing what the video teaches}
 
 ### 3.) Prerequisites
-{tools, software, or knowledge needed before starting, as bullet points}
+{tools, software, or knowledge needed, as bullets}
 
 ### 4.) Main Sections
-{the major sections/chapters with approximate timestamp ranges, as bullet points}
+{chronological chapters with approximate timestamp ranges, as bullets}
 
 ### 5.) Key Outcomes
-{what the viewer can do after watching, as bullet points}
+{what the viewer can do after watching, as bullets}
 
-Title rule: the exact VIDEO TITLE is provided to you in the instruction above. Use it verbatim and do not infer, alter, or add any marker. Separately, and ONLY if you can actually read the real title from the video's metadata, add one extra bullet immediately under the Approximate Length line: `* **Metadata title (from video metadata):** "..."` and note whether it matches the supplied title. If you cannot access the video's metadata (the current expected behaviour), omit that bullet entirely — do not state that metadata is unavailable.
+## Steps
 
-Be specific and concrete. Don't say "the presenter shows techniques" — say what the techniques are.
-```
-
-## Phase 2 — Step-by-step extraction
-
-```text
-Extract detailed step-by-step instructions from this video.
-
-Format every step as a Markdown section using this exact shape, separated from the next step by a horizontal rule (`---`):
+Format every step as follows and separate steps with `---`:
 
 ### STEP {n}: {short title}
-* **TIMESTAMP:** {MM:SS}-{MM:SS} (the approximate start-to-end range for this step)
-* **ACTION:** {what to do, in imperative form, e.g. "Click File > New" or "Set the value to 0.5"}
-* **DETAILS:** {specific values, settings, parameters shown; if the presenter says "adjust to taste" or similar, record the value they actually used in the demo}
-* **VISUAL REFERENCE:** {what the screen/result should look like after this step}
-* **COMMON MISTAKES:** {a pitfall for this step — include one when the presenter states it, or when a practitioner would clearly recognize a well-founded pitfall for this step. Mark inferred pitfalls "(inferred)". Write "None notable" only when nothing meaningful applies.}
+* **TIMESTAMP:** {MM:SS-MM:SS}
+* **ACTION:** {specific imperative action}
+* **DETAILS:** {exact values, settings, and demonstrated choices}
+* **VISUAL REFERENCE:** {expected screen or result}
+* **COMMON MISTAKES:** {stated pitfall, well-founded `(inferred)` pitfall, or
+  `None notable` only when nothing meaningful applies}
 
-Be extremely specific about values, menu paths, and settings. When a step shows code, commands, or JSON, reproduce it inside a fenced Markdown code block (triple backticks), never inline.
-
-If a step relies on a subtle visual technique that may not be fully captured (precise mouse movements, brush strokes, gestures), prefix that step's ACTION with "LOW CONFIDENCE:" and describe it as best you can.
+Put code, commands, or JSON in fenced Markdown blocks. Prefix uncertain subtle
+visual actions with `LOW CONFIDENCE:` and direct the reader to the timestamp.
+If and only if video metadata exposes a title, add a metadata-title bullet and
+compare it with the supplied title; otherwise omit that bullet entirely.
 ```
 
-## Phase 3 — Technical extraction (only with --phases 3)
+## Deep Summary (opt-in)
 
 ```text
-Extract all code, commands, configurations, and technical details from this video.
+Create a long, faithful, chronological deep summary of
+this YouTube video. Only summarize content actually present in the video. Map
+acts to timestamped chapters or meaningful chronological beats.
 
-Extract:
-1. All CODE SNIPPETS shown (reconstruct from what's visible on screen)
-2. All TERMINAL COMMANDS run
-3. All CONFIGURATION values or settings changed
-4. All FILE PATHS referenced
-5. All DEPENDENCIES or PACKAGES installed
-6. Any API keys, environment variables, or config needed (note if they're placeholder values)
+Return ONLY ACT sections using this exact heading contract:
 
-Reproduce every code snippet, command, and configuration inside a fenced Markdown code block (triple backticks), never inline. For code: provide the complete snippet, not fragments. If code is partially visible, note what's inferred and mark it "LOW CONFIDENCE:". For commands: provide the exact command, including flags and arguments.
+## 🎭 ACT I: {specific chronological title}
+**Timestamp:** {approximate range}
+{Detailed faithful narrative of what happens, what is explained, and why it
+matters. Clearly label any inference.}
+
+Continue with `## 🎭 ACT II:`, `## 🎭 ACT III:`, and as many sequential acts as
+needed. End exactly with:
+
+## 🎭 FINAL ACT: Key Takeaways
+{Thorough synthesis of the video's conclusions, lessons, and cautions.}
+
+Do not include session pickup, active-plan status, next-session context, or any
+other work-session template content. Do not fabricate inaccessible details.
+```
+
+## Technical (opt-in; coding/software only)
+
+```text
+Extract all code, commands, configurations, and technical
+details actually shown in this coding/software video.
+
+Include code snippets, terminal commands, configuration values, file paths,
+dependencies, packages, and required environment variables. Put every snippet,
+command, and configuration in fenced Markdown blocks. Mark partial or inferred
+content `LOW CONFIDENCE:`. Never expose real secret values.
 ```

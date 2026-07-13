@@ -12,7 +12,7 @@ There are two modes, auto-selected by context:
 - **Mode A — Code-Batch Verification.** The user just applied or sent code and wants it checked before the next phase. Works for any programming language. This is the original inspect behavior, generalized.
 - **Mode B — General Inspection / Audit.** The user points at any file, skill, document, config, or artifact and asks you to inspect/audit/check it — for mistakes, issues, consistency, or to learn or adapt something.
 
-This skill is not Debug mode, not a code-generation workflow, and not a permission gate. If the user wants a broad bug diagnosis, use `debug`. If the user wants permission to proceed with a task, use `green-light`. If the user wants new implementation planning, use `imp-upd-plan`.
+This skill is not Debug mode, not a code-generation workflow, and not a permission gate. If the user wants a broad bug diagnosis, use `debug`. If the user wants permission to proceed with a task, use `green-light`. If the user wants new implementation planning, use `plan-this`.
 
 ## Project Contract
 

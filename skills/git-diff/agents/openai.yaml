@@ -1,2 +1,7 @@
-name: git-diff
-description: When invoked via /git-diff or git-diff, checks if the workspace is a Git repository. If it is, the agent runs git status and git diff --stat to collate and report tracked changes, untracked files, and overall repository status.
+interface:
+  display_name: "Git Diff"
+  short_description: "Read-only diff, rename totals, and submodule pointers"
+  default_prompt: "Use $git-diff to report this repository read-only in the canonical format, including both rename modes and every submodule pointer."
+
+policy:
+  allow_implicit_invocation: false

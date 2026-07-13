@@ -1,0 +1,7 @@
+interface:
+  display_name: "Finalize Report"
+  short_description: "Close a pending report as reported"
+  default_prompt: "Use $finalize-report to verify completion evidence, update the dismissible footer to REPORTED, preserve the permanent number, rename _pending to _reported, and move the report from its Live Subject folder to the matching Historical Subject folder."
+
+policy:
+  allow_implicit_invocation: true

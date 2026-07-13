@@ -1,4 +1,4 @@
 interface:
   display_name: "Claude Workspace Chat Migration"
   short_description: "Safely migrate Claude chats between workspaces."
-  default_prompt: "Use this skill to migrate selected Claude Desktop chat sessions from one workspace to another by relocating the transcript JSONL (and its internal cwd) and updating the Desktop chat-store record (cwd/originCwd) with backups and verification."
+  default_prompt: "Use this skill to migrate selected Claude Desktop chat sessions from one workspace to another by relocating the transcript JSONL (rewriting its internal cwd, with BOM-safe read and descendant-aware verification), relocating adjacent workspace memory and per-session subagents/tool-results folders, and updating the Desktop chat-store record (cwd/originCwd) with backups, expected-count verification, whole-workspace memory-scope enforcement, collision hard-refusal, and verification."

@@ -6,8 +6,8 @@ It is the third member of a family:
 
 | Artifact | Create / update | Finalize          | Lifecycle          |
 |----------|-----------------|-------------------|--------------------|
-| Plan     | `imp-upd-plan`  | `finalize-plan`   | active → finalized |
-| Task     | `imp-upd-task`  | `finalize-task`   | pending → done     |
+| Plan     | `plan-this`  | `finalize-plan`   | active → finalized |
+| Task     | `task-this`  | `finalize-task`   | pending → done     |
 | Prompt   | `prompt-this`   | `finalize-prompt` | pending → executed |
 
 ## Calls Other Skills

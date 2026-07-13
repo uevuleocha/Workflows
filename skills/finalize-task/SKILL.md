@@ -7,7 +7,7 @@ description: Finalize existing pending workspace housekeeping and admin task fil
 
 Finalize an existing pending workspace task after the user confirms the housekeeping or admin work is complete or satisfactory.
 
-This skill only closes pending task files. It does not create or update pending tasks; use `imp-upd-task` for that.
+This skill only closes pending task files. It does not create or update pending tasks; use `task-this` for that.
 
 ## Project Contract
 
@@ -26,7 +26,7 @@ Treat these as direct invocation and begin the workflow:
 - `this task is done`
 - clear equivalents where the user says a pending housekeeping/admin task is complete, final, closed, or done
 
-If the user asks to create or revise a pending task, stop and direct them to `imp-upd-task`.
+If the user asks to create or revise a pending task, stop and direct them to `task-this`.
 
 If the user asks to finalize an implementation plan, use the relevant plan-finalization workflow instead.
 
@@ -52,7 +52,7 @@ If the user does not reference a task, inspect the workspace's task directory fo
 - If multiple pending tasks are plausible, ask which task to finalize.
 - If no pending task exists, stop and report that there is no pending task to finalize.
 
-Never finalize a `_done.md` file. If the user wants to add work to a done task, direct them to `imp-upd-task` so the done task can be reopened gracefully.
+Never finalize a `_done.md` file. If the user wants to add work to a done task, direct them to `task-this` so the done task can be reopened gracefully.
 
 ## Completion Evidence Rules
 
@@ -74,7 +74,7 @@ Apply completed presentation language only when the evidence supports completion
 
 ## Prompt Contract Review
 
-Tasks created under the current `imp-upd-task` workflow carry a `## Prompt Contract` section (GOAL, CONSTRAINTS, FORMAT, DEFINITION OF DONE, FAILURE). When it exists, it is the authoritative completion gate. Before finalizing, walk it explicitly:
+Tasks created under the current `task-this` workflow carry a `## Prompt Contract` section (GOAL, CONSTRAINTS, FORMAT, DEFINITION OF DONE, FAILURE). When it exists, it is the authoritative completion gate. Before finalizing, walk it explicitly:
 
 - Check each DEFINITION OF DONE item against completion evidence; mark it met, user-confirmed, or explicitly deferred out of scope.
 - Check each FAILURE condition; confirm none is triggered. If any is active, do not finalize until it is resolved or the user waives it.
@@ -98,7 +98,7 @@ If the task lacks a `Definition of Done` section, ask the user for completion cr
 
 ## Delegation Check
 
-Tasks created under the current `imp-upd-task` workflow carry a `**Delegation:**` line under `## Context`. It is a pointer, not a workflow. Read it before finalizing.
+Tasks created under the current `task-this` workflow carry a `**Delegation:**` line under `## Context`. It is a pointer, not a workflow. Read it before finalizing.
 
 - **`N/A`, or the line is absent** (the task predates the field) → nothing to do. Finalize normally. Do not mention delegation in the finalized task.
 - **The line names a delegation record** → the task's work was divided among multiple agents, and that delegation must be closed too.
@@ -174,9 +174,12 @@ When finalizing, update the task as appropriate:
 
 Use the current local date for lifecycle text.
 
-## File Rename Rules
+## File Rename And Move Rules
 
-Rename the pending file:
+Finalization does two things to the file: it flips the lifecycle suffix **and**
+moves the file from the `Live` side of the Archive to the `Historical` side.
+
+**1. Flip the suffix.** Rename the pending file:
 
 ```text
 {name}_pending.md
@@ -188,9 +191,28 @@ to:
 {name}_done.md
 ```
 
-Do not keep a duplicate pending copy after a successful rename.
+**2. Move Live → Historical.** Move the file from its `Live` tasks folder to the
+matching `Historical` tasks folder, preserving the same `[Subject]` subfolder on
+both sides:
 
-If the target `_done.md` file already exists, stop and ask before overwriting, deleting, or choosing another name.
+```text
+<project root>\Archive\Live\Tasks\[Subject]\{name}_done.md
+        ->  <project root>\Archive\Historical\Tasks\[Subject]\{name}_done.md
+```
+
+Create the `Archive\Historical\Tasks\[Subject]\` target folder if it does not
+exist. **Preserve the file's `N.) ` prefix exactly — including any lowercase
+child suffix** (`Na.)`, `Nb.)`, …). Finalization never renumbers and never
+strips a child suffix. The prefix is assigned once for the life of the file
+across the combined `Live` + `Historical` namespace, so the same prefix simply
+follows the file into `Historical`. This applies equally on **reopen**: when a
+done child task is reopened back to `_pending.md`, its complete lowercase child
+prefix is preserved unchanged.
+
+Do not keep a duplicate copy on the `Live` side after a successful move.
+
+If the target `_done.md` file already exists in `Historical`, stop and ask
+before overwriting, deleting, or choosing another name.
 
 Do not delete unrelated task files.
 
@@ -222,8 +244,9 @@ Do not paste the entire finalized task into chat unless the user asks.
 
 After finalizing a task:
 
-- confirm the pending source path no longer exists
-- confirm the done target path exists
+- confirm the pending source path under `Archive\Live\Tasks\` no longer exists
+- confirm the done target path exists under `Archive\Historical\Tasks\[Subject]\`
+- confirm the file was moved Live → Historical and its `N.) ` prefix (including any lowercase child suffix `Na.)`, `Nb.)`, …) is unchanged
 - confirm the filename ends in `_done.md`
 - confirm the file contains a done status or lifecycle note
 - confirm the `## Prompt Contract` DEFINITION OF DONE items were reviewed and no FAILURE condition remains active, or record that the task predates the Prompt Contract convention

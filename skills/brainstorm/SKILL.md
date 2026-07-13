@@ -43,7 +43,7 @@ While in Brainstorming mode:
 
 Mode footer: if Brainstorming is the only active mode, end with `Mode = Brainstorming`. If multiple modes are active, end with `Modes = Brainstorming + Mode B + ... + Mode Z` using every active mode exactly once. Order does not matter, but keep it consistent when practical.
 
-When the User ends Brainstorming mode, the normal next step is often `$imp-upd-plan`, but that handoff is not automatic.
+When the User ends Brainstorming mode, the normal next step is often `$plan-this`, but that handoff is not automatic.
 
 ## Required Intake
 
@@ -97,7 +97,7 @@ Use this order unless the user clearly wants a smaller path:
 
 7. **Define next steps**
    - End each meaningful cycle with concrete next-step options.
-   - If implementation planning is ready, suggest `$imp-upd-plan` after the User ends Brainstorming mode.
+   - If implementation planning is ready, suggest `$plan-this` after the User ends Brainstorming mode.
 
 ## No-Code / LTNEY-First Behavior
 
@@ -121,7 +121,7 @@ Do not:
 - create or edit workflow/memory files silently
 - treat brainstorming as approval to execute
 
-If the User asks to move into code, planning, skill creation, or another execution workflow, confirm the mode switch or use the appropriate skill such as `green-light`, `imp-upd-plan`, or `global-skills-creator`.
+If the User asks to move into code, planning, skill creation, or another execution workflow, confirm the mode switch or use the appropriate skill such as `green-light`, `plan-this`, or `global-skills-creator`.
 
 ## Agent Participation Rules
 
@@ -171,7 +171,7 @@ When the User indicates the verdict is in or calls off Brainstorming mode, summa
 - key decisions
 - remaining open questions
 - recommended next steps
-- whether `$imp-upd-plan` is the right next skill to invoke
+- whether `$plan-this` is the right next skill to invoke
 
 Do not create the plan automatically.
 
@@ -222,5 +222,5 @@ After creating or updating this skill itself:
 - confirm local skill files exist
 - confirm `Mode = Brainstorming` appears exactly
 - confirm the no-code / LTNEY-first boundary exists
-- confirm the skill does not automatically invoke `imp-upd-plan`
+- confirm the skill does not automatically invoke `plan-this`
 - validate folder-style skills with the `quick_validate.py` script that ships with your skill-creator install, running Python in UTF-8 mode (`-X utf8`).

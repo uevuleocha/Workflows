@@ -18,8 +18,10 @@ import argparse
 import datetime as _dt
 import hashlib
 import json
+import os
 import shutil
 import sqlite3
+import subprocess
 from pathlib import Path
 from typing import Any
 
@@ -105,7 +107,12 @@ def migrate_state_db(
     no protobuf, no sidecar folders — just two columns in one table.
     """
     target_ids = {s["id"] for s in sessions}
-    con = sqlite3.connect(STATE_DB_PATH)
+    # Preflight / dry-run ALWAYS opens read-only.  Apply opens read-write.
+    uri = STATE_DB_PATH.resolve().as_uri()
+    if apply:
+        con = sqlite3.connect(STATE_DB_PATH)
+    else:
+        con = sqlite3.connect(uri + "?mode=ro", uri=True)
     try:
         cur = con.cursor()
 
@@ -113,9 +120,10 @@ def migrate_state_db(
         before_count = cur.execute("select count(*) from sessions").fetchone()[0]
         before_digest = digest_sessions_non_target(cur, target_ids)
 
-        changed = []
-        for item in sessions:
-            sid = item["id"]
+        # Enforce exact manifest before-state for every target row.
+        manifest_by_id = {s["id"]: s for s in sessions}
+        preflight_verification: list[dict[str, Any]] = []
+        for sid in sorted(target_ids):
             row = cur.execute(
                 "select cwd, git_repo_root from sessions where id=?", (sid,)
             ).fetchone()
@@ -123,14 +131,49 @@ def migrate_state_db(
                 raise RuntimeError(
                     f"state.db sessions row not found for {sid}"
                 )
+            actual_cwd, actual_git_repo_root = row
+            manifest_entry = manifest_by_id[sid]
+            # Exact before-state from manifest (if declared)
+            declared_old_cwd = manifest_entry.get("old_cwd")
+            declared_old_git = manifest_entry.get("old_git_repo_root")
+            if declared_old_cwd is not None and actual_cwd != declared_old_cwd:
+                raise RuntimeError(
+                    f"before-state mismatch for {sid}: "
+                    f"manifest says old_cwd={declared_old_cwd!r}, actual cwd={actual_cwd!r}"
+                )
+            if declared_old_git is not None and actual_git_repo_root != declared_old_git:
+                raise RuntimeError(
+                    f"before-state mismatch for {sid}: "
+                    f"manifest says old_git_repo_root={declared_old_git!r}, actual git_repo_root={actual_git_repo_root!r}"
+                )
+            preflight_verification.append({
+                "id": sid,
+                "old_cwd": actual_cwd,
+                "old_git_repo_root": actual_git_repo_root,
+                "manifest_matches": True,
+            })
 
+        if not apply:
+            return {
+                "preflight_only": True,
+                "db": str(STATE_DB_PATH),
+                "sessions_count": before_count,
+                "preflight_verification": preflight_verification,
+            }
+
+        # -- Apply phase: explicit write transaction --
+        new_git_repo_root_global = new
+        changed = []
+        cur.execute("BEGIN IMMEDIATE")
+        for item in sessions:
+            sid = item["id"]
+            row = cur.execute(
+                "select cwd, git_repo_root from sessions where id=?", (sid,)
+            ).fetchone()
+            # Re-read within transaction to confirm nothing shifted
             old_cwd, old_git_repo_root = row
 
-            # Determine the new git_repo_root:
-            # - Use manifest's new_git_repo_root if provided
-            # - Otherwise default to the new workspace (same as cwd)
-            new_git_repo_root = item.get("new_git_repo_root", new)
-
+            new_git_repo_root = item.get("new_git_repo_root", new_git_repo_root_global)
             entry = {
                 "id": sid,
                 "old_cwd": old_cwd,
@@ -139,28 +182,25 @@ def migrate_state_db(
                 "new_git_repo_root": new_git_repo_root,
             }
 
-            # Idempotency check: skip if already at destination
-            if old_cwd == new and (old_git_repo_root == new_git_repo_root or old_git_repo_root == new):
+            # Exact idempotency: both cwd AND git_repo_root must match destination
+            if old_cwd == new and old_git_repo_root == new_git_repo_root:
                 entry["status"] = "already_destination"
                 changed.append(entry)
                 continue
 
-            if apply:
-                cur.execute(
-                    "update sessions set cwd=?, git_repo_root=? where id=?",
-                    (new, new_git_repo_root, sid),
+            cur.execute(
+                "update sessions set cwd=?, git_repo_root=? where id=?",
+                (new, new_git_repo_root, sid),
+            )
+            if cur.rowcount != 1:
+                raise RuntimeError(
+                    f"unexpected sessions rowcount for {sid}: {cur.rowcount}"
                 )
-                if cur.rowcount != 1:
-                    raise RuntimeError(
-                        f"unexpected sessions rowcount for {sid}: {cur.rowcount}"
-                    )
-
             entry["status"] = "migrated"
             changed.append(entry)
 
-        if apply:
-            con.commit()
-            cur.execute("pragma wal_checkpoint(truncate)")
+        cur.execute("COMMIT")
+        cur.execute("pragma wal_checkpoint(truncate)")
 
         # Post-write verification
         after_count = cur.execute("select count(*) from sessions").fetchone()[0]
@@ -183,24 +223,27 @@ def migrate_state_db(
             if row is None:
                 raise RuntimeError(f"sessions row disappeared for {sid}")
             v_cwd, v_git_repo_root = row
+            expected_git = sessions_by_id(sid, sessions).get("new_git_repo_root", new)
             verification.append(
                 {
                     "id": sid,
                     "cwd": v_cwd,
                     "git_repo_root": v_git_repo_root,
                     "cwd_is_destination": v_cwd == new,
-                    "git_repo_root_is_destination": (
-                        v_git_repo_root == new
-                        or v_git_repo_root == sessions_by_id(sid, sessions).get(
-                            "new_git_repo_root", new
-                        )
-                    ),
+                    "git_repo_root_is_destination": v_git_repo_root == expected_git,
                 }
             )
+            if not (v_cwd == new):
+                raise RuntimeError(f"post-write cwd mismatch for {sid}: {v_cwd!r}")
+            if not (v_git_repo_root == expected_git):
+                raise RuntimeError(f"post-write git_repo_root mismatch for {sid}: {v_git_repo_root!r}")
 
-        # Check no target row still holds the old workspace
+        # Target-scoped stale check: only the target sessions are verified,
+        # not a global cwd sweep that can miss descendants.
         old_workspace_rows = cur.execute(
-            "select count(*) from sessions where cwd=?", (old,)
+            "select count(*) from sessions where id in (%s) and cwd=?"
+            % ",".join("?" for _ in target_ids),
+            tuple(target_ids) + (old,),
         ).fetchone()[0]
 
         return {
@@ -210,6 +253,7 @@ def migrate_state_db(
             "old_workspace_rows_remaining": old_workspace_rows,
             "integrity_check": integrity,
             "sessions_count": after_count,
+            "transaction": {"begin": "IMMEDIATE", "commit": True},
         }
     finally:
         con.close()
@@ -223,6 +267,45 @@ def sessions_by_id(
         if s["id"] == sid:
             return s
     return {}
+
+
+def _hermes_process_running() -> bool:
+    """True if a Hermes process appears to be running.
+
+    Fail-closed: if the probe raises or returns unusable output, we cannot
+    prove Hermes is closed, so the guard stops the migration rather than
+    interpreting an unknown result as "not running"."""
+    try:
+        out = subprocess.check_output(["tasklist", "/FI", "STATUS eq RUNNING"],
+                                        text=True, timeout=5)
+    except Exception as exc:
+        raise SystemExit(
+            f"process probe failed ({exc!r}); cannot prove Hermes is closed. "
+            "Refusing to proceed — verify manually and retry."
+        )
+    if not isinstance(out, str) or not out.strip():
+        raise SystemExit(
+            "process probe returned no output; cannot prove Hermes is closed. "
+            "Refusing to proceed — verify manually and retry."
+        )
+    return "hermes.exe" in out.lower()
+
+
+def restore_backups(backup_records: list[str]) -> list[str]:
+    """Copy backed-up files back to their original locations under HERMES_HOME."""
+    restored = []
+    for bp in backup_records:
+        bp_path = Path(bp)
+        if not bp_path.exists():
+            continue
+        name = bp_path.name
+        # Restore to the expected platform location
+        dest = HERMES_HOME / name if "user-backups" not in str(bp_path.parent) else None
+        if dest is None:
+            dest = HERMES_HOME / name
+        shutil.copy2(bp_path, dest)
+        restored.append(str(dest))
+    return restored
 
 
 def main() -> int:
@@ -245,20 +328,23 @@ def main() -> int:
         + _dt.datetime.now().strftime("%Y%m%d-%H%M%S")
     )
 
-    # WAL guard: check if state.db-wal is being actively written
-    wal_path = STATE_DB_PATH.with_name(STATE_DB_PATH.name + "-wal")
-    if wal_path.exists() and apply:
-        import time
+    # -- Process guard (apply only) --
+    if apply and _hermes_process_running():
+        raise SystemExit(
+            "Hermes Desktop appears to be running (hermes.exe detected). "
+            "Close it fully before --apply."
+        )
 
-        size1 = wal_path.stat().st_size
-        time.sleep(0.3)
-        size2 = wal_path.stat().st_size
-        if size1 > 0 and size2 != size1:
-            raise SystemExit(
-                f"WAL guard: {wal_path} is being actively written "
-                f"(size changed {size1} -> {size2} in 0.3s). "
-                "Hermes appears to be running. Close it fully before applying."
-            )
+    # -- WAL guard: refuse ANY non-empty WAL, not merely a changing WAL.
+    #    A fixed-size non-empty WAL that isn't growing is still a live
+    #    application's pending work. --
+    wal_path = STATE_DB_PATH.with_name(STATE_DB_PATH.name + "-wal")
+    if apply and wal_path.exists() and wal_path.stat().st_size > 0:
+        raise SystemExit(
+            f"Non-empty WAL at {wal_path} ({wal_path.stat().st_size} bytes). "
+            "Hermes may still be running; close it fully before --apply. "
+            "A non-empty WAL that is not actively growing is still unsafe."
+        )
 
     # Backups
     backups: list[str] = []
@@ -272,7 +358,18 @@ def main() -> int:
         "old_workspace": old,
         "new_workspace": new,
     }
-    results["state_db"] = migrate_state_db(sessions, old, new, apply)
+
+    # -- Coordinated backup restoration on failure --
+    try:
+        results["state_db"] = migrate_state_db(sessions, old, new, apply)
+        results["post_write_verified"] = True
+    except (RuntimeError, SystemExit):
+        if apply and backups:
+            restored = restore_backups(backups)
+            results["restored_from_backups"] = restored
+            results["rollback_performed"] = True
+            print(json.dumps(results, indent=2, ensure_ascii=False))
+        raise
 
     print(json.dumps(results, indent=2, ensure_ascii=False))
     return 0

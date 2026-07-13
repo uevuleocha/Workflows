@@ -25,8 +25,10 @@ import argparse
 import datetime as _dt
 import hashlib
 import json
+import os
 import shutil
 import sqlite3
+import subprocess
 from pathlib import Path
 from typing import Any
 
@@ -40,6 +42,13 @@ LOCAL_STORAGE_PATH = Path.home() / "AppData" / "Roaming" / "zcode" / "session" /
 BACKUP_ROOT = ZCODE_HOME / "user-backups"
 
 
+# Exact approved before-state keys the manifest MUST declare per session.
+# tasks-index.sqlite (primary) and db.sqlite (secondary) rows are compared
+# against these values before anything is overwritten.
+BEFORE_STATE_TASKS_KEYS = ("old_workspace_key", "old_workspace_path", "old_meta_workspacePath")
+BEFORE_STATE_SESSION_KEYS = ("old_directory", "old_path", "old_project_id")
+
+
 def load_manifest(path: Path) -> dict[str, Any]:
     data = json.loads(path.read_text(encoding="utf-8"))
     if not data.get("old_workspace") or not data.get("new_workspace"):
@@ -49,6 +58,17 @@ def load_manifest(path: Path) -> dict[str, Any]:
     for item in data["sessions"]:
         if not item.get("id"):
             raise SystemExit("each session requires id")
+        missing = [
+            key for key in BEFORE_STATE_TASKS_KEYS + BEFORE_STATE_SESSION_KEYS
+            if key not in item
+        ]
+        if missing:
+            raise SystemExit(
+                f"session {item['id']}: manifest must record the exact approved "
+                f"before-state; missing keys: {missing}. Capture them during "
+                "front-door intake from the populated tasks-index.sqlite row and "
+                "the db.sqlite session row."
+            )
     return data
 
 
@@ -81,23 +101,202 @@ def backup(path: Path, suffix: str, apply: bool) -> Path | None:
     return target
 
 
-def backup_sqlite_family(db_path: Path, suffix: str, apply: bool) -> list[str]:
+def backup_sqlite_family(
+    db_path: Path, suffix: str, apply: bool,
+    backup_manifest: list[dict[str, str]] | None = None,
+) -> list[str]:
     paths = [db_path, db_path.with_name(db_path.name + "-wal"), db_path.with_name(db_path.name + "-shm")]
     backups: list[str] = []
     for path in paths:
         target = backup(path, suffix, apply)
         if target:
             backups.append(str(target))
+            if backup_manifest is not None:
+                backup_manifest.append({"original": str(path), "backup": str(target)})
     return backups
+
+
+def restore_backups(backup_manifest: list[dict[str, str]]) -> list[str]:
+    """Restore every backed-up file to its recorded original path and verify
+    each restoration byte-for-byte. Coordinated: called when updating or
+    verifying EITHER database fails, so BOTH databases return to their
+    pre-migration state. Raises if any restoration cannot be verified."""
+    restored: list[str] = []
+    errors: list[str] = []
+    # Remove stray -wal/-shm sidecars created after backup time: restoring a
+    # main DB file next to a leftover post-failure WAL would corrupt it.
+    originals = {entry["original"] for entry in backup_manifest}
+    for entry in backup_manifest:
+        original = Path(entry["original"])
+        if original.suffix == ".sqlite":
+            for sidecar in (original.with_name(original.name + "-wal"),
+                            original.with_name(original.name + "-shm")):
+                if str(sidecar) not in originals and sidecar.exists():
+                    try:
+                        sidecar.unlink()
+                        restored.append(f"removed stray sidecar {sidecar}")
+                    except OSError as exc:
+                        errors.append(f"could not remove stray sidecar {sidecar}: {exc}")
+    for entry in backup_manifest:
+        bp = Path(entry["backup"])
+        original = Path(entry["original"])
+        if not bp.exists():
+            errors.append(f"backup file missing, cannot restore {original}: {bp}")
+            continue
+        try:
+            original.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(bp, original)
+            if original.read_bytes() != bp.read_bytes():
+                errors.append(f"restoration verification failed for {original}")
+                continue
+            restored.append(str(original))
+        except OSError as exc:
+            errors.append(f"restore failed for {original}: {exc}")
+    if errors:
+        raise RuntimeError(
+            "coordinated backup restoration incomplete:\n" + "\n".join(errors)
+            + f"\nRestored so far: {restored}"
+        )
+    return restored
+
+
+def preflight_before_state(
+    sessions: list[dict[str, Any]], old: str, new: str
+) -> dict[str, Any]:
+    """Read-only preflight across BOTH databases before either is written.
+
+    Validates all six exact before-state values per session (tasks-index:
+    workspace_key/workspace_path/meta_json.workspacePath; db.sqlite session:
+    directory/path/project_id) against the manifest. A row already fully at
+    the destination is accepted as already_destination. Any other mismatch or
+    missing row raises with ZERO writes performed."""
+    new_project_id = compute_project_id(new)
+    report: dict[str, Any] = {"tasks_index": [], "session": []}
+
+    def _ro(path: Path) -> sqlite3.Connection:
+        return sqlite3.connect(path.resolve().as_uri() + "?mode=ro", uri=True)
+
+    con = _ro(TASKS_INDEX_PATH)
+    try:
+        cur = con.cursor()
+        for item in sessions:
+            sid = item["id"]
+            row = cur.execute(
+                "select workspace_key, workspace_path, meta_json from tasks where task_id=?",
+                (sid,),
+            ).fetchone()
+            if row is None:
+                raise RuntimeError(f"preflight: tasks-index.sqlite tasks row not found for {sid}")
+            workspace_key, workspace_path, meta_json_raw = row
+            meta_workspace = parse_meta_json(meta_json_raw, sid).get("workspacePath")
+            at_dest = (
+                workspace_key == new and workspace_path == new
+                and meta_workspace == new and old not in (meta_json_raw or "")
+            )
+            if not at_dest:
+                mismatches = [
+                    f"{key}: manifest={item[key]!r}, actual={actual!r}"
+                    for key, actual in (
+                        ("old_workspace_key", workspace_key),
+                        ("old_workspace_path", workspace_path),
+                        ("old_meta_workspacePath", meta_workspace),
+                    )
+                    if item[key] != actual
+                ]
+                if mismatches:
+                    raise RuntimeError(
+                        f"preflight: tasks-index before-state mismatch for {sid}: "
+                        + "; ".join(mismatches)
+                    )
+            report["tasks_index"].append({"id": sid, "already_destination": at_dest})
+    finally:
+        con.close()
+
+    con = _ro(DB_PATH)
+    try:
+        cur = con.cursor()
+        for item in sessions:
+            sid = item["id"]
+            row = cur.execute(
+                "select directory, path, project_id from session where id=?", (sid,)
+            ).fetchone()
+            if row is None:
+                raise RuntimeError(f"preflight: db.sqlite session row not found for {sid}")
+            directory, path, project_id = row
+            at_dest = directory == new and path == new and project_id == new_project_id
+            if not at_dest:
+                mismatches = [
+                    f"{key}: manifest={item[key]!r}, actual={actual!r}"
+                    for key, actual in (
+                        ("old_directory", directory),
+                        ("old_path", path),
+                        ("old_project_id", project_id),
+                    )
+                    if item[key] != actual
+                ]
+                if mismatches:
+                    raise RuntimeError(
+                        f"preflight: db.sqlite before-state mismatch for {sid}: "
+                        + "; ".join(mismatches)
+                    )
+            report["session"].append({"id": sid, "already_destination": at_dest})
+    finally:
+        con.close()
+
+    report["all_before_state_verified"] = True
+    return report
 
 
 def detect_bom(raw: bytes) -> bool:
     return raw.startswith(b"\xef\xbb\xbf")
 
 
+def _cf(value: str) -> str:
+    """Casefold for case-insensitive Windows-path comparison. Only comparisons
+    are normalized; a value left unchanged keeps its original casing."""
+    return value.casefold()
+
+
+def _is_nested(old: str, new: str) -> bool:
+    """True when old and new are in a parent/child relationship (either
+    direction) rather than side by side. Case-insensitive (Windows paths)."""
+    of, nf = _cf(old), _cf(new)
+    return nf.startswith(of + "\\") or of.startswith(nf + "\\")
+
+
 def replace_prefix(value: Any, old: str, new: str) -> tuple[Any, bool]:
-    if isinstance(value, str) and value.startswith(old):
-        return new + value[len(old) :], True
+    """Nesting-aware, idempotent, boundary-safe workspace-path prefix remap.
+
+    Used by the cleanup surfaces (workflow_run.cwd, setting.json recent/last
+    projects, message.data path fields). The primary/secondary grouping stores
+    do exact manifest-directed replacement and never call this.
+
+    Precedence:
+      1. Exact old root -> ``new`` (checked before the destination guard so a
+         source-under-destination exact root is still rewritten).
+      2. Already at/under ``new`` -> unchanged. The original ``value.startswith
+         (old)`` had neither this guard nor a separator boundary, so when
+         ``new`` was nested under ``old`` an already-destination value got
+         ``new`` re-applied (doubling), and a sibling like ``…Universe2``
+         matched ``…Universe``. Both are fixed here.
+      3. A subtree of ``old`` (separator-anchored) -> side-by-side move swaps
+         the prefix; a nested move leaves it unchanged (no fabricated path).
+      4. Otherwise -> unchanged.
+    """
+    if not isinstance(value, str):
+        return value, False
+    vf, of, nf = _cf(value), _cf(old), _cf(new)
+    # Case-insensitive comparisons; rewrites use the manifest ``new`` spelling,
+    # preserved values keep their original casing. ``len(old)`` is safe because
+    # ``old`` is a case-insensitive prefix at that branch.
+    if vf == of:
+        return new, True
+    if vf == nf or vf.startswith(nf + "\\"):
+        return value, False
+    if vf.startswith(of + "\\"):
+        if _is_nested(old, new):
+            return value, False
+        return new + value[len(old):], True
     return value, False
 
 
@@ -188,6 +387,24 @@ def migrate_tasks_index(
                 entry["status"] = "already_destination"
                 changed.append(entry)
                 continue
+
+            # Exact approved before-state: the live row must match the
+            # manifest's recorded values exactly before it is overwritten.
+            mismatches = [
+                f"{key}: manifest={item[key]!r}, actual={actual!r}"
+                for key, actual in (
+                    ("old_workspace_key", workspace_key),
+                    ("old_workspace_path", workspace_path),
+                    ("old_meta_workspacePath", before_meta_workspace),
+                )
+                if item[key] != actual
+            ]
+            if mismatches:
+                raise RuntimeError(
+                    f"tasks-index before-state mismatch for {sid}: "
+                    + "; ".join(mismatches)
+                )
+            entry["before_state_verified"] = True
 
             if apply:
                 cur.execute(
@@ -332,6 +549,22 @@ def migrate_sqlite(
                 entry["status"] = "already_destination"
                 changed.append(entry)
                 continue
+            # Exact approved before-state for the secondary db.sqlite row.
+            mismatches = [
+                f"{key}: manifest={item[key]!r}, actual={actual!r}"
+                for key, actual in (
+                    ("old_directory", directory),
+                    ("old_path", path),
+                    ("old_project_id", project_id),
+                )
+                if item[key] != actual
+            ]
+            if mismatches:
+                raise RuntimeError(
+                    f"db.sqlite before-state mismatch for {sid}: "
+                    + "; ".join(mismatches)
+                )
+            entry["before_state_verified"] = True
             if apply:
                 cur.execute(
                     "update session set directory=?, path=?, project_id=? where id=?",
@@ -343,8 +576,12 @@ def migrate_sqlite(
             changed.append(entry)
 
         wf_changed = 0
+        # Escape %, _, and the escape character itself in SQL LIKE patterns.
+        # Old workspace paths are user-provided and can contain these chars.
+        like_old = old.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
         for wf_id, wf_cwd in cur.execute(
-            "select id, cwd from workflow_run where cwd like ?", (old + "%",)
+            "select id, cwd from workflow_run where cwd like ? escape '\\'",
+            (like_old + "%",),
         ).fetchall():
             new_cwd, changed_cwd = replace_prefix(wf_cwd, old, new)
             if changed_cwd:
@@ -474,6 +711,33 @@ def reset_local_storage(suffix: str, apply: bool) -> dict[str, Any]:
     }
 
 
+def _zcode_process_running() -> bool:
+    """True if a zCode process appears to be running.
+
+    Fail-closed: if the probe raises or returns unusable output, we cannot
+    prove zCode is closed, so the guard stops the migration rather than
+    interpreting an unknown result as "not running"."""
+    try:
+        out = subprocess.check_output(["tasklist", "/FI", "STATUS eq RUNNING"],
+                                        text=True, timeout=5)
+    except Exception as exc:
+        raise SystemExit(
+            f"process probe failed ({exc!r}); cannot prove zCode is closed. "
+            "Refusing to proceed — verify manually and retry."
+        )
+    if not isinstance(out, str) or not out.strip():
+        raise SystemExit(
+            "process probe returned no output; cannot prove zCode is closed. "
+            "Refusing to proceed — verify manually and retry."
+        )
+    return "zcode.exe" in out.lower() or "z code.exe" in out.lower()
+
+
+def _non_empty_wal(db_path: Path) -> bool:
+    wal = db_path.with_name(db_path.name + "-wal")
+    return wal.exists() and wal.stat().st_size > 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("manifest", type=Path)
@@ -492,23 +756,71 @@ def main() -> int:
         + _dt.datetime.now().strftime("%Y%m%d-%H%M%S")
     )
 
+    # -- Process + dual-WAL guards (apply only) --
+    if apply:
+        if _zcode_process_running():
+            raise SystemExit("zCode appears to be running. Close it fully before --apply.")
+        for db_path, label in ((TASKS_INDEX_PATH, "tasks-index.sqlite"), (DB_PATH, "db.sqlite")):
+            if _non_empty_wal(db_path):
+                raise SystemExit(
+                    f"Non-empty WAL at {db_path.with_name(db_path.name + '-wal')} "
+                    f"({label}). zCode may still be running; close it fully before --apply."
+                )
+
+    # -- Cross-database preflight: all six exact before-state values across
+    #    BOTH databases are validated read-only before either DB is written.
+    #    Any mismatch stops here with zero writes. --
+    preflight = preflight_before_state(sessions, old, new)
+
+    # -- Backups: BOTH database families (plus setting.json) are backed up
+    #    with an explicit original->backup manifest before the first write. --
+    backup_manifest: list[dict[str, str]] = []
     backups: list[str] = []
     if apply:
-        backups.extend(backup_sqlite_family(TASKS_INDEX_PATH, suffix, True))
-        backups.extend(backup_sqlite_family(DB_PATH, suffix, True))
+        backups.extend(backup_sqlite_family(TASKS_INDEX_PATH, suffix, True, backup_manifest))
+        backups.extend(backup_sqlite_family(DB_PATH, suffix, True, backup_manifest))
         setting_backup = backup(SETTING_PATH, suffix, True)
         if setting_backup:
             backups.append(str(setting_backup))
+            backup_manifest.append({"original": str(SETTING_PATH), "backup": str(setting_backup)})
 
     results: dict[str, Any] = {
         "mode": "apply" if apply else "dry-run",
         "backup_run": suffix,
         "backups": backups,
+        "preflight": preflight,
     }
-    results["tasks_index"] = migrate_tasks_index(sessions, old, new, apply)
-    results["sqlite"] = migrate_sqlite(sessions, old, new, apply)
-    results["setting_json"] = migrate_setting_json(old, new, apply)
-    results["local_storage"] = reset_local_storage(suffix, apply)
+    # -- Coordinated operation: both database updates and their post-write
+    #    assertions run inside one guarded block. A failure updating or
+    #    verifying EITHER database restores BOTH from the verified backups
+    #    before the failure is returned. --
+    try:
+        results["tasks_index"] = migrate_tasks_index(sessions, old, new, apply)
+        results["sqlite"] = migrate_sqlite(sessions, old, new, apply)
+        results["setting_json"] = migrate_setting_json(old, new, apply)
+        results["local_storage"] = reset_local_storage(suffix, apply)
+    except BaseException as exc:
+        # EVERY failure raised while updating or verifying either database —
+        # RuntimeError/SystemExit, sqlite3.Error subclasses, OSError, JSON or
+        # Unicode decode errors, unexpected helper exceptions, and even a
+        # KeyboardInterrupt — triggers coordinated verified restoration of
+        # both database families (plus recorded settings) from the exact
+        # backup manifest, then re-raises the ORIGINAL failure. Nothing is
+        # swallowed, and an interrupt is never converted into success.
+        if apply and backup_manifest:
+            try:
+                restored = restore_backups(backup_manifest)
+            except RuntimeError as restore_exc:
+                # Restoration itself failed: surface BOTH failures — the
+                # restore error chained onto the original exception.
+                results["rollback_performed"] = False
+                results["rollback_error"] = str(restore_exc)
+                print(json.dumps(results, indent=2, ensure_ascii=False))
+                raise restore_exc from exc
+            results["restored_from_backups"] = restored
+            results["rollback_performed"] = True
+            print(json.dumps(results, indent=2, ensure_ascii=False))
+        raise
     print(json.dumps(results, indent=2, ensure_ascii=False))
     return 0
 

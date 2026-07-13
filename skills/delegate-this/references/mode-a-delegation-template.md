@@ -24,6 +24,50 @@ The record's **content is immutable after dispatch**. Its **state is not** — t
 
 ---
 
+## Execution Workspace
+
+The delegation family is created inside a single execution workspace, resolved
+before any parent, delegation, mini, or return report is written. State it once
+here; every path in this record is resolved relative to it.
+
+```text
+Execution workspace: <absolute path to the workspace root holding Archive\>
+```
+
+Create the parent plan/task, the delegation record, every mini artifact, and the
+session-summary / return-report family **all under this workspace** from the
+start.
+
+---
+
+## Child Numbering
+
+The families use lowercase child numbering, with **separate linked anchors** per
+artifact-type namespace:
+
+- each family master / independent mini: `N.)`
+- child mini artifacts and return reports: `Na.)`, `Nb.)` … `Nz.)`, then
+  `Naa.)`, `Nab.)` …
+
+**Separate anchors (do not share one number across namespaces):**
+
+- **Plan/Task family** — master `N` from the Plan/Task Subject namespace; child
+  plans/tasks inherit it. Canonical: `1.)`, children `1a.)` … `1e.)`.
+- **Delegation record** — own `N` from the Delegation Subject namespace.
+  Canonical: `1.)` (independent of the Plan number).
+- **Summary family** — master `N` from the Summary Subject namespace; return
+  reports inherit it. Canonical: `9.)`, reports `9a.)` … `9e.)`.
+
+Each anchor is calculated across its own combined Live + Historical namespace.
+Explicit paths and pointers connect the families; their numeric anchors need not
+match.
+
+The orchestrator reserves every child prefix before dispatch and writes the
+exact reserved prefix into the assignment overview, the mini-artifact table, the
+return-report table, and each packet. Never leave a child prefix blank or vague.
+
+---
+
 ## Record
 
 ```markdown
@@ -48,9 +92,29 @@ At least one parent is mandatory. Each parent's `Delegation` field must name thi
 
 ## Mini Artifacts
 
-| Owner platform | Kind | Path                                    | Created by     |
-|----------------|------|-----------------------------------------|----------------|
-| <platform>     | Plan | `<path>` or `To be created after recon` | <orchestrator> |
+| Owner platform | Prefix  | Kind | Path                                       | Created by     |
+|----------------|---------|------|--------------------------------------------|----------------|
+| <platform>     | `Na.)`  | Plan | `<path>` or `(reserved, created after recon)` | <orchestrator> |
+
+The prefix column carries the **exact reserved child prefix** (`1a.)`, `1b.)`,
+…) from the **Plan/Task family**. Every prefix is reserved by the orchestrator
+before dispatch; children inherit the Plan/Task family master `N`.
+
+## Session-Summary / Return-Report Family
+
+Uses the **Summary family** master `N` (from the Summary Subject namespace), not
+the Plan/Task or Delegation number.
+
+| Kind               | Prefix  | Path                                                          |
+|--------------------|---------|---------------------------------------------------------------|
+| Orchestrator summary | `9.)` | `<workspace>\Archive\Historical\Summaries\<Subject>\9.) <Topic>.md` |
+| Return report (a)  | `9a.)`  | `...\9a.) <platform>_<packet>_Report.md`                      |
+| Return report (b)  | `9b.)`  | `...\9b.) <platform>_<packet>_Report.md`                      |
+
+Return-report filenames **end in `Report.md`** and carry the reserved child
+prefix from the Summary family. Each is created (under the execution workspace's
+`Archive\Historical\Summaries\<Subject>\`) when its assignment returns. A return
+report uses session-summary structure plus an append-only `## Feedback` ledger.
 
 ## Shared Context
 
@@ -77,19 +141,36 @@ explicitly which assignments are parallel-safe and which are strictly serial.>
 
 ## Assignment Overview
 
-| Wave | Platform    | Role     | Assignment        | Rec. model | Actual model   | Parent   | Mini     | Depends on | Status     |
-|------|-------------|----------|-------------------|------------|----------------|----------|----------|------------|------------|
-| 1    | Claude Code | Worker   | <short>           | <model>    | User to select | `<path>` | `<path>` | None       | Dispatched |
-| 2    | Codex       | Reviewer | <short>           | <model>    | User to select | `<path>` | N/A      | Wave 1     | Dispatched |
+| Wave | Platform    | Role     | Assignment        | Rec. model | Actual model   | Parent   | Mini     | Prefix  | Return report    | Depends on | Status     |
+|------|-------------|----------|-------------------|------------|----------------|----------|----------|---------|------------------|------------|------------|
+| 1    | Claude Code | Worker   | <short>           | <model>    | User to select | `<path>` | `<path>` | `1a.)`  | `9a.) …Report.md` | None       | Dispatched |
+| 2    | Codex       | Reviewer | <short>           | <model>    | User to select | `<path>` | N/A      | N/A     | `9b.) …Report.md` | Wave 1     | Dispatched |
 
 Cells are capped at 80 characters and the pipes are aligned. Where a cell would
 overflow, truncate at a word boundary and add `→ see note <wave>` with the full text
-directly beneath the table.
+directly beneath the table. `Prefix` carries the exact reserved **Plan/Task
+family** child prefix (or `N/A` when the assignment creates no mini artifact);
+`Return report` is the reserved path ending in `Report.md`, carrying the
+**Summary family** child prefix. The two prefixes come from different families
+and need not match.
 
 ## Assignment Packets
 
-<One packet per platform/agent, using `assignment-packet-template.md`. A receiving agent
-may read the whole record, but executes only its own packet.>
+<One packet per platform/agent, using `assignment-packet-template.md`. Each
+packet carries all 21 required fields, including the Checkpoint Policy and the
+reserved return-report prefix. A receiving agent may read the whole record, but
+executes only its own packet.>
+
+## Checkpoint Policy (per packet)
+
+Each packet states explicitly:
+
+- where execution stops (default: complete the packet continuously; only
+  `USER CHECKPOINT` midpoints pause for the user);
+- whether sync is allowed (default for skill work: centralized sync — workers
+  do not sync, the orchestrator does one final global-sync + parity pass);
+- what deliverables must be returned first (the return report and named
+  deliverables).
 
 ## Launch Instructions
 
@@ -102,7 +183,14 @@ may read the whole record, but executes only its own packet.>
 
 ## Return and Integration Instructions
 
-- Each agent returns its deliverable in the format its packet specifies.
+- Each agent returns its deliverable in the format its packet specifies **and**
+  writes a **return report** at its reserved child prefix under
+  `<workspace>\Archive\Historical\Summaries\<Subject>\` with a filename ending
+  in `Report.md`. The return report is mandatory at packet/wave completion.
+- A return report uses session-summary structure plus an append-only
+  `## Feedback` ledger. Existing report content and earlier feedback entries are
+  immutable; feedback is appendable only while the delegation is active and
+  freezes when `finalize-delegation` closes it.
 - Bring every return back to the orchestrator session.
 - The orchestrator reconciles returns against the parent objective, every mini artifact,
   the global constraints, and the parent's Definition of Done.
@@ -112,7 +200,8 @@ may read the whole record, but executes only its own packet.>
 - **Dispatch is not completion.** The parent objective is complete only after integration
   and verification.
 - When integration is verified, run `finalize-delegation` to move this record to
-  `Archive\Historical\Delegations\<Subject>\` as `_completed`.
+  `Archive\Historical\Delegations\<Subject>\` as `_completed`. Closing the
+  delegation freezes every return report and its `## Feedback` ledger.
 
 ## Global Stop Conditions
 
@@ -129,7 +218,7 @@ Any agent stops and returns to the user immediately if:
 
 ## Parent Backlink Field
 
-Every parent plan/task must name this record. In a `delegate-this`-aware `imp-upd-plan` or `imp-upd-task`, fill the existing field. In an older parent that predates the field, add it under `## Context`:
+Every parent plan/task must name this record. In a `delegate-this`-aware `plan-this` or `task-this`, fill the existing field. In an older parent that predates the field, add it under `## Context`:
 
 ```markdown
 **Delegation:** `<Workspace>\Archive\Live\Delegations\<Subject>\N.) <Topic>_dispatched.md`

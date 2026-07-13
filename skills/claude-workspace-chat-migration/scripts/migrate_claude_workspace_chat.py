@@ -81,13 +81,100 @@ def backup_tree(path: Path, suffix: str, apply: bool) -> Path | None:
     return target
 
 
+def _cf(value: str) -> str:
+    """Casefold a string for case-insensitive Windows-path comparison. Windows
+    paths are case-insensitive, so identity/prefix tests must not depend on the
+    stored casing — only the *comparison* is normalized; the original string is
+    preserved whenever a value is left unchanged."""
+    return value.casefold()
+
+
+def _under(value: str, base: str) -> bool:
+    """Case-insensitive: value equals base or sits under base\\."""
+    vf, bf = _cf(value), _cf(base)
+    return vf == bf or vf.startswith(bf + "\\")
+
+
+def _is_nested(old: str, new: str) -> bool:
+    """True when old and new are in a parent/child relationship (either
+    direction) rather than side by side. In a nested move a subtree of the old
+    workspace must be preserved as an honest record, not stamped with new.
+    Case-insensitive, since Windows paths are."""
+    of, nf = _cf(old), _cf(new)
+    return nf.startswith(of + "\\") or of.startswith(nf + "\\")
+
+
 def remap_cwd(value: str, old: str, new: str) -> str:
-    """Exact match or under-the-workspace prefix; otherwise unchanged."""
-    if value == old:
+    """Nesting-aware, idempotent workspace-path remap.
+
+    Classification precedence — the ORDER is load-bearing:
+      1. Exact old root -> rewrite to ``new``. Checked FIRST so that when
+         ``old`` is itself nested under ``new`` (source-under-destination), the
+         exact old root is still rewritten instead of being swallowed by the
+         already-destination guard in step 2.
+      2. Already at/under ``new`` -> leave unchanged. This is the guard the
+         original code lacked: when ``new`` is nested under ``old``, a value
+         already correctly at/under ``new`` also matches ``old\\`` and would
+         otherwise get ``new`` appended a second time (the doubled-path bug).
+         It also makes the transform idempotent.
+      3. A different subtree of ``old`` -> a side-by-side move swaps the ``old``
+         prefix for ``new`` (subfolders travel with the workspace); a nested
+         move (either direction) LEAVES the value unchanged rather than
+         fabricating a ``new``-relative path that never existed.
+      4. Unrelated -> unchanged.
+    """
+    # All comparisons are case-insensitive (Windows paths). When rewriting, the
+    # manifest-provided ``new`` spelling is used; when leaving a value alone, the
+    # original string (its own casing) is returned untouched. ``len(old)`` is a
+    # safe slice index because ``old`` is a case-insensitive prefix here, so the
+    # character count matches regardless of casing.
+    # 1. exact old root
+    if _cf(value) == _cf(old):
         return new
-    if value.startswith(old + "\\"):
+    # 2. already at/under destination (idempotent; nesting-safe)
+    if _under(value, new):
+        return value
+    # 3. a different subtree of old
+    if _cf(value).startswith(_cf(old) + "\\"):
+        if _is_nested(old, new):
+            return value
         return new + value[len(old):]
+    # 4. unrelated
     return value
+
+
+def is_doubled_new(value: Any, old: str, new: str) -> bool:
+    """True if ``value`` is a doubled-destination corruption: ``new`` with its
+    own old-relative tail re-applied on top. This is the exact shape the
+    prefix-only remap produced when ``new`` was nested under ``old`` (e.g.
+    ``…\\Workflows\\MilkyWay\\Tools\\Workflows\\skills``).
+
+    Such a value starts with ``new\\`` and therefore looks clean to
+    ``is_residual_old`` (which treats anything under ``new`` as non-residual).
+    Verification checks this separately so a doubled path can never pass merely
+    because it begins with ``new``. Only meaningful when ``new`` is nested under
+    ``old`` — that is the only configuration in which the doubling can arise."""
+    if not isinstance(value, str):
+        return False
+    if not _cf(new).startswith(_cf(old) + "\\"):
+        return False
+    rel = new[len(old) + 1:]           # new's path relative to old
+    doubled = _cf(new + "\\" + rel)
+    vf = _cf(value)
+    return vf == doubled or vf.startswith(doubled + "\\")
+
+
+def is_residual_old(value: Any, old: str, new: str) -> bool:
+    """True if a cwd value still points at or under the old workspace after the
+    transform. Catches stale descendant paths (``old\\\\subdir``), not only the
+    exact old root, so a leftover descendant cannot pass verification silently.
+    A value at or under the destination is never residual, which keeps nested
+    old-under-new configs honest."""
+    if not isinstance(value, str):
+        return False
+    under_old = _under(value, old)
+    under_new = _under(value, new)
+    return under_old and not under_new
 
 
 def transcript_paths(item: dict[str, Any], old_ws: str, new_ws: str) -> tuple[Path, Path]:
@@ -103,7 +190,12 @@ def transcript_paths(item: dict[str, Any], old_ws: str, new_ws: str) -> tuple[Pa
 def migrate_transcript(old_path: Path, new_path: Path, old: str, new: str, apply: bool) -> dict[str, Any]:
     if not old_path.exists():
         raise SystemExit(f"transcript not found: {old_path} (already migrated? mark status: done in manifest)")
-    raw = old_path.read_text(encoding="utf-8")
+    # Read BOM-safely: a pre-existing UTF-8 BOM must not break JSON parsing.
+    # Detect it, then decode with utf-8-sig so the BOM (if any) is consumed
+    # without ever forcing one onto the (plain UTF-8) JSONL output.
+    raw_bytes = old_path.read_bytes()
+    had_bom = raw_bytes.startswith(BOM)
+    raw = raw_bytes.decode("utf-8-sig")
     out: list[str] = []
     changed = 0
     for line in raw.splitlines(keepends=True):
@@ -124,19 +216,38 @@ def migrate_transcript(old_path: Path, new_path: Path, old: str, new: str, apply
         out.append(line)
 
     text = "".join(out)
-    # Verify in-memory before writing: every line parses, counts add up.
-    cwd_new = cwd_old = 0
+    # Verify in-memory before writing: every line parses, and no residual
+    # old-workspace cwd remains. Residual detection is descendant-aware, so a
+    # stale ``old\subdir`` value cannot pass verification by differing from the
+    # exact old root.
+    cwd_new = cwd_residual = cwd_doubled = 0
+    residual_examples: list[str] = []
+    doubled_examples: list[str] = []
     for ln in text.splitlines():
         ln = ln.strip()
         if not ln:
             continue
         c = json.loads(ln).get("cwd")
-        if c == new:
+        # Doubled paths are checked FIRST: they start with ``new`` and would
+        # otherwise be miscounted as clean by the ``c == new`` / residual tests.
+        if is_doubled_new(c, old, new):
+            cwd_doubled += 1
+            if len(doubled_examples) < 3:
+                doubled_examples.append(str(c))
+        elif c == new:
             cwd_new += 1
-        elif c == old:
-            cwd_old += 1
-    if cwd_old:
-        raise RuntimeError(f"{old_path}: {cwd_old} old-workspace cwd values still present after transform")
+        elif is_residual_old(c, old, new):
+            cwd_residual += 1
+            if len(residual_examples) < 3:
+                residual_examples.append(str(c))
+    if cwd_residual or cwd_doubled:
+        raise RuntimeError(
+            f"{old_path}: transform verification failed — "
+            f"{cwd_residual} residual old-workspace cwd value(s) "
+            f"(examples: {residual_examples}); "
+            f"{cwd_doubled} doubled-destination cwd value(s) "
+            f"(examples: {doubled_examples})"
+        )
 
     if apply:
         new_path.parent.mkdir(parents=True, exist_ok=True)
@@ -151,7 +262,9 @@ def migrate_transcript(old_path: Path, new_path: Path, old: str, new: str, apply
         "to": str(new_path),
         "changed_records": changed,
         "cwd_new": cwd_new,
-        "cwd_old": cwd_old,
+        "cwd_residual_after_transform": cwd_residual,
+        "cwd_doubled_after_transform": cwd_doubled,
+        "had_bom": had_bom,
     }
 
 
@@ -248,6 +361,79 @@ def move_tree(source: Path, destination: Path, suffix: str, apply: bool) -> dict
     return result
 
 
+def _require_expected_counts_declared(label: str, expected: Any) -> None:
+    """Hard-stop BEFORE any move when the manifest omits the mandatory
+    ``expected_files`` block. Requiring the declaration up front means an
+    invalid manifest never gets as far as moving files."""
+    if not isinstance(expected, dict):
+        raise SystemExit(
+            f"{label}: manifest is missing the required expected_files block "
+            "(expected-file/count verification is mandatory for every relocation)"
+        )
+    if expected.get("files") is None and expected.get("directories") is None:
+        raise SystemExit(
+            f"{label}: expected_files must declare 'files' and/or 'directories' counts; "
+            "an empty block is not verification evidence"
+        )
+
+
+def _check_missing_source(label: str, source: Path, expected: Any, allow_missing: Any) -> bool:
+    """Gate a declared relocation whose source does not exist.
+
+    A missing declared source is a hard stop — a relocation must never
+    silently succeed as a no-op — unless the manifest explicitly sets
+    ``allow_missing_source: true`` for that entry AND declares expected
+    counts of exactly 0 files and 0 directories (i.e. the manifest itself
+    asserts there is nothing to move). Returns True when the relocation may
+    proceed as an intentional, explicitly-declared no-op."""
+    if source.exists():
+        return False
+    if allow_missing is not True:
+        raise SystemExit(
+            f"{label}: declared source does not exist: {source}. A missing "
+            "declared source is a hard stop; set allow_missing_source: true "
+            "(with expected_files files=0 and directories=0) only when the "
+            "no-op is intentional."
+        )
+    files = expected.get("files") if isinstance(expected, dict) else None
+    dirs = expected.get("directories") if isinstance(expected, dict) else None
+    if files != 0 or dirs != 0:
+        raise SystemExit(
+            f"{label}: allow_missing_source is set but expected_files is not "
+            f"files=0/directories=0 (got files={files!r}, directories={dirs!r}). "
+            "The allowance is only valid when the manifest declares both "
+            "expected counts as zero."
+        )
+    return True
+
+
+def _verify_expected_counts(label: str, dest: Path, expected: Any, moved: dict[str, Any]) -> None:
+    """Assert that a relocated tree matches the manifest's expected file/dir
+    counts. Expected counts are REQUIRED evidence for every relocation the
+    manifest declares (see ``_require_expected_counts_declared``); the
+    destination must match exactly."""
+    _require_expected_counts_declared(label, expected)
+    if moved.get("source_exists_before") is False:
+        # Unreachable for declared relocations: missing sources hard-stop in
+        # _check_missing_source before any move. Kept as defense in depth.
+        raise SystemExit(
+            f"{label}: relocation reached count verification with a missing "
+            f"source ({moved.get('source')}); this should have been gated by "
+            "the missing-source check."
+        )
+    expected_files = expected.get("files")
+    expected_dirs = expected.get("directories")
+    after = moved.get("destination_counts_after") or count_tree(dest)
+    if expected_files is not None and after.get("files") != expected_files:
+        raise RuntimeError(
+            f"{label}: expected {expected_files} files at {dest}, found {after.get('files')}"
+        )
+    if expected_dirs is not None and after.get("directories") != expected_dirs:
+        raise RuntimeError(
+            f"{label}: expected {expected_dirs} directories at {dest}, found {after.get('directories')}"
+        )
+
+
 def relocate_adjacent_data(plan: dict[str, Any], suffix: str, apply: bool) -> dict[str, Any]:
     result: dict[str, Any] = {
         "memory_move": None,
@@ -255,10 +441,52 @@ def relocate_adjacent_data(plan: dict[str, Any], suffix: str, apply: bool) -> di
         "then_delete": plan.get("then_delete"),
         "then_delete_counts_before": None,
         "then_delete_removed": False,
+        "memory_scope": plan.get("memory_scope"),
     }
     memory = plan.get("memory_move")
     if isinstance(memory, dict) and memory.get("source") and memory.get("destination"):
-        result["memory_move"] = move_tree(Path(memory["source"]), Path(memory["destination"]), suffix, apply)
+        # Workspace `memory/` is whole-workspace state shared by every chat in
+        # the encoded project folder, not per-selected-chat state. Moving it as
+        # part of a selected-chat migration would silently drag other chats'
+        # memory along. The manifest MUST declare the scope explicitly:
+        # "whole_workspace" (only valid when the whole workspace is moving) or
+        # "none" (skip the move for a selected-chat migration). An absent
+        # scope is a hard stop — it is never defaulted.
+        if result["memory_scope"] is None:
+            raise SystemExit(
+                "memory_move is declared but memory_scope is absent. Declare "
+                "memory_scope 'whole_workspace' or 'none' explicitly; the scope "
+                "is never defaulted."
+            )
+        scope = str(result["memory_scope"]).strip().lower()
+        if scope == "none":
+            result["memory_move"] = {
+                "skipped": True,
+                "reason": "memory_scope=none: workspace memory is whole-workspace and was not moved",
+            }
+        elif scope != "whole_workspace":
+            raise SystemExit(
+                f"memory_move requires memory_scope 'whole_workspace' or 'none'; got {scope!r}. "
+                "Workspace memory/ is whole-workspace state, not per-selected-chat."
+            )
+        else:
+            _require_expected_counts_declared("memory_move", memory.get("expected_files"))
+            source = Path(memory["source"])
+            if _check_missing_source(
+                "memory_move", source, memory.get("expected_files"),
+                memory.get("allow_missing_source"),
+            ):
+                result["memory_move"] = {
+                    "skipped": True,
+                    "reason": "allow_missing_source: declared no-op (source absent, expected counts 0/0)",
+                    "source": str(source),
+                }
+            else:
+                moved = move_tree(source, Path(memory["destination"]), suffix, apply)
+                _verify_expected_counts(
+                    "memory_move", Path(memory["destination"]), memory.get("expected_files"), moved
+                )
+                result["memory_move"] = moved
 
     # `aux_relocations` is the legacy manifest key. New manifests should use
     # the clearer `sidecar_relocations` key.
@@ -266,7 +494,26 @@ def relocate_adjacent_data(plan: dict[str, Any], suffix: str, apply: bool) -> di
     for item in sidecar_relocations:
         source = Path(item["source"])
         destination = Path(item["destination"])
+        label = f"sidecar[{item.get('session_id')}]"
+        _require_expected_counts_declared(label, item.get("expected_files"))
+        if _check_missing_source(
+            label, source, item.get("expected_files"), item.get("allow_missing_source")
+        ):
+            result["sidecar_relocations"].append({
+                "skipped": True,
+                "reason": "allow_missing_source: declared no-op (source absent, expected counts 0/0)",
+                "source": str(source),
+                "session_id": item.get("session_id"),
+                "sidecar_kind": item.get("sidecar_kind", item.get("aux_kind")),
+            })
+            continue
         moved = move_tree(source, destination, suffix, apply)
+        _verify_expected_counts(
+            f"sidecar[{item.get('session_id')}]",
+            destination,
+            item.get("expected_files"),
+            moved,
+        )
         moved.update({
             "session_id": item.get("session_id"),
             "sidecar_kind": item.get("sidecar_kind", item.get("aux_kind")),

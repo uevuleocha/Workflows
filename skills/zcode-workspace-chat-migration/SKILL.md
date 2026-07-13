@@ -51,13 +51,22 @@ Examples:
 ## Safety Rules
 
 - Start with one session when testing a new migration pattern.
-- Do not modify any zCode state while zCode is running. Abort if `db.sqlite-wal` or `tasks-index.sqlite-wal` is being actively written at apply time (the WAL guard).
-- Back up every touched file before mutation.
+- Do not modify any zCode state while zCode is running. The **process guard** checks for a running zCode process before apply and is **fail-closed**: if the probe itself fails (exception, timeout, or empty output), the helper stops rather than treating the unknown result as "not running". **Both** `tasks-index.sqlite-wal` **and** `db.sqlite-wal` are WAL-guarded independently — either having a non-empty WAL is a hard stop (zCode may still be running). An empty or absent WAL on both DBs is safe (zCode checkpoints on shutdown, and the helper's LIKE patterns are escaped to prevent wildcard injection from paths containing `%` or `_`).
+- Back up every touched file before mutation. Both database families are backed up before the **first** write, all six before-state values are preflighted read-only across **both** databases before **either** is written, and a failure updating or verifying either database triggers a verified restore of **both** (see **Failure And Rollback**).
 - Do not globally replace paths across `C:\Users\Admin\.zcode`.
 - Edit only structured workspace metadata fields: the `tasks` row's `workspace_key`, `workspace_path`, and `meta_json.workspacePath`; the `session` row's `directory`, `path`, and `project_id`; `setting.json` path strings; and structured `message.data` cwd/root fields. Do not rewrite user/assistant prose, message content, `part` rows, or rollout transcript records just because they mention the old path.
 - Preserve on-disk format: SQLite transactions with `PRAGMA integrity_check`; JSON validity; UTF-8 encoding; preserve BOM/no-BOM state where relevant.
 - Keep a rollback path by preserving backups.
 - Save every backup to the unified backup folder, never scattered next to originals (see **Backup Location**).
+
+## Nested Workspaces
+
+Workspaces are sometimes **nested inside another workspace** — e.g. a hub with sub-workspaces under it. This shape is common in some setups but is **not assumed universal** (this skill may be used anywhere), so the transform must change only the values that genuinely point at the **old** location and are **not already at or under the destination**, and never force-rewrite a value that is already correct.
+
+The primary grouping store (`tasks-index.sqlite`) and the secondary resume store (`db.sqlite session`) use **exact manifest-directed replacement** with before-state verification and an already-destination guard, so they are structurally immune to prefix-doubling. The **cleanup surfaces** (`workflow_run.cwd`, `setting.json` recent/last projects, `message.data` path fields) go through `replace_prefix`, which applies the nesting rules:
+
+- **Exact old root** → `new`; **already at/under `new`** → unchanged (idempotent, prevents doubling); **subtree of `old`** → prefix swapped for a side-by-side move, left unchanged for a nested move.
+- Separator-anchored, so a sibling like `…Universe2` never matches `…Universe`.
 
 ## Backup Location
 
@@ -75,17 +84,17 @@ C:\Users\Admin\.zcode\user-backups\<run-timestamp>\<original filename>
 
 ## Manifest Storage
 
-Building a manifest when running this skill is encouraged — it keeps a migration explicit and auditable. It is a shared concern: the **Front-Door Workflow** creates the manifest and the **Execution Workflow** consumes it. Save the manifest into the active workspace's `Archive/Manifests/zCode/` folder (create it if missing), written workspace-relative so it works for whichever project/working directory the migration targets:
+Building a manifest when running this skill is encouraged — it keeps a migration explicit and auditable. It is a shared concern: the **Front-Door Workflow** creates the manifest and the **Execution Workflow** consumes it. Save the manifest into the active workspace's `Archive/Historical/Manifests/zCode/` folder (create it if missing), written workspace-relative so it works for whichever project/working directory the migration targets:
 
 ```
-$WORKSPACE/Archive/Manifests/zCode/
-<workspace_root>/Archive/Manifests/zCode/
-./Archive/Manifests/zCode/
+$WORKSPACE/Archive/Historical/Manifests/zCode/
+<workspace_root>/Archive/Historical/Manifests/zCode/
+./Archive/Historical/Manifests/zCode/
 ```
 
-All three notations mean the same thing: the `Archive/Manifests/zCode/` folder of the workspace currently being worked in. The platform folder is determined by the chat platform being migrated, not by the agent performing the work: a Codex or Claude helper executing a zCode migration still uses the `zCode` folder. Once a migration is confirmed, the manifest is no longer needed — the user can ask an agent to delete it from there.
+All three notations mean the same thing: the `Archive/Historical/Manifests/zCode/` folder of the workspace currently being worked in. The platform folder is determined by the chat platform being migrated, not by the agent performing the work: a Codex or Claude helper executing a zCode migration still uses the `zCode` folder. Once a migration is confirmed, the manifest is no longer needed — the user can ask an agent to delete it from there.
 
-Every manifest saved in `Archive/Manifests/zCode/` must start with the next sequential `N.) ` prefix based only on the highest existing numbered file in that platform folder. Use `N.) <descriptive-manifest-name>.json`; for example, `1.) zcode_galaxies_to_milkyway_manifest.json`. When updating or renaming a staged manifest, preserve its existing sequence number while changing the descriptive portion to match its current scope and state. Do not leave migration manifests unnumbered.
+Every manifest saved in `Archive/Historical/Manifests/zCode/` must start with the next sequential `N.) ` prefix based only on the highest existing numbered file in that platform folder. Use `N.) <descriptive-manifest-name>.json`; for example, `1.) zcode_galaxies_to_milkyway_manifest.json`. When updating or renaming a staged manifest, preserve its existing sequence number while changing the descriptive portion to match its current scope and state. Do not leave migration manifests unnumbered.
 
 When a migration is staged (e.g. one-session test first, then the rest), prefer updating the existing manifest in place to reflect what is done and what remains, rather than creating a second file, unless the sessions come from more than one source workspace. One source workspace means one manifest.
 
@@ -102,7 +111,7 @@ Both workflows close by producing an explicit session summary through the `sessi
 
 **Save location and naming (both workflows).** Invoke `session-summary` pre-filled so the user does not have to complete its input template:
 
-- Directory: `<workspace_root>/Archive/Summaries/Migration/zCode/`
+- Directory: `<workspace_root>/Archive/Historical/Summaries/Migration/zCode/`
 - Create the `zCode` platform folder if it does not exist.
 - Sequence number: the next integer after the highest existing `N.)` file in the `zCode` platform folder only.
 - Filename: the `session-summary` convention `x.) [Project] [Topic] Summary [N].md`.
@@ -128,22 +137,24 @@ Do not ask the user to supply source workspace roots when those can be discovere
 For the requested sessions, discover the real values from zCode's source-of-truth files. Do not infer or guess them. See the **Read-Only Mapping Workflow** below for the step-by-step discovery procedure.
 
 - discover session IDs
-- discover the current `directory`, `path`, and `project_id` per session
+- discover the current `directory`, `path`, and `project_id` per session (from `db.sqlite`)
+- **discover the current `tasks-index.sqlite` before-state** — read the `tasks` row (`workspace_key`, `workspace_path`, `meta_json`) for every target `task_id`. This is the PRIMARY grouping store and the front-door must capture its exact before-state before handoff; the execution helper verifies it during preflight
 - discover old workspace roots per session (from `directory`)
 - discover whether the requested sessions come from one source workspace or multiple source groups
 - discover whether the destination path exists on disk (it should — the rename must have happened first)
 
 Use read-only inspection of:
 
-- `C:\Users\Admin\.zcode\cli\db\db.sqlite` (open `mode=ro`) — table `session`, columns `id`, `title`, `directory`, `path`, `project_id`
+- `C:\Users\Admin\.zcode\v2\tasks-index.sqlite` (open `mode=ro`) — table `tasks`, columns `task_id`, `workspace_key`, `workspace_path`, `meta_json`, `title` — **the PRIMARY grouping store; must be inspected before handoff**
+- `C:\Users\Admin\.zcode\cli\db\db.sqlite` (open `mode=ro`) — table `session`, columns `id`, `title`, `directory`, `path`, `project_id` — secondary resume-directory store
 - `C:\Users\Admin\.zcode\v2\setting.json` — `recentProjects` and `lastWorkspaceSession`
 
 ### Front-Door Output
 
 Once discovery is complete:
 
-1. Save (or update in place) a sequentially numbered `N.) ` manifest under the active workspace's `Archive/Manifests/zCode/` folder.
-2. Produce the migration handoff summary by explicitly invoking the `session-summary` skill (see **Session Summary Integration**). Scope it to the helper agent's portion, pre-fill the skill's inputs, and save it under `Archive/Summaries/Migration/zCode/`. Apply the availability guard if the skill is not loaded.
+1. Save (or update in place) a sequentially numbered `N.) ` manifest under the active workspace's `Archive/Historical/Manifests/zCode/` folder.
+2. Produce the migration handoff summary by explicitly invoking the `session-summary` skill (see **Session Summary Integration**). Scope it to the helper agent's portion, pre-fill the skill's inputs, and save it under `Archive/Historical/Summaries/Migration/zCode/`. Apply the availability guard if the skill is not loaded.
 3. Group sessions by real discovered old workspace when needed. If there are mixed-source sessions, represent them as separate source groups rather than flattening them into one assumed old workspace.
 
 ### Front-Door Stop Boundary
@@ -261,7 +272,7 @@ These do not affect sidebar grouping. Skip unless the user asks for a tidy DB.
 
 ### Helper Script
 
-Use `scripts/migrate_zcode_workspace_chat.py` for deterministic migration when available. Prefer `--dry-run` first. Save the manifest you pass to it under the workspace's `Archive/Manifests/zCode/` folder (see **Manifest Storage**).
+Use `scripts/migrate_zcode_workspace_chat.py` for deterministic migration when available. Prefer `--dry-run` first. Save the manifest you pass to it under the workspace's `Archive/Historical/Manifests/zCode/` folder (see **Manifest Storage**).
 
 The helper script belongs to the **Execution Workflow** side. It is not the front door. zCode may help discover inputs and generate the manifest, but a non-zCode helper agent should run the script while zCode is fully closed.
 
@@ -274,11 +285,19 @@ Expected manifest shape:
   "sessions": [
     {
       "id": "sess_bb6d3e64-f056-4b98-9e0e-311a91f0b073",
-      "title": "Running Git Diff Skill"
+      "title": "Running Git Diff Skill",
+      "old_workspace_key": "C:\\Users\\Admin\\Uzzys Universe\\Galaxies\\Trading\\Uzzy Ecosystem",
+      "old_workspace_path": "C:\\Users\\Admin\\Uzzys Universe\\Galaxies\\Trading\\Uzzy Ecosystem",
+      "old_meta_workspacePath": "C:\\Users\\Admin\\Uzzys Universe\\Galaxies\\Trading\\Uzzy Ecosystem",
+      "old_directory": "C:\\Users\\Admin\\Uzzys Universe\\Galaxies\\Trading\\Uzzy Ecosystem",
+      "old_path": "C:\\Users\\Admin\\Uzzys Universe\\Galaxies\\Trading\\Uzzy Ecosystem",
+      "old_project_id": "proj_c-users-admin-uzzys-universe-galaxies-trading-uzzy-ecosystem"
     }
   ]
 }
 ```
+
+The six `old_*` keys are **mandatory**: they record the exact approved before-state of the PRIMARY `tasks-index.sqlite` row (`old_workspace_key`, `old_workspace_path`, `old_meta_workspacePath`) and the SECONDARY `db.sqlite` session row (`old_directory`, `old_path`, `old_project_id`), captured during front-door intake. The helper refuses a manifest that omits any of them and hard-fails before overwriting a row whose live values differ from the recorded before-state (a row already fully at the destination is reported `already_destination` instead).
 
 Run modes:
 
@@ -298,11 +317,17 @@ After migration and before telling the user it is done:
 
 ### Execution Summary
 
-After verification passes and before considering the migration closed, produce an execution report by explicitly invoking the `session-summary` skill (see **Session Summary Integration**). Scope it to the helper agent's portion: the handoff it received plus every change it applied, verified, or rolled back. Pre-fill the skill's inputs and save under `Archive/Summaries/Migration/zCode/` so the user (and the front-door agent) can review it. Apply the availability guard if the skill is not loaded.
+After verification passes and before considering the migration closed, produce an execution report by explicitly invoking the `session-summary` skill (see **Session Summary Integration**). Scope it to the helper agent's portion: the handoff it received plus every change it applied, verified, or rolled back. Pre-fill the skill's inputs and save under `Archive/Historical/Summaries/Migration/zCode/` so the user (and the front-door agent) can review it. Apply the availability guard if the skill is not loaded.
 
 ### Failure And Rollback
 
-If anything fails before a session is fully written, stop and report the failing session ID and file. If a post-write verification fails, restore from backups before attempting another approach.
+The two-database write is a **coordinated operation**:
+
+- All six exact before-state values (tasks-index `workspace_key`/`workspace_path`/`meta_json.workspacePath` and db.sqlite `directory`/`path`/`project_id`) are **preflighted read-only across both databases before either database is written**. Any mismatch stops with zero writes.
+- Both database families (plus `setting.json`) are backed up — with an explicit original→backup manifest — **before the first write**.
+- Both updates and their post-write assertions run inside one guarded block: **every** exception raised while updating or verifying **either** database — not only helper-raised errors but `sqlite3` errors, `OSError`, JSON/Unicode decode errors, unexpected helper exceptions, and even a keyboard interrupt — restores **both** databases from the manifest (stray post-failure `-wal`/`-shm` sidecars are removed first so a restored main DB is not corrupted), and each restoration is **verified byte-for-byte before the original failure is re-raised** — the original exception is never swallowed, and an interrupt is never converted into success. An unverifiable restoration is reported loudly with both failures chained, never skipped.
+
+If anything else fails before a session is fully written, stop and report the failing session ID and file.
 
 **If the migrated chat is absent from the sidebar (or still under the old group) after the writes:** the cause is almost always that **`tasks-index.sqlite` was not fully updated** — that DB, not `db.sqlite`, is what the sidebar reads. Diagnose in order:
 1. **Re-read the `tasks` row** for the session: are `workspace_key`, `workspace_path`, AND `meta_json.workspacePath` all the destination path? If any still holds the old path, the sidebar groups by it. Fix and re-verify.

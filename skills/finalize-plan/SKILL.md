@@ -7,7 +7,7 @@ description: Finalize existing active implementation plans by verifying completi
 
 Finalize an existing active implementation plan after the user confirms the work is complete or satisfactory.
 
-This skill only closes active plans. It does not create or update active implementation plans; use `imp-upd-plan` for that.
+This skill only closes active plans. It does not create or update active implementation plans; use `plan-this` for that.
 
 ## Project Contract
 
@@ -26,7 +26,7 @@ Treat these as direct invocation and begin the workflow:
 - `this implementation plan is done`
 - clear equivalents where the user says an active implementation plan is complete, final, finalized, or done
 
-If the user asks to create or revise an active implementation plan, stop and direct them to `imp-upd-plan`.
+If the user asks to create or revise an active implementation plan, stop and direct them to `plan-this`.
 
 ## Required Review
 
@@ -34,7 +34,7 @@ Review only the sources needed to finalize the plan safely:
 
 1. The project's canonical contract (e.g. `CLAUDE.md`)
 2. the user-referenced active plan, if provided
-3. existing `_active.md` files under `<project root>\Archive\Plans\` when the user did not name the plan
+3. existing `_active.md` files under `<project root>\Archive\Live\Plans\` when the user did not name the plan
 4. referenced verification results, session notes, or source files only when needed to confirm completion
 
 Do not perform a broad repo audit unless the user asks or completion evidence genuinely requires it.
@@ -43,7 +43,7 @@ Do not perform a broad repo audit unless the user asks or completion evidence ge
 
 Use the plan the user explicitly references.
 
-If the user does not reference a plan, inspect `<project root>\Archive\Plans\` for `_active.md` files:
+If the user does not reference a plan, inspect `<project root>\Archive\Live\Plans\` for `_active.md` files:
 
 - If exactly one active plan exists, use it.
 - If exactly one active plan clearly matches the user's project/component/task, use it.
@@ -73,7 +73,7 @@ Apply completed presentation language only when the evidence supports completion
 
 ## Prompt Contract Review
 
-Plans created under the current `imp-upd-plan` workflow carry a `## Prompt Contract` section (GOAL, CONSTRAINTS, FORMAT, DEFINITION OF DONE, FAILURE). When it exists, it is the authoritative completion gate. Before finalizing, walk it explicitly:
+Plans created under the current `plan-this` workflow carry a `## Prompt Contract` section (GOAL, CONSTRAINTS, FORMAT, DEFINITION OF DONE, FAILURE). When it exists, it is the authoritative completion gate. Before finalizing, walk it explicitly:
 
 - Check each DEFINITION OF DONE item against completion evidence; mark it met, user-confirmed, or explicitly deferred out of scope.
 - Check each FAILURE condition; confirm none is triggered. If any is active, do not finalize until it is resolved or the user waives it.
@@ -97,7 +97,7 @@ If the plan lacks a `Definition of Done` section, use the plan's checklist, impl
 
 ## Delegation Check
 
-Plans created under the current `imp-upd-plan` workflow carry a `**Delegation:**` line under `## Context`. It is a pointer, not a workflow. Read it before finalizing.
+Plans created under the current `plan-this` workflow carry a `**Delegation:**` line under `## Context`. It is a pointer, not a workflow. Read it before finalizing.
 
 - **`N/A`, or the line is absent** (the plan predates the field) → nothing to do. Finalize normally. Do not mention delegation in the finalized plan.
 - **The line names a delegation record** → the plan's work was divided among multiple agents, and that delegation must be closed too.
@@ -175,9 +175,12 @@ When finalizing, update the plan as appropriate:
 
 Use the current local date for lifecycle text.
 
-## File Rename Rules
+## File Rename And Move Rules
 
-Rename the active file:
+Finalization does two things to the file: it flips the lifecycle suffix **and**
+moves the file from the `Live` side of the Archive to the `Historical` side.
+
+**1. Flip the suffix.** Rename the active file:
 
 ```text
 {name}_active.md
@@ -189,9 +192,31 @@ to:
 {name}_finalized.md
 ```
 
-Do not keep a duplicate active copy after a successful rename.
+(Preserve the `_mini_` marker if present: `{name}_mini_active.md` →
+`{name}_mini_finalized.md`.)
 
-If the target `_finalized.md` file already exists, stop and ask before overwriting, deleting, or choosing another name.
+**2. Move Live → Historical.** Move the file from its `Live` plans folder to the
+matching `Historical` plans folder, preserving the same `[Subject]` subfolder on
+both sides:
+
+```text
+<project root>\Archive\Live\Plans\[Subject]\{name}_finalized.md
+        ->  <project root>\Archive\Historical\Plans\[Subject]\{name}_finalized.md
+```
+
+Create the `Archive\Historical\Plans\[Subject]\` target folder if it does not
+exist. **Preserve the file's `N.) ` prefix exactly — including any lowercase
+child suffix** (`Na.)`, `Nb.)`, …). Finalization never renumbers and never
+strips a child suffix. The prefix is assigned once for the life of the file
+across the combined `Live` + `Historical` namespace, so the same prefix simply
+follows the file into `Historical`. This applies equally on **reopen**: when a
+finalized child plan is reopened back to `_active.md`, its complete lowercase
+child prefix is preserved unchanged.
+
+Do not keep a duplicate copy on the `Live` side after a successful move.
+
+If the target `_finalized.md` file already exists in `Historical`, stop and ask
+before overwriting, deleting, or choosing another name.
 
 Do not delete unrelated plan files.
 
@@ -223,8 +248,9 @@ Do not paste the entire finalized plan into chat unless the user asks.
 
 After finalizing a plan:
 
-- confirm the active source path no longer exists
-- confirm the finalized target path exists
+- confirm the active source path under `Archive\Live\Plans\` no longer exists
+- confirm the finalized target path exists under `Archive\Historical\Plans\[Subject]\`
+- confirm the file was moved Live → Historical and its `N.) ` prefix (including any lowercase child suffix `Na.)`, `Nb.)`, …) is unchanged
 - confirm the filename ends in `_finalized.md`
 - confirm the file contains a finalized status or lifecycle note
 - confirm the `## Prompt Contract` DEFINITION OF DONE items were reviewed and no FAILURE condition remains active, or record that the plan predates the Prompt Contract convention

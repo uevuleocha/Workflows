@@ -13,8 +13,8 @@ This skill is meaningless in isolation, which is why this README exists — the 
 | `delegate-this`     | Creates the `_dispatched` record this skill closes              |
 | `finalize-plan`     | Prompts the user to run this skill when it closes a parent plan |
 | `finalize-task`     | Prompts the user to run this skill when it closes a parent task |
-| `imp-upd-plan`      | Authors the parent plan carrying the `Delegation` pointer       |
-| `imp-upd-task`      | Authors the parent task carrying the `Delegation` pointer       |
+| `plan-this`      | Authors the parent plan carrying the `Delegation` pointer       |
+| `task-this`      | Authors the parent task carrying the `Delegation` pointer       |
 
 The dependency direction is strict and one-way. `delegate-this` calls the plan/task skills; the plan/task skills never call it. `finalize-plan` and `finalize-task` **prompt** for this skill but never invoke it and never touch a delegation file. Adopt `finalize-delegation` alongside `delegate-this`, or neither.
 
@@ -25,7 +25,16 @@ delegate-this        →  Archive\Live\Delegations\<Subject>\N.) <Topic>_dispatc
 finalize-delegation  →  Archive\Historical\Delegations\<Subject>\N.) <Topic>_completed.md
 ```
 
-`N` is preserved across the move. Subject folders are never numbered on either side. The record's **content** is immutable — assignment packets are never rewritten, because they are what the receiving agents actually acted on. Only the status line, the lifecycle line, the Assignment Overview's status cells, and a `## Notes` entry change.
+`N` is preserved across the move. Subject folders are never numbered on either side. The record's **content** is immutable — assignment packets are never rewritten, because they are what the receiving agents actually acted on. Only the status line, the lifecycle line, the Assignment Overview's status cells, and a `## Notes` entry change. **Every lowercase child prefix** (`Na.)`, `Nb.)`, …) on the delegation's mini artifacts and return reports is preserved verbatim — never stripped or renumbered.
+
+## Return-Report Freeze
+
+Closing the delegation **freezes the entire session-summary / return-report
+family**. Every return report (files ending in `Report.md` at the reserved
+child prefixes) and its append-only `## Feedback` ledger becomes a closed
+historical artifact — no further feedback may be appended after the delegation
+is `_completed`. The orchestrator/master summary is likewise frozen. This skill
+does not rewrite the reports; it only enforces the freeze.
 
 ## Two Gates That Will Stop You
 

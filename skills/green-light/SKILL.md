@@ -63,7 +63,7 @@ Do not ask when the user explicitly invoked `green-light` and the task is clear.
 Greenlight applies only to the named task or clearly active task. It can authorize the agent to proceed with:
 
 - surgical code blocks, lines, or method snippets
-- an implementation plan through `imp-upd-plan`
+- an implementation plan through `plan-this`
 - a skill creation or update through `global-skills-creator`
 - plan finalization through `finalize-plan`
 - a session summary through `session-summary`
@@ -127,7 +127,7 @@ Use the output mode implied by the greenlit task:
 - **Surgical code blocks:** send exact blocks, line updates, or method snippets with placement instructions.
 - **Lines only:** send only the specific lines to add, replace, or delete.
 - **Phased delivery:** split code or instructions into batches when the change is risky or large; where practical, include multiple phases, blocks, or a complete large phase in one batch to preserve momentum without sacrificing reviewability.
-- **Implementation plan:** use `imp-upd-plan` to create or update the active plan.
+- **Implementation plan:** use `plan-this` to create or update the active plan.
 - **Skill creation or update:** use `global-skills-creator` or `global-skills-creator-auto` according to the user's requested workflow.
 - **Plan finalization:** use `finalize-plan`.
 - **Session summary:** use `session-summary`.

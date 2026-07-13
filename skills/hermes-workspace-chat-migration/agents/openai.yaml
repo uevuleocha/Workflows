@@ -1,4 +1,4 @@
 interface:
   display_name: "Hermes Workspace Chat Migration"
   short_description: "Safely migrate Hermes chats between workspaces."
-  default_prompt: "Use this skill to migrate selected Hermes Desktop chat sessions from one workspace to another by updating the state.db sessions row (cwd and git_repo_root), with backups and verification. Hermes must be fully closed for the execution side."
+  default_prompt: "Use this skill to migrate selected Hermes Desktop chat sessions from one workspace to another by updating the state.db sessions row (cwd and git_repo_root), with fail-closed process and non-empty-WAL guards, read-only preflight, exact before/destination state enforcement, target-scoped stale-binding checks, explicit transaction boundaries, coordinated backup restoration on failure, and verification. Hermes must be fully closed for the execution side."

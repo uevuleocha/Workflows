@@ -11,12 +11,12 @@ adopt `prompt-contracts` too:
 
 | Skill | How it uses `prompt-contracts` |
 |---|---|
-| `imp-upd-plan` | Hard — embeds a Prompt Contract in every plan (`## Prompt Contract Integration`) |
-| `imp-upd-task` | Hard — embeds a Prompt Contract in every task; the contract holds the task's Definition of Done |
+| `plan-this` | Hard — embeds a Prompt Contract in every plan (`## Prompt Contract Integration`) |
+| `task-this` | Hard — embeds a Prompt Contract in every task; the contract holds the task's Definition of Done |
 | `finalize-plan` | Soft — verifies the embedded contract before finalizing (`## Prompt Contract Review`) |
 | `finalize-task` | Soft — verifies the embedded contract before finalizing (`## Prompt Contract Review`) |
 
-When invoked by `imp-upd-plan` or `imp-upd-task`, the calling skill embeds the contract into that
+When invoked by `plan-this` or `task-this`, the calling skill embeds the contract into that
 plan/task artifact under a `## Prompt Contract` section. `prompt-contracts` itself still writes no
 standalone contract file.
 

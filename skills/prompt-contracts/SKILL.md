@@ -16,7 +16,7 @@ This skill operates under whatever canonical contract the host project defines (
 
 A Prompt Contract authored under this skill is a **planning artifact**. It scopes what the work must achieve; it does not by itself grant authority to bypass any direct-edit, manual-copy, or approval rules the host project enforces.
 
-When invoked by `imp-upd-plan` or `imp-upd-task`, the calling skill embeds the contract into that plan/task artifact under a `## Prompt Contract` section. `prompt-contracts` itself still writes no standalone contract file — on its own it delivers the contract in chat.
+When invoked by `plan-this` or `task-this`, the calling skill embeds the contract into that plan/task artifact under a `## Prompt Contract` section. `prompt-contracts` itself still writes no standalone contract file — on its own it delivers the contract in chat.
 
 ## Invocation
 

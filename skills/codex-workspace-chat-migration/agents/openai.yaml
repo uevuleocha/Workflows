@@ -1,4 +1,4 @@
 interface:
   display_name: "Codex Workspace Chat Migration"
   short_description: "Safely migrate Codex chats between workspaces."
-  default_prompt: "Use this skill to migrate selected Codex chat sessions from one workspace to another by updating transcript metadata, global state hints, and the SQLite thread index with backups and verification."
+  default_prompt: "Use this skill to migrate selected Codex chat sessions from one workspace to another by rewriting all authoritative transcript JSONL sources (unioned, never shadowed), updating global-state hints (without inserting empty keys), and the SQLite threads index, with fail-closed process and non-empty-WAL guards, hard-stop on ambiguous state DBs, post-write re-parse verification at recorded paths (hints must exist and match), coordinated original-path backup restoration on failure, explicit cleanup-key controls, and manifest-driven verification."

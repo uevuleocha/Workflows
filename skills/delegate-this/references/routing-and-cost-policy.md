@@ -45,11 +45,35 @@ Two factors override preference outright:
 
 - **Claude Code and Codex** are preferred for complex architecture, integration, and higher-risk skill work — when authorized and available.
 - **zCode** normally uses its native subscription-backed GLM models.
-- **Hermes** defaults to GLM 5.2.
-- **Avoid unnecessary simultaneous heavy GLM usage** in both zCode and Hermes. If both are assigned GLM-backed work in the same wave, either serialize them or justify the concurrency.
-- **DeepSeek V4 Pro** is available **only through Hermes**, and only as an emergency pay-as-you-go bridge for reaching a reasonable stopping point. It is not a default.
-- **Any paid API model requires explicit user approval.** Never infer it. Never treat a previous run's approval as standing.
+- **Hermes is provider-neutral.** Its provider/model surface is dynamic — see the **Provider-Neutral Hermes Routing** section below. Never permanently bind Hermes to a single provider, and never downgrade it based on GLM, OpenAI, Codex, or zCode.
+- **Avoid unnecessary simultaneous heavy usage** of a shared quota pool. If two assignments draw on the same subscription/quota pool in the same wave, either serialize them or justify the concurrency.
+- **Any paid API model requires explicit user approval.** Never infer it. Never treat a previous run's approval as standing. **Pay-as-you-go providers always require explicit approval.**
 - **Antigravity** defaults to low-risk research and review. It may receive very small, isolated, low-risk edits only when the user specifically includes it for that. Never high-risk work under the default profile.
+
+---
+
+## Provider-Neutral Hermes Routing
+
+Hermes is routed by **capability, trust, and tools** — not by a fixed provider
+label. Before routing any assignment to Hermes:
+
+1. **Ask which provider/model Hermes currently uses** and **which
+   subscription/quota pool it shares.** Do not assume the previous run's
+   provider; the surface is dynamic.
+2. **Route by capability, trust, and tools** — the same routing factors as every
+   other platform. Provider identity is an input to routing, not a label.
+3. **Schedule according to current quota capacity.** If the configured provider
+   is near its quota ceiling, serialize, defer, or reroute rather than overload
+   it.
+4. **Never permanently bind or downgrade Hermes** based on GLM, OpenAI, Codex,
+   or zCode. A run-time pairing is a run-time decision, recorded in the
+   delegation record, not a standing downgrade.
+5. **Pay-as-you-go providers always require explicit approval** — for this run,
+   not inferred from a previous one.
+
+Record the resolved provider/model and quota pool in the delegation record (for
+example in the Assignment Overview's Hermes rows) so the run-time pairing is
+visible and reversible.
 
 ---
 

@@ -38,7 +38,7 @@ While in Debug mode:
 - Debug mode remains active until the user explicitly exits, ends, stops, clears, or terminates Debug mode. A later invocation of another mode does not end Debug mode; the modes layer together.
 - if the user says "exit all modes", "end all modes", "stop all modes", "clear all modes", or "terminate all modes", all active modes including Debug are ended
 - do not silently create plans, summaries, workflows, or memory updates
-- if debugging reveals multi-phase work, suggest using `$imp-upd-plan` rather than creating a plan inside this skill
+- if debugging reveals multi-phase work, suggest using `$plan-this` rather than creating a plan inside this skill
 - if the user asks for a summary, plan, finalization, or workflow update, use the appropriate skill or workflow normally
 
 Mode footer: if Debug is the only active mode, end with `Mode = Debugging`. If multiple modes are active, end with `Modes = Debugging + Mode B + ... + Mode Z` using every active mode exactly once. Order does not matter, but keep it consistent when practical.
@@ -113,7 +113,7 @@ Use this order unless the issue clearly requires a smaller path:
 6. **Choose the fix path**
    - For non-product workspace files, ask before editing unless the user explicitly said to edit or fix.
    - For product source files, provide surgical code blocks and exact placement instructions unless direct edits were explicitly authorized.
-   - If the fix is larger than a narrow patch, suggest `$imp-upd-plan` before continuing.
+   - If the fix is larger than a narrow patch, suggest `$plan-this` before continuing.
 
 7. **Verify**
    - Rerun the failing command, validator, parser, compile-adjacent check, or focused smoke test when possible.
@@ -186,7 +186,7 @@ Use the output mode implied by the user:
 - **Surgical code blocks:** provide exact replacement/addition blocks and placement instructions.
 - **Ask-before-edit:** propose the file edit and wait for approval.
 - **Direct fix:** only when the user explicitly said to edit/fix the relevant non-product file or explicitly authorized product-code edits.
-- **Plan update:** suggest `$imp-upd-plan` when debugging reveals multi-phase work or changes an active plan.
+- **Plan update:** suggest `$plan-this` when debugging reveals multi-phase work or changes an active plan.
 - **Final report:** summarize the failure, cause, fix, verification, and any remaining action.
 
 If the requested output mode conflicts with the project's canonical contract or safety rules, follow the stricter rule and explain the constraint.
