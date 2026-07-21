@@ -1,6 +1,6 @@
 # Finalize Prompt — Adoption Guide
 
-`finalize-prompt` closes a pending prompt: it verifies every Prompt Contract **DEFINITION OF DONE** item and every **Verification Checklist** item against evidence, confirms no FAILURE condition is active, rewrites the header to `EXECUTED ✅`, and moves the file from `Archive\Live\Prompts\<Subject>\` to `Archive\Historical\Prompts\<Subject>\` — with its `N.)` prefix and filename unchanged.
+`finalize-prompt` closes a pending prompt: it verifies every Prompt Contract **DEFINITION OF DONE** item and every **Verification Checklist** item against evidence, confirms no FAILURE condition is active, rewrites the header to `EXECUTED ✅`, and moves the file from `Archive\Live\Prompts\<Subject>\` to `Archive\Historical\Prompts\<Subject>\` — renaming its suffix `_pending` → `_executed` while its `N.)` prefix and Topic stay unchanged.
 
 It is the closing half of a lifecycle that `prompt-this` opens. On its own it does nothing; there is no prompt to close.
 
@@ -21,11 +21,11 @@ Adopt `finalize-prompt` alongside `prompt-this`, or neither.
 ## The Lifecycle
 
 ```text
-prompt-this      →  Archive\Live\Prompts\<Subject>\N.) <Topic>.md         (PENDING ⌛)
-finalize-prompt  →  Archive\Historical\Prompts\<Subject>\N.) <Topic>.md   (EXECUTED ✅)
+prompt-this      →  Archive\Live\Prompts\<Subject>\N.) <Topic>_pending.md          (PENDING ⌛)
+finalize-prompt  →  Archive\Historical\Prompts\<Subject>\N.) <Topic>_executed.md   (EXECUTED ✅)
 ```
 
-Lifecycle is expressed by **location plus the in-file `Status:` line** — there is no `_pending` / `_executed` filename suffix. `N` is preserved across the move; Subject folders are never numbered on either side.
+Lifecycle is expressed by **location, the in-file `Status:` line, and a filename suffix** — `_pending` while Live, `_executed` once finalized. `N` and the Topic are preserved across the move; only the suffix is renamed. Subject folders are never numbered on either side.
 
 The `## Prompt` payload is **never rewritten.** It is the historical record of what was asked. Only the status line, the lifecycle line, the contract and checklist headings, and a dated `## Notes` entry change.
 

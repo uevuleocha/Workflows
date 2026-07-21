@@ -105,7 +105,7 @@ $WORKSPACE/Archive/Historical/Manifests/Claude/
 
 All three notations mean the same thing: the `Archive/Historical/Manifests/Claude/` folder of the workspace currently being worked in. The platform folder is determined by the chat platform being migrated, not by the agent performing the work: a Codex or Antigravity helper executing a Claude migration still uses the `Claude` folder. Once a migration is confirmed, the manifest is no longer needed — the user can ask an agent to delete it from there.
 
-Every manifest saved in `Archive/Historical/Manifests/Claude/` must start with the next sequential `N.) ` prefix based only on the highest existing numbered file in that platform folder. Use `N.) <descriptive-manifest-name>.json`; for example, `1.) claude_migration_manifest_chats0-4_full_batch.json`. When updating or renaming a staged manifest, preserve its existing sequence number while changing the descriptive portion to match its current scope and state. Do not leave migration manifests unnumbered.
+Every manifest saved in `Archive/Historical/Manifests/Claude/` must start with the next sequential `N.) ` prefix based only on the highest existing numbered file in that platform folder. Use the migration grammar `N.) Who + Topic + What`: `N.) <Platform> <Topic> Manifest.json`, Title Case with spaces, where `<Platform>` is the chat platform being migrated; for example, `1.) Claude Trading Chats Manifest.json`. When updating or renaming a staged manifest, preserve its existing sequence number while changing the descriptive portion to match its current scope and state. Do not leave migration manifests unnumbered.
 
 When a migration is staged (e.g. one-session test first, then the rest), prefer updating the existing manifest in place to reflect what is done and what remains, rather than creating a second file, unless the sessions come from more than one source workspace. One source workspace means one manifest.
 
@@ -347,4 +347,6 @@ Both workflows close by producing an explicit session summary through the `sessi
 - Directory: `<workspace_root>/Archive/Historical/Summaries/Migration/Claude/`
 - Create the `Claude` platform folder if it does not exist.
 - Sequence number: the next integer after the highest existing `N.)` file in the `Claude` platform folder only.
-- Filename: the `session-summary` convention `x.) [Project] [Topic] Summary [N].md`.
+- Filename templates — the migration grammar `N.) Who + Topic + What`. These override the `session-summary` skill's default filename convention: pre-fill the filename so the output uses this exact shape, with no trailing `Summary N` and no `Execution` wording.
+  - Handoff, written by the front-door agent: `N.) <Front-Door Agent> <Topic> Handoff.md` — e.g. `1.) Claude Trading Chats Handoff.md`
+  - Report, written by the helper agent: `N.) <Helper Agent> <Topic> Report.md` — e.g. `2.) Hermes Trading Chats Report.md`

@@ -94,7 +94,7 @@ $WORKSPACE/Archive/Historical/Manifests/zCode/
 
 All three notations mean the same thing: the `Archive/Historical/Manifests/zCode/` folder of the workspace currently being worked in. The platform folder is determined by the chat platform being migrated, not by the agent performing the work: a Codex or Claude helper executing a zCode migration still uses the `zCode` folder. Once a migration is confirmed, the manifest is no longer needed — the user can ask an agent to delete it from there.
 
-Every manifest saved in `Archive/Historical/Manifests/zCode/` must start with the next sequential `N.) ` prefix based only on the highest existing numbered file in that platform folder. Use `N.) <descriptive-manifest-name>.json`; for example, `1.) zcode_galaxies_to_milkyway_manifest.json`. When updating or renaming a staged manifest, preserve its existing sequence number while changing the descriptive portion to match its current scope and state. Do not leave migration manifests unnumbered.
+Every manifest saved in `Archive/Historical/Manifests/zCode/` must start with the next sequential `N.) ` prefix based only on the highest existing numbered file in that platform folder. Use the migration grammar `N.) Who + Topic + What`: `N.) <Platform> <Topic> Manifest.json`, Title Case with spaces, where `<Platform>` is the chat platform being migrated; for example, `1.) zCode Trading Chats Manifest.json`. When updating or renaming a staged manifest, preserve its existing sequence number while changing the descriptive portion to match its current scope and state. Do not leave migration manifests unnumbered.
 
 When a migration is staged (e.g. one-session test first, then the rest), prefer updating the existing manifest in place to reflect what is done and what remains, rather than creating a second file, unless the sessions come from more than one source workspace. One source workspace means one manifest.
 
@@ -114,7 +114,9 @@ Both workflows close by producing an explicit session summary through the `sessi
 - Directory: `<workspace_root>/Archive/Historical/Summaries/Migration/zCode/`
 - Create the `zCode` platform folder if it does not exist.
 - Sequence number: the next integer after the highest existing `N.)` file in the `zCode` platform folder only.
-- Filename: the `session-summary` convention `x.) [Project] [Topic] Summary [N].md`.
+- Filename templates — the migration grammar `N.) Who + Topic + What`. These override the `session-summary` skill's default filename convention: pre-fill the filename so the output uses this exact shape, with no trailing `Summary N` and no `Execution` wording.
+  - Handoff, written by the front-door agent: `N.) <Front-Door Agent> <Topic> Handoff.md` — e.g. `1.) zCode Trading Chats Handoff.md`
+  - Report, written by the helper agent: `N.) <Helper Agent> <Topic> Report.md` — e.g. `2.) Hermes Trading Chats Report.md`
 
 ## Front-Door Workflow
 

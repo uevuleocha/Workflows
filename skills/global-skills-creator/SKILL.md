@@ -269,11 +269,18 @@ Use stdout only to tell the *user* what went wrong. Never to decide.
 
 ## Skill Writing Guidelines
 
-Keep the skill focused on the reusable procedure another agent needs. Do not add extra documentation files such as README, changelog, or install guides unless the user explicitly asks.
+Keep the skill focused on the reusable procedure another agent needs. Do not add extra documentation files such as changelogs or install guides unless the user explicitly asks — with one mandatory exception: the README.
+
+**README.md is compulsory for every skill.** Every skill ships a top-level `skills/<name>/README.md` alongside `SKILL.md`, created in the same pass as the skill itself and mirrored to every global copy. Keep it very brief — a shelf label, not a second SKILL.md:
+
+- a few sentences saying what the skill does and when to invoke it
+- when the skill depends on, calls, or pairs with other skills, a short "Related skills" (ships-with/requires) list so an adopter taking the skill from a repo grabs the full set
+- nothing else by default — no changelog, no install guide, no restated procedure
 
 Do:
 
 - keep `SKILL.md` concise and procedural
+- create the mandatory brief `README.md` beside `SKILL.md` in the same pass
 - include all trigger logic in the `description`
 - use required-input prompts for missing user intent
 - use references only when they reduce context bloat

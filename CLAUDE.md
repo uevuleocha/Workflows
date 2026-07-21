@@ -4,6 +4,8 @@ This workspace is the **home for Uzo's skills**. It holds the **local master cop
 
 This workspace runs on a simple model: **Workflows** (markdown SOPs + skills) say what to do, you're the **Agent** deciding how, and **Tools** (skills + built-ins) do the executing.
 
+For LLM wiki setup, sync, query, or lint work, read and obey `wiki/wiki-schema.md`.
+
 ## Core Conventions
 
 - **Files inside folders start with `x.)`** — this is a **hard rule with a fixed set of exceptions**, not a suggestion. Every file saved into a workspace folder gets a sequential index (`1.) `, `2.) `…; `0.)` allowed for a preamble). **The only exceptions:** structural/special files (`CLAUDE.md`, `AGENTS.md`, `README.md`, `SKILL.md`, dotfiles, config); files a skill or script generates under its own naming scheme; and any case where the user explicitly says not to use the numbering convention. Outside those exceptions, always apply it — if unsure whether something qualifies, apply the prefix.
@@ -14,7 +16,7 @@ This workspace runs on a simple model: **Workflows** (markdown SOPs + skills) sa
 ## Skills Workflow (the core job of this workspace)
 
 - **Local master first.** All skill creation/edits begin in `skills/<name>/`. Finish and let the user verify the local master **before** any global sync. Global sync runs only when the user explicitly asks — never in the same pass as the local edit. The exceptions are `global-skills-creator` and `global-skills-creator-auto`, which are designed to create-and-sync after their own approval flow.
-- **Folder-style skills mirror structure** — each keeps `SKILL.md` + `agents/openai.yaml` across the local master and every global copy.
+- **Folder-style skills mirror structure** — each keeps `SKILL.md` + `README.md` (a compulsory, very brief what-it-does note, with related-skill pointers when the skill calls or pairs with others) + `agents/openai.yaml` across the local master and every global copy.
 - **Sync targets (path stack):**
   - Local master: `skills/<name>/`
   - Codex: `C:\Users\Admin\.codex\skills\<name>\`
@@ -63,7 +65,7 @@ When needed, check individual skill files for how the mode should be named in th
 
 ## Workspace Layout
 
-> **Layout sync status:** `current` · last verified 2026-07-08
+> **Layout sync status:** `current` · last verified 2026-07-16 (wiki/ added as the schema-driven, gitignored Workflows knowledge map; Archive tier differences user-accepted)
 >
 > Keep this tree honest. If the real workspace and this tree disagree — a new folder/file that isn't shown here, or an entry here that no longer exists — **prompt the user before continuing substantive work**. The user may: (a) add the entry to the tree, (b) prune or replace something to keep it lean, or (c) decline the change. In every case, once the user has reviewed, reset the status line to `current` with today's date so the next agent doesn't re-raise it. Prefer a lean schema over an exhaustive one — prompt to prune before the tree sprawls; the goal is a map, not an inventory.
 
@@ -76,11 +78,12 @@ C:\Users\Admin\Uzzys Universe\MilkyWay\Tools\Workflows\
 ├── AGENTS.md                    ← Agent wrapper (Codex/Antigravity) → points to CLAUDE.md
 ├── CLAUDE.md                    ← This file. Canonical workspace contract.
 ├── README.md                    ← Human-facing overview of the skills home
-├── Documentation/               ← Supporting notes and workspace documentation
 ├── skills/                      ← Local master copies of reusable skills
 │   └── <skill-name>/
 │       ├── SKILL.md             ← The skill's procedure + frontmatter
+│       ├── README.md            ← Compulsory brief description + related skills
 │       └── agents/openai.yaml   ← Codex UI metadata (mirrored across all copies)
+├── wiki/                        ← LLM-maintained knowledge map (gitignored; schema-driven)
 ├── Archive/                     ← Durable artifacts (gitignored; not pushed)
 │   ├── Summaries/               ← Session summaries (owned by session-summary)
 │   └── Tasks/                   ← Pending/done housekeeping tasks (owned by task-this)

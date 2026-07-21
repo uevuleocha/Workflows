@@ -1,6 +1,6 @@
 ---
 name: prompt-this
-description: Create or update a durable, structured prompt file with a pending lifecycle, saved under Archive\Live\Prompts\ in a broad Subject folder as "N.) Topic.md", with fixed recognizable headings, a mandatory embedded Prompt Contract, a Verification Checklist, and Parent Plan / Parent Task / Delegation pointers. Also reopens an executed prompt from Historical back to Live. Use when the user asks for /prompt-this, prompt-this, make a prompt, create a prompt, update the prompt, save this as a prompt, prompt file, reopen a prompt, or clear equivalents asking for a durable prompt artifact. This skill never finalizes a prompt; finalize-prompt owns that.
+description: Create or update a durable, structured prompt file with a pending lifecycle, saved under Archive\Live\Prompts\ in a broad Subject folder as "N.) Topic_pending.md" in Title Case, with fixed recognizable headings, a mandatory embedded Prompt Contract, a Verification Checklist, and Parent Plan / Parent Task / Delegation pointers. Also reopens an executed prompt from Historical back to Live, renaming its suffix from _executed back to _pending. Use when the user asks for /prompt-this, prompt-this, make a prompt, create a prompt, update the prompt, save this as a prompt, prompt file, reopen a prompt, or clear equivalents asking for a durable prompt artifact. This skill never finalizes a prompt; finalize-prompt owns that.
 ---
 
 # Prompt This
@@ -76,17 +76,17 @@ On any later update, re-derive or revise the contract to match the new scope, re
 
 ## Directory Layout and Lifecycle
 
-A prompt's lifecycle is expressed by **location plus an in-file `Status:` line** — never by a filename suffix.
+A prompt's lifecycle is expressed by **location, an in-file `Status:` line, and a filename suffix** — the suffix is `_pending` while the prompt is Live and `_executed` once it is finalized.
 
 ```text
-Pending:   <Workspace>\Archive\Live\Prompts\<Subject>\N.) <Topic>.md
-Executed:  <Workspace>\Archive\Historical\Prompts\<Subject>\N.) <Topic>.md
+Pending:   <Workspace>\Archive\Live\Prompts\<Subject>\N.) <Topic>_pending.md
+Executed:  <Workspace>\Archive\Historical\Prompts\<Subject>\N.) <Topic>_executed.md
 ```
 
 - `<Workspace>` is the **active workspace root**. If `Archive\Live\Prompts\` does not exist, create it when file creation is allowed. Never hardcode a specific machine's path.
 - **Subject** is the broad category — the school-subject sense ("math"). **Subject folders are never numbered.** Keep Subjects deliberately broad so you do not end up with one folder per file.
-- **Topic** is the specific thing ("polynomials"). It becomes the filename.
-- Only `finalize-prompt` moves a prompt Live → Historical or changes PENDING → EXECUTED. **There is no manual move/finalization fallback.**
+- **Topic** is the specific thing ("polynomials"). It becomes the filename Topic, ahead of the `_pending` suffix.
+- Only `finalize-prompt` moves a prompt Live → Historical, changes PENDING → EXECUTED, or renames the suffix `_pending` → `_executed`. **There is no manual move/finalization fallback.**
 - `prompt-this` may move a prompt Historical → Live, but only as a deliberate **reopen** (see `Reopen Behavior`).
 
 ### The `N.)` number
@@ -109,11 +109,11 @@ Assign `N` once. Never reclaim gaps. Never renumber during finalization or reope
 ### Filename shape
 
 ```text
-N.) <Topic>.md
+N.) <Topic>_pending.md
 ```
 
-- **Title Case with spaces**, matching the workspace's existing prompt files.
-- **The filename must not contain the word "prompt".** The `Prompts\` folder already says what it is. Plans do not say "plan"; tasks do not say "task".
+- **Title Case with spaces for the Topic**, matching the workspace's existing prompt files. Only the lifecycle suffix (`_pending`) keeps its underscore form.
+- **The filename Topic must not contain the word "prompt".** The `Prompts\` folder already says what it is. Plans do not say "plan"; tasks do not say "task".
   - **Exception:** if the user explicitly intends to share this prompt publicly, they may opt in to including "prompt" in that one filename. Never the default.
 
 ---
@@ -134,7 +134,7 @@ Here are my inferred values — green-light to use them as-is, or change any sin
 1. Subject: [inferred, or `NEW: <proposed broad Subject>`]
 2. Topic:   [inferred]
 3. Number:  [N = previous_max + 1] (previous_max captured across Live + Historical)
-4. Path:    <Workspace>\Archive\Live\Prompts\[Subject]\[N].) [Topic].md
+4. Path:    <Workspace>\Archive\Live\Prompts\[Subject]\[N].) [Topic]_pending.md
 5. Depth:   Standard | Compact
 ```
 
@@ -205,7 +205,7 @@ An executed prompt is **not** reopened merely because the user mentions it. The 
 When reopening:
 
 1. Move the file from `Archive\Historical\Prompts\<Subject>\` back to the matching `Archive\Live\Prompts\<Subject>\`.
-2. **Preserve `N.)` and the Topic filename exactly.** No renumbering.
+2. **Preserve `N.)` and the Topic exactly, and rename the suffix `_executed` → `_pending`.** No renumbering.
 3. Preserve all prior execution evidence. Do not erase the executed history.
 4. Restore the status and lifecycle lines to `PENDING ⌛` / `REOPENED`, keeping the earlier executed dates visible.
 5. Add a dated reopen note under `## Notes`.
@@ -224,7 +224,7 @@ Do:
 - infer Subject/Topic and present a pre-filled block for confirmation
 - author the Prompt Contract through `prompt-contracts`, show it in chat, embed it verbatim
 - retain every mandatory section and all three `## Context` fields
-- preserve `N.)`, the filename, and prior history on reopen
+- preserve `N.)` and the Topic, rename the suffix `_executed` → `_pending`, and preserve prior history on reopen
 - stop on any path collision
 
 Do not:
@@ -246,8 +246,8 @@ Do not:
 
 After creating, updating, or reopening a prompt, confirm and report:
 
-- the file exists at `<Workspace>\Archive\Live\Prompts\<Subject>\N.) <Topic>.md`
-- the Subject folder is unnumbered; the filename carries the `N.) ` prefix
+- the file exists at `<Workspace>\Archive\Live\Prompts\<Subject>\N.) <Topic>_pending.md`
+- the Subject folder is unnumbered; the filename carries the `N.) ` prefix and the `_pending` suffix
 - on create: the new file carries `N`, `N` equals the **captured `previous_max + 1`** (never a maximum recomputed after the write), and no second file across Live and Historical owns that number
 - on update or reopen: `N` is **unchanged**
 - the filename does not contain "prompt" (unless the user opted in for sharing)
@@ -257,7 +257,7 @@ After creating, updating, or reopening a prompt, confirm and report:
 - the Delegation field is a pointer only — no routing, packet, platform, or subagent text entered the file
 - the Prompt Contract was authored via `prompt-contracts` (or the guard fired and was reported), was shown in chat, and is embedded verbatim
 - no `Estimated Effort` table was added
-- on reopen: prior execution evidence is preserved, a dated reopen note was added, and no collision was overwritten
+- on reopen: the suffix was renamed `_executed` → `_pending`, prior execution evidence is preserved, a dated reopen note was added, and no collision was overwritten
 - UTF-8 was used; any Markdown table is pipe-aligned with every cell at 80 characters or fewer
 
 Report the file path and summarize the change. Do not paste the entire prompt into chat.

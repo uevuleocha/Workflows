@@ -135,13 +135,13 @@ directly under `Tasks/` without a Subject folder.
 Filename format:
 
 ```text
-N.) {area_or_component}_{main_task}_pending.md
+N.) <Topic>_pending.md
 ```
 
 Mini task filename format, only when the user explicitly asks for a "mini task":
 
 ```text
-N.) {area_or_component}_{main_task}_mini_task_pending.md
+N.) <Topic>_mini_task_pending.md
 ```
 
 `N` is assigned **once at creation** as the next integer past the highest `N.) `
@@ -159,7 +159,7 @@ reopen. Never renumber on finalization or reopening, and never reclaim gaps.
 **Folders are never numbered — only files carry the `N.) ` prefix**, restarting
 at `1` per `[Subject]` folder across the combined namespace.
 
-Generate the body of the filename from the task area/component and main task. Use lowercase letters, digits, and underscores for the body. Do not ask the user for the filename unless the derived name would be ambiguous or misleading.
+Generate the filename **Topic** as a short **Title Case phrase with spaces** describing the task's work — typically the `Main Task`, optionally led by the `Task Area / Component` (for example, `Global Skill Sync Sweep`). Match the workspace's other artifact filenames (`prompt-this`, `doc-this`, `session-summary`): Title Case, spaces, no underscores inside the Topic. Only the lifecycle suffix (`_pending`, `_mini_task_pending`) keeps its underscore form. Do not ask the user for the filename unless the derived Topic would be ambiguous or misleading.
 
 ## Required Inputs
 
@@ -181,10 +181,9 @@ We need to define this task before writing it.
 
 How these fields determine the task path:
 - Subject decides the broad category folder under `Archive/Live/Tasks`, usually `Archive/Live/Tasks/[Subject]` (the folder is never numbered).
-- Task Area / Component becomes the leading part of the filename.
-- Main Task becomes the rest of the filename body.
-- Together they produce `N.) {area_or_component}_{main_task}_pending.md` under the Subject folder (`<project root>\Archive\Live\Tasks\[Subject]\` by default), where `N` is the next integer past the highest number across the Subject's combined `Live` + `Historical` folders.
-- If the user explicitly asked for a mini task, use `N.) {area_or_component}_{main_task}_mini_task_pending.md` instead.
+- Main Task (optionally led by the Task Area / Component) becomes the filename **Topic** — a short Title Case phrase with spaces.
+- Together they produce `N.) <Topic>_pending.md` under the Subject folder (`<project root>\Archive\Live\Tasks\[Subject]\` by default), where `N` is the next integer past the highest number across the Subject's combined `Live` + `Historical` folders.
+- If the user explicitly asked for a mini task, use `N.) <Topic>_mini_task_pending.md` instead.
 
 1. Subject:
 2. Task Area / Component:

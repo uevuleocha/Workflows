@@ -5,15 +5,15 @@ The one shape every `prompt-this` artifact takes. **Reuse it; do not reconstruct
 **Path:**
 
 ```text
-Pending:   <Workspace>\Archive\Live\Prompts\<Subject>\N.) <Topic>.md
-Executed:  <Workspace>\Archive\Historical\Prompts\<Subject>\N.) <Topic>.md
+Pending:   <Workspace>\Archive\Live\Prompts\<Subject>\N.) <Topic>_pending.md
+Executed:  <Workspace>\Archive\Historical\Prompts\<Subject>\N.) <Topic>_executed.md
 ```
 
 Subject folders are never numbered. Before writing, capture `previous_max` — the highest numeric prefix across **both** the Live and Historical Subject folders (`0` if neither has one) — and assign `N = previous_max + 1`. Validate against that **captured** value, never against a maximum recomputed after the write, because the new file is itself part of the union by then. `N` is assigned once and preserved through finalization and reopen.
 
-The filename is Title Case with spaces and **must not contain the word "prompt"** — unless the user explicitly opts in to share that prompt publicly.
+The filename Topic is Title Case with spaces and **must not contain the word "prompt"** — unless the user explicitly opts in to share that prompt publicly. Only the lifecycle suffix (`_pending`, `_executed`) uses an underscore.
 
-Only `finalize-prompt` moves a prompt Live → Historical. There is no manual fallback.
+Only `finalize-prompt` moves a prompt Live → Historical and renames the suffix `_pending` → `_executed`. There is no manual fallback.
 
 ---
 
@@ -113,6 +113,6 @@ Status: EXECUTED ✅ — created <YYYY-MM-DD>, finalized <YYYY-MM-DD>.
 Prompt lifecycle: EXECUTED on <YYYY-MM-DD>. <Past-tense summary.>
 ```
 
-promotes `## Prompt Contract` to `## Prompt Contract ✅ Complete` once every DEFINITION OF DONE item is met or explicitly deferred, adds a dated note under `## Notes`, and moves the file to the Historical Subject folder with `N.)` and the filename unchanged.
+promotes `## Prompt Contract` to `## Prompt Contract ✅ Complete` once every DEFINITION OF DONE item is met or explicitly deferred, adds a dated note under `## Notes`, and moves the file to the Historical Subject folder with `N.)` and the Topic unchanged, renaming only the suffix `_pending` → `_executed`.
 
 The `## Prompt` payload itself is **never rewritten**. It is the historical record of what was asked.

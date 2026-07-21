@@ -1,7 +1,7 @@
 interface:
   display_name: "Session Name"
   short_description: "Suggest four chat-session name options"
-  default_prompt: "Use $session-name to get four short, descriptive name options for this chat session."
+  default_prompt: "Use $session-name to get four rich, descriptive name options for this chat session."
 
 policy:
   allow_implicit_invocation: true

@@ -1,6 +1,6 @@
 ---
 name: session-name
-description: Suggest exactly four short, descriptive chat-session names grounded in the work this session actually did, at session end or midway through. Use when the user invokes /session-name, use session-name, "name this session", "give me session name options", "suggest a name for this chat", "top four names for this session", or clear equivalents asking for chat-session-name suggestions. Offers an OPT-IN N.) session-number prefix (asks first; if wanted, requires the user-supplied session number and never guesses it), presents choices 1-4, and confirms the final string. Suggestion-only — it never renames the chat, claims platform-side changes, or creates, moves, or renames any file. Not for naming files, plans, tasks, prompts, or reports, and not a recap (session-summary owns that).
+description: Suggest exactly four short, descriptive chat-session names grounded in the work this session actually did, at session end or midway through. Use when the user invokes /session-name, use session-name, "name this session", "give me session name options", "suggest a name for this chat", "top four names for this session", or clear equivalents asking for chat-session-name suggestions. Offers an OPT-IN N.) session-identifier prefix (asks first; if wanted, requires the user-supplied identifier — used verbatim, including lowercase child suffixes like 17a — and never guesses it), presents choices 1-4, and confirms the final string. Suggestion-only — it never renames the chat, claims platform-side changes, or creates, moves, or renames any file. Not for naming files, plans, tasks, prompts, or reports, and not a recap (session-summary owns that).
 ---
 
 # Session Name
@@ -42,35 +42,50 @@ The skill may be invoked at **session end** or **midway through** a session.
    the work performed, decisions made, problems solved. Use only the real
    content of *this* session; never a generic guess.
 2. **Confirm the prefix (opt-in).** Before generating any suggestions, ask
-   whether the user wants the `N.)` session-number prefix on the names. The
+   whether the user wants the `N.)` session-identifier prefix on the names. The
    prefix is **opt-in**, not assumed.
    - If the user already made the choice clear at invocation (e.g. "this is
-     session 20" implies yes-with-number; "no prefix" implies no), skip the
+     session 20" implies yes-with-identifier; "no prefix" implies no), skip the
      question and honor it.
-3. **Resolve the number (only if the prefix is wanted).** The number must come
-   from the user:
+3. **Resolve the identifier (only if the prefix is wanted).** The session
+   identifier must come from the user:
    - If the user supplied it ("run session-name, this is session 20"), use it.
-   - If not, **stop and ask** "What number is this chat session?" and wait for
-     the answer before presenting any options. Continue next turn. Where the
-     host supports an AskUserQuestion-style runtime prompt, that is an
-     acceptable way to ask.
-   - **Never guess or infer the number** — not from workspace file numbering,
-     folder indexes, or any other source. Ask-or-tell only.
-4. **Produce exactly four options.** Short, accurate, decently descriptive,
-   and meaningfully distinct — four different angles (tool, outcome, method,
-   headline result), not four rewordings of one phrase. When the prefix is in
-   use, all four carry the **identical** `N.)` prefix; only the descriptive
-   part varies. Present them as a numbered list of choices 1–4.
+   - **Use the supplied identifier verbatim, including any lowercase child
+     suffix** in the workspace's `Nx.)` grammar: "this is session 17a" produces
+     a `17a.)` prefix, never `17.)`. Do not strip, normalize, or "correct" a
+     child suffix to the bare number.
+   - If not supplied, **stop and ask** "What is this chat session's identifier
+     (e.g. 20, or 17a for a child session)?" and wait for the answer before
+     presenting any options. Continue next turn. Where the host supports an
+     AskUserQuestion-style runtime prompt, that is an acceptable way to ask.
+   - **Never guess or infer the identifier** — neither the number nor the
+     suffix — not from workspace file numbering, folder indexes, or any other
+     source. Ask-or-tell only.
+4. **Produce exactly four options.** Accurate, richly descriptive, and
+   meaningfully distinct. Build each option from the session's applicable
+   **facets** — Outcome, Artifact/Tool, Method, Headline Result — combining
+   the facets that are applicable and statable and omitting the ones that are
+   not. Each option **leads with a different facet** so the four remain four
+   genuine angles, not four rewordings of one phrase. When the prefix is in
+   use, all four carry the **identical** prefix (including any child suffix);
+   only the descriptive part varies. Present them as a numbered list of
+   choices 1–4.
 5. **Confirm the pick.** After the user selects one, echo the exact final
    string for them to paste into the platform UI. The skill does **not**
    rename the session and never claims the platform-side name changed.
 
 ## Naming Style Rules
 
-- **Short.** A UI label, not a sentence. Soft guidance: about eight
-  descriptive words or ~60 characters, **excluding** the `N.)` prefix. This is
-  guidance only — do not hard-fail or truncate a longer name that is the
-  accurate one.
+- **Rich, under a 150-character ceiling.** Up to ~150 characters, **excluding**
+  the prefix. 150 is a **ceiling, not a quota**: reach toward it when the
+  session has enough real substance and context to fill it richly; a shorter
+  name is the correct name for a thin, short, or early session. **Never pad**
+  a name just to approach 150 — agent judgment decides how much of the ceiling
+  the session's actual content earns. The ceiling is soft guidance — do not
+  hard-fail or truncate a longer name that is the accurate one.
+- **Facet-built.** Compose each option from the applicable facets — Outcome,
+  Artifact/Tool, Method, Headline Result — including only those that are
+  applicable and statable for this session.
 - **Accurate.** Grounded in what the session genuinely did; do not inflate or
   misdescribe.
 - **Distinct.** The four options vary in emphasis so the user has a real
@@ -97,32 +112,37 @@ at session close.
 ## Output Shape
 
 ```text
-This is session 20. Top four name options:
+This is session 17a. Top four name options:
 
-1. 20.) ChatGPT Codex in Hermes — Subscription Connected
-2. 20.) Hermes on ChatGPT: OpenAI Codex OAuth Setup
-3. 20.) GPT-5.6-sol as Hermes Default via Codex OAuth
-4. 20.) Connecting ChatGPT to Hermes (no API key)
+1. 17a.) ChatGPT Codex Connected to Hermes — OAuth Subscription Login Working, No API Key Needed
+2. 17a.) Hermes Default Model Set to GPT-5.6-sol via Codex OAuth Setup and Config Edits
+3. 17a.) OAuth-Based Codex Wiring in Hermes: Auth Flow Debugged, Subscription Verified
+4. 17a.) Headline: Hermes Now Runs on the ChatGPT Subscription — Codex OAuth Replaces API-Key Billing
 
 Pick one and I'll confirm it.
 ```
 
-Without the prefix, the same block simply omits `20.)` from each option.
+Each option leads with a different facet (outcome, artifact/tool, method,
+headline result) and combines the others where statable. Without the prefix,
+the same block simply omits `17a.)` from each option; a plain parent session
+would carry e.g. `17.)` instead.
 
 ## Examples
 
-### 1. Known session number
+### 1. Known session identifier (child suffix used verbatim)
 
-> **User:** run session-name, this is session 20
-> **Agent:** *(prefix implied yes, number supplied — generates immediately)*
-> presents four `20.)`-prefixed options as choices 1–4.
+> **User:** run session-name, this is session 17a
+> **Agent:** *(prefix implied yes, identifier supplied — generates
+> immediately)* presents four `17a.)`-prefixed options as choices 1–4. The
+> `a` suffix is kept verbatim — never normalized to `17.)`.
 
-### 2. Prefix wanted, number missing — stop and ask
+### 2. Prefix wanted, identifier missing — stop and ask
 
 > **User:** /session-name — yes, use the number prefix
-> **Agent:** "What number is this chat session?" *(stops; no options yet;
-> continues next turn once the user answers — an AskUserQuestion-style prompt
-> is fine where the host supports it)*
+> **Agent:** "What is this chat session's identifier (e.g. 20, or 17a for a
+> child session)?" *(stops; no options yet; continues next turn once the user
+> answers — an AskUserQuestion-style prompt is fine where the host supports
+> it)*
 
 ### 3. User declines the prefix
 
@@ -166,7 +186,7 @@ Without the prefix, the same block simply omits `20.)` from each option.
 
 ## Future Hook
 
-A hard word/character cap and an automatic platform-derived session number are
-deliberately **not** implemented in this version. Number source is ask-or-tell
-only; the ~8-word/~60-character guidance is the documented hook for a future
-hard cap once usage settles.
+A hard character cap and an automatic platform-derived session identifier are
+deliberately **not** implemented in this version. Identifier source is
+ask-or-tell only; the 150-character soft ceiling is the documented hook for a
+future hard cap once usage settles.

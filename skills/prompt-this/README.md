@@ -42,11 +42,11 @@ That embedding is the whole integration goal: the agent that eventually runs the
 ## Lifecycle
 
 ```text
-Pending:   <Workspace>\Archive\Live\Prompts\<Subject>\N.) <Topic>.md
-Executed:  <Workspace>\Archive\Historical\Prompts\<Subject>\N.) <Topic>.md
+Pending:   <Workspace>\Archive\Live\Prompts\<Subject>\N.) <Topic>_pending.md
+Executed:  <Workspace>\Archive\Historical\Prompts\<Subject>\N.) <Topic>_executed.md
 ```
 
-Lifecycle is expressed by **location plus the in-file `Status:` line** — there is no `_pending` / `_executed` filename suffix.
+Lifecycle is expressed by **location, the in-file `Status:` line, and a filename suffix** — `_pending` while Live, `_executed` once finalized. Only `finalize-prompt` renames the suffix.
 
 **Subject** is the broad category (the school-subject sense: "math"). **Topic** is the specific thing ("polynomials"). Subject folders are never numbered; only files carry `N.)`. Keep Subjects broad, or you end up with one folder per file.
 
@@ -56,7 +56,7 @@ The snapshot matters. Once the new file exists it belongs to that union, so reco
 
 Scanning only the Live side silently reuses a number already held by an executed prompt. And because the Subject layer makes the tree two levels deep, any scan must descend into the Subject folder on **both** sides.
 
-**The filename never contains the word "prompt."** The `Prompts\` folder already says what it is, just as plan files don't say "plan." The one exception is an explicit opt-in when you intend to share a prompt publicly.
+**The filename Topic never contains the word "prompt."** The `Prompts\` folder already says what it is, just as plan files don't say "plan." The one exception is an explicit opt-in when you intend to share a prompt publicly.
 
 ## Two Rules That Will Stop You
 

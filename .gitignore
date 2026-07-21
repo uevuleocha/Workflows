@@ -7,12 +7,16 @@ __pycache__/
 
 # Machine-local agent state / settings
 .agents/
+.obsidian/
 .antigravity/
 .claude/
 .codex/
 
 # Durable local artifacts (session summaries, etc. — not pushed)
 Archive/
+
+# LLM-maintained knowledge synthesized from private Archive sources
+wiki/
 
 # Temporary workspace files
 tmp/

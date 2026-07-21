@@ -1,7 +1,7 @@
 interface:
   display_name: "Video to Action"
-  short_description: "Create deterministic video report.md artifacts through Gemini"
-  default_prompt: "Use /video-to-action to confirm setup, tier cost, exact video title and duration, and explicit optional phase choices before running the deterministic helper that writes report.md."
+  short_description: "Create deterministic video reports and caption transcripts"
+  default_prompt: "Use /video-to-action to confirm setup, tier cost, exact video title and duration, and explicit optional phase choices before running the deterministic helper that writes report.md, transcript.md, and prompts.md."
 
 policy:
   allow_implicit_invocation: false

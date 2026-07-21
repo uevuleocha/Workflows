@@ -1,6 +1,6 @@
 # Session Name — Adoption Guide
 
-Suggests exactly four short, descriptive **chat-session names** (the label in
+Suggests exactly four rich, descriptive **chat-session names** (the label in
 the platform's session sidebar/UI), grounded in the work the current session
 actually did. Usable at session end or midway through. The user picks one and
 the skill confirms the exact final string.
@@ -8,12 +8,18 @@ the skill confirms the exact final string.
 ## What it does — and does not do
 
 - Produces **exactly four** distinct options, presented as choices 1–4.
-- The `N.)` session-number prefix is **opt-in**: the skill asks whether the
-  user wants it before generating. If wanted, the number must be supplied by
-  the user — the skill **stops and asks** for it if absent and **never**
-  guesses or infers it from workspace file numbering.
-- Length is soft guidance only (~8 descriptive words / ~60 characters,
-  excluding `N.)`); accurate longer names are not rejected.
+- The `N.)` session-identifier prefix is **opt-in**: the skill asks whether
+  the user wants it before generating. If wanted, the identifier must be
+  supplied by the user — used **verbatim, including lowercase child suffixes**
+  (`17a` → `17a.)`, never normalized to `17.)`) — and the skill **stops and
+  asks** for it if absent, **never** guessing or inferring it from workspace
+  file numbering.
+- Options are **facet-built**: each combines the applicable facets — Outcome,
+  Artifact/Tool, Method, Headline Result — with each option leading on a
+  different facet.
+- Length: a **150-character soft ceiling** (excluding the prefix) — a ceiling
+  to reach toward when the session's substance earns it, never a quota to pad
+  toward; accurate longer names are not rejected.
 - **Suggestion-only.** It never renames the chat, never claims platform-side
   changes, and creates, moves, and renames no files during invocation.
 - **Platform-neutral.** It recommends a UI label but does not claim it can

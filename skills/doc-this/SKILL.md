@@ -1,6 +1,6 @@
 ---
 name: doc-this
-description: Create or update durable documentation in the nested Live Documentation tree using the workspace house style and per-Subject numbering. Categories are Personal, Resources, or Articles, chosen by the document's nature. Use when the user invokes /doc-this or asks to create durable documentation.
+description: Create or update durable documentation in the nested Live Documentation tree using a user-selected or context-appropriate category, the workspace house style, and per-Subject numbering. Use when the user invokes /doc-this or asks to create durable documentation.
 ---
 
 # Doc This
@@ -32,16 +32,14 @@ If the user wants a plan, task, report, prompt, or summary, route to `plan-this`
 
 ## Category And Subject
 
-Infer before asking, and ask only when genuinely ambiguous:
+Use any appropriate, unnumbered top-level category. An explicit user-provided
+category always wins. Otherwise infer a sensible broad category from context;
+ask only when the category is genuinely ambiguous and a wrong choice would
+materially affect placement.
 
-- `Articles` — the artifact is an article.
-- `Resources` — the artifact is a resource, or the user designates it as one.
-- `Personal` — user-authored documentation that is neither an article nor a
-  resource.
-
-Category is decided by nature, not source. An article or resource remains in
-its category whether authored by the user, found online, or supplied by a
-friend. There is no Personal article or Personal resource.
+Useful defaults and examples include `Personal`, `Resources`, and `Articles`,
+but they are not an exhaustive allowlist. Do not force an artifact into one of
+these categories when another category better matches the user's intent.
 
 Then select a broad, reusable Subject folder. Folders are never numbered. Avoid
 creating a unique Subject for every file.
@@ -62,7 +60,6 @@ Use analogy or for-dummies layering only when the user explicitly requests it.
 
 - Destination:
   `Archive\Live\Documentation\<category>\<Subject>\N.) <Title>.md`.
-- `category` must be exactly `Personal`, `Resources`, or `Articles`.
 - Subject folders and category folders are never numbered.
 - Compute `N` from numbered files in that exact category/Subject folder only,
   starting at `1` and using one past the highest existing number.
@@ -73,11 +70,13 @@ Use analogy or for-dummies layering only when the user explicitly requests it.
 
 Infer these from context when safe: title/topic, source material, category,
 Subject, target workspace (current by default), and optional analogy/for-dummies
-layering (off by default).
+layering (off by default). Preserve any explicit user-provided category.
 
 ## Workflow
 
-1. Determine title, source, category, Subject, and target workspace.
+1. Determine title, source, category, Subject, and target workspace. Use an
+   explicit user category; otherwise infer a broad category and ask only when
+   a materially important ambiguity remains.
 2. Inspect the exact category/Subject folder and calculate the next number.
 3. Compose the full draft in house style.
 4. Ask how to proceed with an interactive question when available: Draft first
@@ -111,14 +110,17 @@ If categorization, order, or a collision is ambiguous, stop rather than guess.
 
 Do not create a documentation lifecycle/finalizer, write outside
 `Archive\Live\Documentation\`, use the phantom Reference path, categorize by
-source, overwrite a file, silently reconcile Legacy, or delete Legacy without
-explicit permission.
+source against the user's explicit choice, create a unique Subject for every
+file, overwrite a file, silently reconcile Legacy, or delete Legacy without
+explicit permission. Do not treat `Personal`, `Resources`, and `Articles` as an
+exhaustive category allowlist.
 
 ## Validation
 
-After create/update, confirm the expected path exists; category and Subject are
-unnumbered; numbering is correct within the exact folder; house style is intact;
-no file was overwritten; and UTF-8 was preserved.
+After create/update, confirm the expected path exists; the selected or inferred
+category was honored; category and Subject are unnumbered; numbering is correct
+within the exact category/Subject folder; house style is intact; no file was
+overwritten; and UTF-8 was preserved.
 
 After migration, confirm no docs remain loose above category folders, numbering
 is clean in Legacy/destinations, and before/after inventories match by content.

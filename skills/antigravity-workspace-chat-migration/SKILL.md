@@ -80,7 +80,7 @@ $WORKSPACE/Archive/Historical/Manifests/Antigravity/
 ./Archive/Historical/Manifests/Antigravity/
 ```
 
-The platform folder is the chat platform being migrated (`Antigravity`), regardless of which agent performs the work. Every manifest must start with the next sequential `N.) ` prefix based only on the highest existing numbered file in that platform folder, e.g. `1.) antigravity_migration_manifest.json`. When updating or renaming a staged manifest, preserve its sequence number. Do not leave migration manifests unnumbered. One destination project means one manifest.
+The platform folder is the chat platform being migrated (`Antigravity`), regardless of which agent performs the work. Every manifest must start with the next sequential `N.) ` prefix based only on the highest existing numbered file in that platform folder. Use the migration grammar `N.) Who + Topic + What`: `N.) <Platform> <Topic> Manifest.json`, Title Case with spaces, where `<Platform>` is the chat platform being migrated; for example, `1.) Antigravity Trading Chats Manifest.json`. When updating or renaming a staged manifest, preserve its sequence number. Do not leave migration manifests unnumbered. One destination project means one manifest.
 
 ## Front-Door Workflow
 
@@ -183,4 +183,6 @@ Both workflows close by producing an explicit session summary through the `sessi
 **Save location and naming (both workflows).** Invoke `session-summary` pre-filled:
 
 - Directory: `<workspace_root>/Archive/Historical/Summaries/Migration/Antigravity/`
-- Filename: the `session-summary` convention `x.) [Project] [Topic] Summary [N].md`.
+- Filename templates — the migration grammar `N.) Who + Topic + What`. These override the `session-summary` skill's default filename convention: pre-fill the filename so the output uses this exact shape, with no trailing `Summary N` and no `Execution` wording.
+  - Handoff, written by the front-door agent: `N.) <Front-Door Agent> <Topic> Handoff.md` — e.g. `1.) Antigravity Trading Chats Handoff.md`
+  - Report, written by the helper agent: `N.) <Helper Agent> <Topic> Report.md` — e.g. `2.) Hermes Trading Chats Report.md`

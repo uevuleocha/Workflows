@@ -1,0 +1,8 @@
+interface:
+  display_name: "Wiki This"
+  short_description: "Set up a schema-driven workspace wiki"
+  default_prompt: "Use $wiki-this to scaffold a schema-driven Markdown wiki, adapting the Hub schema only as an example. Confirm roots, taxonomy, track/ignore treatment, and first-sync order or batching. Require user approval before any history-aware mine-and-fold treatment. Never mutate sources or create an Obsidian vault."
+
+policy:
+  allow_implicit_invocation: true
+

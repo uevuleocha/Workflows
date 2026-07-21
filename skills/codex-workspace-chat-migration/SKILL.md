@@ -121,7 +121,7 @@ $WORKSPACE/Archive/Historical/Manifests/Codex/
 
 All three notations mean the same thing: the `Archive/Historical/Manifests/Codex/` folder of the workspace currently being worked in. The platform folder is determined by the chat platform being migrated, not by the agent performing the work: a Claude or Antigravity helper executing a Codex migration still uses the `Codex` folder. Once a migration is confirmed, the manifest is no longer needed — the user can ask an agent to delete it from there.
 
-Every manifest saved in `Archive/Historical/Manifests/Codex/` must start with the next sequential `N.) ` prefix based only on the highest existing numbered file in that platform folder. Use `N.) <descriptive-manifest-name>.json`; for example, `1.) codex_workspace_chat_migration_manifest.json`. When updating or renaming a staged manifest, preserve its existing sequence number while changing the descriptive portion to match its current scope and state. Do not leave migration manifests unnumbered.
+Every manifest saved in `Archive/Historical/Manifests/Codex/` must start with the next sequential `N.) ` prefix based only on the highest existing numbered file in that platform folder. Use the migration grammar `N.) Who + Topic + What`: `N.) <Platform> <Topic> Manifest.json`, Title Case with spaces, where `<Platform>` is the chat platform being migrated; for example, `1.) Codex Trading Chats Manifest.json`. When updating or renaming a staged manifest, preserve its existing sequence number while changing the descriptive portion to match its current scope and state. Do not leave migration manifests unnumbered.
 
 ## Session Summary Integration
 
@@ -139,7 +139,9 @@ Both workflows close by producing an explicit session summary through the `sessi
 - Directory: `<workspace_root>/Archive/Historical/Summaries/Migration/Codex/`
 - Create the `Codex` platform folder if it does not exist.
 - Sequence number: the next integer after the highest existing `N.)` file in the `Codex` platform folder only.
-- Filename style: `N.) <Agent> <Topic> <Handoff|Execution Report> Summary N.md` (Codex/front-door uses `Handoff`; helper/execution uses `Execution Report`).
+- Filename templates — the migration grammar `N.) Who + Topic + What`. These override the `session-summary` skill's default filename convention: pre-fill the filename so the output uses this exact shape, with no trailing `Summary N` and no `Execution` wording.
+  - Handoff, written by the front-door agent: `N.) <Front-Door Agent> <Topic> Handoff.md` — e.g. `1.) Codex Trading Chats Handoff.md`
+  - Report, written by the helper agent: `N.) <Helper Agent> <Topic> Report.md` — e.g. `2.) Hermes Trading Chats Report.md`
 
 **Scope of each summary.** Each side summarizes only its own portion; do not re-summarize the other side beyond referencing the handoff.
 

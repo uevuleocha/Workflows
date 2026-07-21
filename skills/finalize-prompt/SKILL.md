@@ -1,6 +1,6 @@
 ---
 name: finalize-prompt
-description: Finalize an existing pending prompt by verifying every Prompt Contract DEFINITION OF DONE item and every Verification Checklist item against evidence, confirming no FAILURE condition is active, applying executed presentation styling, and moving the file from its Subject folder under Archive\Live\Prompts\ to the matching Subject folder under Archive\Historical\Prompts\ with its N.) prefix and filename unchanged. Use when the user asks for /finalize-prompt, finalize prompt, mark prompt executed, close this prompt, this prompt is done, move the prompt to historical, or clear equivalents. This skill never creates, updates, or reopens a prompt; prompt-this owns that.
+description: Finalize an existing pending prompt by verifying every Prompt Contract DEFINITION OF DONE item and every Verification Checklist item against evidence, confirming no FAILURE condition is active, applying executed presentation styling, and moving the file from its Subject folder under Archive\Live\Prompts\ to the matching Subject folder under Archive\Historical\Prompts\ while renaming its suffix from _pending to _executed and keeping its N.) prefix and Topic unchanged. Use when the user asks for /finalize-prompt, finalize prompt, mark prompt executed, close this prompt, this prompt is done, move the prompt to historical, or clear equivalents. This skill never creates, updates, or reopens a prompt; prompt-this owns that.
 ---
 
 # Finalize Prompt
@@ -9,14 +9,14 @@ Close an existing **pending** prompt after the user confirms the work it asked f
 
 This skill only closes pending prompts. It does not create, update, or reopen them — use `prompt-this` for that.
 
-A prompt's lifecycle is expressed by **location plus its in-file `Status:` line**, not by a filename suffix:
+A prompt's lifecycle is expressed by **location, its in-file `Status:` line, and a filename suffix** — `_pending` while Live, `_executed` once finalized:
 
 ```text
-Pending:   <Workspace>\Archive\Live\Prompts\<Subject>\N.) <Topic>.md
-Executed:  <Workspace>\Archive\Historical\Prompts\<Subject>\N.) <Topic>.md
+Pending:   <Workspace>\Archive\Live\Prompts\<Subject>\N.) <Topic>_pending.md
+Executed:  <Workspace>\Archive\Historical\Prompts\<Subject>\N.) <Topic>_executed.md
 ```
 
-**This skill is the only thing that may change PENDING → EXECUTED or move a prompt Live → Historical.**
+**This skill is the only thing that may change PENDING → EXECUTED, move a prompt Live → Historical, or rename the suffix `_pending` → `_executed`.**
 
 ## Project Contract
 
@@ -135,13 +135,13 @@ Finalization converts a pending prompt into a completed record. Do a small prese
 The prompt crosses the Archive's lifecycle boundary. Move it:
 
 ```text
-From:  <Workspace>\Archive\Live\Prompts\<Subject>\N.) <Topic>.md
-To:    <Workspace>\Archive\Historical\Prompts\<Subject>\N.) <Topic>.md
+From:  <Workspace>\Archive\Live\Prompts\<Subject>\N.) <Topic>_pending.md
+To:    <Workspace>\Archive\Historical\Prompts\<Subject>\N.) <Topic>_executed.md
 ```
 
 Rules:
 
-- **Preserve `N.)` and the filename exactly.** Do not renumber, do not reclaim gaps, do not rename. `N` is lifecycle-agnostic and permanent.
+- **Preserve `N.)` and the Topic exactly, and rename only the suffix `_pending` → `_executed`.** Do not renumber, do not reclaim gaps, do not alter the Topic. `N` is lifecycle-agnostic and permanent.
 - **Preserve the Subject folder name exactly, and never number it.** Subject folders are unnumbered on both sides.
 - Create `Archive\Historical\Prompts\<Subject>\` if it does not exist, when file creation is allowed.
 - If a file with that `N.)` already exists in the Historical Subject folder, **stop and ask.** Do not overwrite, delete, or silently renumber.
@@ -186,7 +186,7 @@ Do:
 
 - verify every DEFINITION OF DONE item **and** every Verification Checklist item against evidence
 - confirm no FAILURE condition is active
-- preserve `N.)`, the filename, the Subject folder name, and the `## Prompt` payload verbatim
+- preserve `N.)`, the Topic, the Subject folder name, and the `## Prompt` payload verbatim, renaming only the suffix `_pending` → `_executed`
 - move the file Live → Historical in the same pass as the status rewrite
 - record deferrals, waivers, and the finalization date under `## Notes`
 - stop on a Historical filename collision
@@ -210,7 +210,7 @@ After finalizing a prompt:
 
 - confirm the Live source path no longer exists
 - confirm the Historical target path exists under `Archive\Historical\Prompts\<Subject>\`
-- confirm the filename and its `N.) ` prefix are unchanged
+- confirm the `N.) ` prefix and the Topic are unchanged and the suffix was renamed `_pending` → `_executed`
 - confirm the Subject folder name is unchanged and unnumbered
 - confirm the file contains `Status: EXECUTED ✅` and a `Prompt lifecycle: EXECUTED` note
 - confirm `## Prompt Contract ✅ Complete` and `## Verification Checklist ✅ Complete` appear only where the evidence supports them

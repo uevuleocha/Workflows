@@ -1,13 +1,14 @@
 ---
 name: video-to-action
-description: Extract deterministic report.md artifacts from public YouTube videos through Gemini, with one always-on Procedure call and explicit opt-in Deep Summary and coding-only Technical calls. Setup-gated and explicitly invoked only with /video-to-action.
+description: Extract deterministic report.md and transcript.md artifacts from public YouTube videos, using Gemini for one always-on Procedure call plus explicit opt-in Deep Summary and coding-only Technical calls, and YouTube captions for a failure-isolated transcript. Setup-gated and explicitly invoked only with /video-to-action.
 ---
 
 # Video-to-Action
 
-Extract a public YouTube video into a deterministic `report.md`. The bundled
-Python helper is the sole writer; the orchestrating agent selects phases and
-presents results but never assembles or invents video content.
+Extract a public YouTube video into deterministic `report.md`, `transcript.md`,
+and `prompts.md` artifacts. The bundled Python helper is the sole writer; the
+orchestrating agent selects phases and presents results but never assembles or
+invents video content.
 
 The report conforms structurally to the local `report-this` package through a
 clean title, Report Metadata, Procedure, Detailed Summary, errors, and notes. It
@@ -83,15 +84,38 @@ Required deterministic skeleton:
 1. Clean H1 report title.
 2. `## Report Metadata` with source, extraction time, intent, model, selected
    calls, and status.
-3. `## Procedure` containing merged Overview and Steps, demoted to H3.
-   Script-side processing preserves deeper headings and fenced code.
+3. `## Procedure` containing merged Overview and Steps at H3, with their
+   numbered and STEP children at H4. Script-side processing preserves fenced
+   code and deeper headings.
 4. Optional `### Code, Commands & Configuration` inside Procedure when selected.
 5. `## Detailed Summary` containing ACTS headings demoted to H3, or an honest
    `Not selected for this run.` marker.
 6. `## Extraction Errors` when a selected phase failed.
 7. `## Notes` with verification and authorization cautions.
 
-The helper writes `report.md` as the sole durable run report.
+The helper writes `report.md` as the sole durable run report and always writes
+the sibling `transcript.md` caption artifact.
+
+## Transcript Artifact
+
+Every run writes `transcript.md` without adding a Gemini call. The helper parses
+the video ID from standard watch, `youtu.be`, Shorts, or embed URLs and uses
+`youtube-transcript-api` to retrieve an original YouTube caption track. It
+prefers manual captions over generated captions and never silently translates.
+
+Successful artifacts preserve timestamped caption fragments plus language and
+track metadata. If captions are unavailable or retrieval is blocked, the file
+records the reason and points the user to `https://youtubetotranscript.com/` for
+manual recovery. The user copies the transcript itself back to the agent; a
+populated third-party transcript page is never a programmatic input.
+
+Complete a pending manual fallback without rerunning Gemini:
+
+```text
+python scripts\video_to_action.py --complete-transcript <transcript.md> --manual-transcript-file <copied-transcript.txt>
+```
+The completed file removes temporary recovery instructions while retaining the
+automatic failure reason and user-supplied provenance.
 
 ## Procedure Call
 
@@ -125,22 +149,24 @@ or inferred material LOW CONFIDENCE. Never include real secret values.
 
 ## Configuration
 
-| Parameter           | Default                                | Purpose                         |
-|---------------------|----------------------------------------|---------------------------------|
-| `url`               | required                               | Public YouTube URL              |
-| `--title`           | required                               | Exact user-supplied title       |
-| `--duration`        | required                               | Exact normalized video length   |
-| `--intent`          | `summarize`                            | `follow`, `summarize`, `learn`  |
-| `--deep-summary`    | off                                    | Add Deep Summary call           |
-| `--technical`       | off                                    | Add Technical call              |
-| `--coding-video`    | off                                    | Confirm Technical relevance     |
-| `--model`           | `gemini-3.5-flash`                     | Gemini model or env override    |
-| `--resolution`      | `default`                              | `low` reduces video tokens      |
-| `--start` / `--end` | none                                   | Optional clip offsets           |
-| `--output-dir`      | `Archive\Historical\Video-to-action`   | Historical run-record root      |
-| `--check-setup`     | off                                    | No-API dependency/key check     |
-| `--dump-prompts`    | off                                    | Regenerate canonical prompts    |
-| `--self-test`       | off                                    | Run deterministic no-API fixture|
+| Parameter                  | Default                                | Purpose                          |
+|----------------------------|----------------------------------------|----------------------------------|
+| `url`                      | required                               | Public YouTube URL               |
+| `--title`                  | required                               | Exact user-supplied title        |
+| `--duration`               | required                               | Exact normalized video length    |
+| `--intent`                 | `summarize`                            | `follow`, `summarize`, `learn`   |
+| `--deep-summary`           | off                                    | Add Deep Summary call            |
+| `--technical`              | off                                    | Add Technical call               |
+| `--coding-video`           | off                                    | Confirm Technical relevance      |
+| `--model`                  | `gemini-3.5-flash`                     | Gemini model or env override     |
+| `--resolution`             | `default`                              | `low` reduces video tokens       |
+| `--start` / `--end`        | none                                   | Optional clip offsets            |
+| `--output-dir`             | `Archive\Historical\Video-to-action`   | Historical run-record root       |
+| `--check-setup`            | off                                    | No-API dependency/key check      |
+| `--dump-prompts`           | off                                    | Regenerate canonical prompts     |
+| `--self-test`              | off                                    | Deterministic no-API fixture     |
+| `--complete-transcript`    | none                                   | Complete pending transcript      |
+| `--manual-transcript-file` | none                                   | User-copied transcript input     |
 
 ## Prompt Provenance And Output Files
 
@@ -149,11 +175,12 @@ or inferred material LOW CONFIDENCE. Never include real secret values.
 resolution, clip, and selected calls. Unselected prompts are not represented as
 sent.
 
-| File          | Description                                       |
-|---------------|---------------------------------------------------|
-| `report.md`   | Deterministic report assembled by the helper      |
-| `prompts.md`  | Exact prompts sent for selected calls             |
-| `latest.json` | Windows-safe pointer to the latest completed run  |
+| File            | Description                                       |
+|-----------------|---------------------------------------------------|
+| `report.md`     | Deterministic report assembled by the helper      |
+| `transcript.md` | Timestamped captions or honest recovery marker    |
+| `prompts.md`    | Exact prompts sent for selected calls             |
+| `latest.json`   | Windows-safe pointer to the latest completed run  |
 
 All files use explicit UTF-8. The output root remains
 `Archive\Historical\Video-to-action\` because extraction artifacts are records.
@@ -187,8 +214,10 @@ Never promise a free run from historical documentation alone.
 5. Present the phase-selection pop-up or stop and ask in chat.
 6. Confirm the final 1/2/3 call configuration before any API request.
 7. Run the helper from the workspace root.
-8. Present `report.md`, phase errors, and LOW CONFIDENCE warnings honestly.
-9. Do not act on Procedure steps without separate authorization.
+8. Present `report.md`, `transcript.md`, phase errors, and LOW CONFIDENCE
+   warnings honestly.
+9. If transcript retrieval failed, offer the documented manual recovery flow.
+10. Do not act on Procedure steps without separate authorization.
 
 ## Output Honesty And Failure Isolation
 
@@ -203,8 +232,9 @@ After updates:
 
 - run `--check-setup` without making an API call
 - run `--dump-prompts` and confirm regenerated `PROMPTS.md` matches constants
-- run `--self-test` for 1/2/3 calls, relevance gate, report structure, prompt
-  provenance, and isolated failure
+- run `--self-test` for 1/2/3 calls, URL parsing, relevance gate, report
+  structure, nesting, prompt provenance, transcript states, manual recovery,
+  and isolated failure
 - compile the helper with Python UTF-8 mode
 - confirm no required stale run-artifact naming remains
 - audit Markdown tables for visual alignment and cells ≤80 characters

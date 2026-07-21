@@ -134,13 +134,13 @@ Default directory (the `[Subject]` folder is the broad category, e.g. `Skills/`,
 Filename format:
 
 ```text
-N.) {primary_file_or_component}_{main_task}_active.md
+N.) <Topic>_active.md
 ```
 
 Mini plan filename format, only when the user explicitly asks for a "mini plan":
 
 ```text
-N.) {primary_file_or_component}_{main_task}_mini_active.md
+N.) <Topic>_mini_active.md
 ```
 
 `N` is assigned **once at creation** as the next integer past the highest `N.) `
@@ -160,7 +160,7 @@ reopen. Never renumber on finalization or reopening, and never reclaim gaps.
 index lives only on the files inside it, and `N.)` is unique per Subject across
 the combined namespace.
 
-Generate the body of the filename from `Primary File or Main Component` and `Main Task`. Use lowercase letters, digits, and underscores for the body. Do not ask the user for the filename unless the derived name would be ambiguous or misleading.
+Generate the filename **Topic** as a short **Title Case phrase with spaces** describing the plan's work — typically the `Main Task`, optionally led by the `Primary File or Main Component` (for example, `Prompt-This Suffix Rollout`). Match the workspace's other artifact filenames (`prompt-this`, `doc-this`, `session-summary`): Title Case, spaces, no underscores inside the Topic. Only the lifecycle suffix (`_active`, `_mini_active`) keeps its underscore form. Do not ask the user for the filename unless the derived Topic would be ambiguous or misleading.
 
 ## Update Mode
 
@@ -194,10 +194,9 @@ We need to define this implementation plan.
 
 How these fields determine the plan path:
 - Subject decides the broad category folder under `Archive/Live/Plans`, usually `Archive/Live/Plans/[Subject]` (the folder is never numbered).
-- Primary File or Main Component becomes the filename prefix.
-- Main Task becomes the filename body.
-- Together they produce `N.) {primary_file_or_component}_{main_task}_active.md`, where `N` is the next integer past the highest number across the Subject's combined `Live` + `Historical` folders.
-- If the user explicitly asked for a mini plan, use `N.) {primary_file_or_component}_{main_task}_mini_active.md` instead.
+- Main Task (optionally led by the Primary File or Main Component) becomes the filename **Topic** — a short Title Case phrase with spaces.
+- Together they produce `N.) <Topic>_active.md`, where `N` is the next integer past the highest number across the Subject's combined `Live` + `Historical` folders.
+- If the user explicitly asked for a mini plan, use `N.) <Topic>_mini_active.md` instead.
 
 1. Subject:
 2. Main Task:

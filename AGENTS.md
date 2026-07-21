@@ -2,6 +2,8 @@
 
 `CLAUDE.md` is the canonical project contract for this workspace.
 
+For LLM wiki setup, sync, query, or lint work, read and obey `wiki/wiki-schema.md`.
+
 At the start of every conversation in this project workspace, before any substantive reply, read `CLAUDE.md` from the workspace root and treat it as the source of truth. This applies even if the first user message is only a greeting or general check-in.
 
 This file is only an agent wrapper for Codex and Antigravity compatibility. Do not duplicate the full operating contract here; use `CLAUDE.md` for canonical safety rules, skills workflow, active-plan handling, workspace layout, communication style, and mode behavior.

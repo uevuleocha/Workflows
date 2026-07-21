@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Deterministic YouTube-to-report extraction through the Gemini API.
+"""Deterministic YouTube report and transcript extraction.
 
-The script is the sole writer of each run's report.md and prompts.md. It never
-invokes report-this or session-summary; it only conforms structurally to the
-local report package. Real runs require orchestrator-supplied phase choices.
+The script is the sole writer of each run's report.md, transcript.md, and
+prompts.md. It never invokes report-this or session-summary; it only conforms
+structurally to the local report package. Real runs require
+orchestrator-supplied phase choices.
 """
 
 import argparse
@@ -14,9 +15,13 @@ import sys
 import tempfile
 from datetime import datetime
 from pathlib import Path
+from urllib.parse import parse_qs, urlparse
 
 DEFAULT_MODEL = "gemini-3.5-flash"
 DEFAULT_OUTPUT_DIR = Path("Archive") / "Historical" / "Video-to-action"
+MANUAL_TRANSCRIPT_URL = "https://youtubetotranscript.com/"
+MANUAL_RECOVERY_START = "<!-- MANUAL_RECOVERY_START -->"
+MANUAL_RECOVERY_END = "<!-- MANUAL_RECOVERY_END -->"
 SETUP_TASK_HINT = (
     "Setup is incomplete. See the pending video-to-action setup task under "
     "Archive\\Live\\Tasks\\<Subject>\\ for key and dependency setup."
@@ -120,6 +125,15 @@ def check_setup(verbose: bool = True) -> bool:
         ok = False
         if verbose:
             print("MISSING: python-dotenv (pip install python-dotenv).")
+    try:
+        import youtube_transcript_api  # noqa: F401
+    except ImportError:
+        ok = False
+        if verbose:
+            print(
+                "MISSING: youtube-transcript-api "
+                "(pip install youtube-transcript-api)."
+            )
     if ok:
         load_env_files()
         if os.environ.get("GEMINI_API_KEY"):
@@ -218,6 +232,10 @@ def demote_embedded_headings(text: str, block: str) -> str:
         if not in_fence:
             if block == "procedure" and line in ("## Overview", "## Steps"):
                 line = "#" + line
+            elif block == "procedure" and (
+                    re.match(r"^### \d+(?:\.\)|\)) ", line) or
+                    line.startswith("### STEP ")):
+                line = "#" + line
             elif block == "deep_summary" and (
                     line.startswith("## 🎭 ACT ") or
                     line.startswith("## 🎭 FINAL ACT:")):
@@ -233,11 +251,193 @@ def sanitize_title(text: str, fallback: str = "video") -> str:
     return text or fallback
 
 
+def parse_youtube_video_id(url: str) -> str:
+    """Return a validated video ID from supported public YouTube URL forms."""
+    parsed = urlparse(url.strip())
+    host = (parsed.hostname or "").lower()
+    if host.startswith("www."):
+        host = host[4:]
+    if host.startswith("m."):
+        host = host[2:]
+
+    video_id = ""
+    parts = [part for part in parsed.path.split("/") if part]
+    if host == "youtu.be" and parts:
+        video_id = parts[0]
+    elif host in ("youtube.com", "music.youtube.com"):
+        if parsed.path == "/watch":
+            video_id = parse_qs(parsed.query).get("v", [""])[0]
+        elif len(parts) >= 2 and parts[0] in ("shorts", "embed"):
+            video_id = parts[1]
+
+    if not re.fullmatch(r"[A-Za-z0-9_-]{11}", video_id):
+        raise ValueError(
+            "a supported public YouTube URL with a valid video ID is required"
+        )
+    return video_id
+
+
 def is_youtube_url(url: str) -> bool:
-    return bool(re.match(
-        r"https?://(www\.)?(youtube\.com/watch\?v=|youtu\.be/|youtube\.com/shorts/)",
-        url,
-    ))
+    try:
+        parse_youtube_video_id(url)
+        return True
+    except ValueError:
+        return False
+
+
+def select_transcript_track(transcripts) -> object:
+    """Prefer original manual tracks, then original generated tracks."""
+    tracks = list(transcripts)
+    if not tracks:
+        raise LookupError("no caption tracks are available")
+
+    def is_english(track) -> bool:
+        return str(getattr(track, "language_code", "")).lower().startswith("en")
+
+    groups = (
+        [track for track in tracks if not track.is_generated and is_english(track)],
+        [track for track in tracks if not track.is_generated and not is_english(track)],
+        [track for track in tracks if track.is_generated and is_english(track)],
+        [track for track in tracks if track.is_generated and not is_english(track)],
+    )
+    return next(group[0] for group in groups if group)
+
+
+def fetch_transcript(url: str, api_factory=None) -> dict:
+    """Fetch one original caption track and return a failure-isolated result."""
+    video_id = parse_youtube_video_id(url)
+    try:
+        if api_factory is None:
+            from youtube_transcript_api import YouTubeTranscriptApi
+            api_factory = YouTubeTranscriptApi
+        api = api_factory()
+        track = select_transcript_track(api.list(video_id))
+        fetched = track.fetch()
+        snippets = [
+            {
+                "text": snippet.text,
+                "start": float(snippet.start),
+                "duration": float(snippet.duration),
+            }
+            for snippet in fetched
+        ]
+        if not snippets:
+            raise LookupError("the selected caption track is empty")
+        return {
+            "status": "complete",
+            "video_id": video_id,
+            "language": track.language,
+            "language_code": track.language_code,
+            "is_generated": bool(track.is_generated),
+            "snippets": snippets,
+        }
+    except Exception as exc:  # noqa: BLE001 - every caption failure is isolated
+        unavailable = {
+            "NoTranscriptFound", "TranscriptsDisabled", "VideoUnavailable",
+            "NoTranscriptAvailable", "LookupError",
+        }
+        status = "unavailable" if type(exc).__name__ in unavailable else "failed"
+        return {
+            "status": status,
+            "video_id": video_id,
+            "reason": f"{type(exc).__name__}: {exc}",
+            "snippets": [],
+        }
+
+
+def format_timestamp(seconds: float) -> str:
+    milliseconds = max(0, round(seconds * 1000))
+    hours, remainder = divmod(milliseconds, 3_600_000)
+    minutes, remainder = divmod(remainder, 60_000)
+    secs, millis = divmod(remainder, 1000)
+    return f"{hours:02d}:{minutes:02d}:{secs:02d}.{millis:03d}"
+
+
+def build_transcript_doc(title: str, url: str, result: dict) -> str:
+    """Render an automatic transcript or an honest manual-recovery artifact."""
+    status = result["status"]
+    lines = [
+        f"# {title} — Video Transcript", "", "## Transcript Metadata", "",
+        f"- **Source:** {url}",
+        f"- **Video ID:** {result['video_id']}",
+    ]
+    if status == "complete":
+        track_type = (
+            "Automatically generated" if result["is_generated"] else "Manual"
+        )
+        lines += [
+            "- **Status:** Complete via automatic retrieval",
+            "- **Automatic retrieval:** Complete",
+            f"- **Language:** {result['language']} ({result['language_code']})",
+            f"- **Caption track:** {track_type}",
+            "- **Manual source:** Not used", "",
+            "## Accuracy Note", "",
+            "This is the available YouTube caption track, not a human-verified",
+            "transcription of the audio. Automatic captions may contain recognition",
+            "errors, missing punctuation, absent speaker labels, and awkward breaks.",
+            "", "## Transcript", "",
+        ]
+        for snippet in result["snippets"]:
+            end = snippet["start"] + snippet["duration"]
+            lines.append(
+                f"[{format_timestamp(snippet['start'])}–{format_timestamp(end)}] "
+                f"{snippet['text']}"
+            )
+    else:
+        automatic_label = "Unavailable" if status == "unavailable" else "Failed"
+        lines += [
+            "- **Status:** Manual recovery required",
+            f"- **Automatic retrieval:** {automatic_label}",
+            f"- **Automatic failure reason:** {result['reason']}",
+            "- **Manual source:** Not yet supplied", "",
+            MANUAL_RECOVERY_START,
+            "## Manual Recovery", "",
+            "Automatic caption retrieval did not complete. To recover manually:", "",
+            f"1. Open {MANUAL_TRANSCRIPT_URL}",
+            "2. Paste the original YouTube URL and generate the transcript.",
+            "3. Copy the transcript itself; do not provide only the generated page URL.",
+            "4. Give the copied transcript to the agent for this run.",
+            "5. The helper will replace these instructions while preserving the",
+            "   automatic-failure provenance above.", "",
+            "Manual transcript pending.",
+            MANUAL_RECOVERY_END,
+        ]
+    return "\n".join(lines) + "\n"
+
+
+def complete_manual_transcript(transcript_path: Path, manual_path: Path) -> Path:
+    """Complete a failed transcript artifact without rerunning Gemini."""
+    existing = transcript_path.read_text(encoding="utf-8")
+    manual_text = manual_path.read_text(encoding="utf-8").strip()
+    if not manual_text:
+        raise ValueError("manual transcript file is empty")
+    pattern = re.compile(
+        rf"{re.escape(MANUAL_RECOVERY_START)}.*?{re.escape(MANUAL_RECOVERY_END)}",
+        re.DOTALL,
+    )
+    if not pattern.search(existing):
+        raise ValueError(
+            "transcript does not contain a pending manual-recovery block"
+        )
+    completed = existing.replace(
+        "- **Status:** Manual recovery required",
+        "- **Status:** Complete via manual fallback",
+        1,
+    ).replace(
+        "- **Manual source:** Not yet supplied",
+        f"- **Manual source:** User-supplied copy from {MANUAL_TRANSCRIPT_URL}",
+        1,
+    )
+    completed = pattern.sub(
+        "## Accuracy Note\n\n"
+        "This transcript was supplied by the user from a third-party caption "
+        "tool and is preserved as supplied. The automatic retrieval result "
+        "remains recorded above.\n\n## Transcript\n\n" + manual_text,
+        completed,
+        count=1,
+    )
+    transcript_path.write_text(completed.rstrip() + "\n", encoding="utf-8")
+    return transcript_path
 
 
 def inject_ground_truth(prompt: str, title: str, duration: str,
@@ -354,7 +554,8 @@ def build_run_prompts_doc(url: str, model: str, resolution: str, clip: str,
 
 def save_outputs(output_base: Path, title: str, duration: str, url: str, intent: str, model: str,
                  effective: list[dict], results: dict, errors: list,
-                 resolution: str, clip: str, run_ts: str | None = None) -> Path:
+                 transcript_result: dict, resolution: str, clip: str,
+                 run_ts: str | None = None) -> Path:
     run_ts = run_ts or datetime.now().strftime("%Y%m%d-%H%M%S")
     output_dir = output_base / f"{run_ts} - {sanitize_title(title)}"
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -368,6 +569,9 @@ def save_outputs(output_base: Path, title: str, duration: str, url: str, intent:
         build_run_prompts_doc(
             url, model, resolution, clip, title, duration, effective),
         encoding="utf-8",
+    )
+    (output_dir / "transcript.md").write_text(
+        build_transcript_doc(title, url, transcript_result), encoding="utf-8"
     )
     (output_base / "latest.json").write_text(json.dumps({
         "latest_run": run_ts, "run_dir": str(output_dir), "url": url,
@@ -390,11 +594,12 @@ def run_extraction(url: str, intent: str, model: str, start: str | None,
         print(f"  Call: {pd['title']} ...")
         return run_phase(client, model, url, pd["prompt"], start, end, low_res)
     results, errors = execute_phases(effective, runner)
+    transcript_result = fetch_transcript(url)
     resolution = "low" if low_res else "default"
     clip = f"{start or 'start'} -> {end or 'end'}" if start or end else "full video"
     report_path = save_outputs(
         output_base, title, duration, url, intent, model, effective,
-                               results, errors, resolution, clip)
+        results, errors, transcript_result, resolution, clip)
     print(f"Saved: {report_path}")
     return 0 if results else 1
 
@@ -413,6 +618,21 @@ def run_self_test() -> bool:
             except argparse.ArgumentTypeError:
                 pass
 
+        expected_id = "0-QDPnEIkvw"
+        url_forms = (
+            f"https://www.youtube.com/watch?v={expected_id}",
+            f"https://youtu.be/{expected_id}",
+            f"https://youtube.com/shorts/{expected_id}",
+            f"https://youtube.com/embed/{expected_id}",
+        )
+        assert all(parse_youtube_video_id(url) == expected_id for url in url_forms)
+        for invalid_url in ("https://example.com/watch?v=0-QDPnEIkvw", "bad"):
+            try:
+                parse_youtube_video_id(invalid_url)
+                raise AssertionError(f"invalid YouTube URL accepted: {invalid_url}")
+            except ValueError:
+                pass
+
         phase_counts = [
             len(selected_phase_defs(False, False, False)),
             len(selected_phase_defs(True, False, False)),
@@ -425,10 +645,61 @@ def run_self_test() -> bool:
         except ValueError:
             pass
 
+        class Snippet:
+            def __init__(self, text, start, duration):
+                self.text, self.start, self.duration = text, start, duration
+
+        class Track:
+            def __init__(self, language, code, generated, snippets):
+                self.language = language
+                self.language_code = code
+                self.is_generated = generated
+                self._snippets = snippets
+
+            def fetch(self):
+                return self._snippets
+
+        manual_spanish = Track(
+            "Spanish", "es", False, [Snippet("Hola", 0.08, 1.5)]
+        )
+        generated_english = Track(
+            "English", "en", True, [Snippet("Hello", 0.08, 1.5)]
+        )
+
+        class FakeApi:
+            def list(self, video_id):
+                assert video_id == expected_id
+                return [generated_english, manual_spanish]
+
+        successful_transcript = fetch_transcript(url_forms[0], FakeApi)
+        assert successful_transcript["status"] == "complete"
+        assert successful_transcript["language_code"] == "es"
+        assert not successful_transcript["is_generated"]
+
+        class TranscriptsDisabled(Exception):
+            pass
+
+        class DisabledApi:
+            def list(self, video_id):
+                raise TranscriptsDisabled("captions disabled")
+
+        unavailable_transcript = fetch_transcript(url_forms[0], DisabledApi)
+        assert unavailable_transcript["status"] == "unavailable"
+
+        class RequestBlocked(Exception):
+            pass
+
+        class BlockedApi:
+            def list(self, video_id):
+                raise RequestBlocked("request blocked")
+
+        blocked_transcript = fetch_transcript(url_forms[0], BlockedApi)
+        assert blocked_transcript["status"] == "failed"
+
         duration = "14:34"
         procedure_result = (
-            "## Overview\n### Overview child\n#### Overview detail\n"
-            "```markdown\n## Overview\n## Steps\n```\n"
+            "## Overview\n### 1.) Video Title and Length\n#### Overview detail\n"
+            "```markdown\n## Overview\n### 2.) Fenced child\n## Steps\n```\n"
             "## Steps\n### STEP 1: Fixture\n#### Step detail"
         )
         acts = (
@@ -440,12 +711,26 @@ def run_self_test() -> bool:
         omitted_effective = build_effective_prompts(
             selected_phase_defs(False, False, False), "Omitted Fixture", duration)
         omitted_path = save_outputs(
-            base, "Omitted Fixture", duration, "https://youtu.be/fixture",
+            base, "Omitted Fixture", duration, url_forms[0],
             "summarize", DEFAULT_MODEL, omitted_effective,
-            {"procedure": procedure_result}, [], "default", "full video",
-            run_ts="20000101-000001")
+            {"procedure": procedure_result}, [], unavailable_transcript,
+            "default", "full video", run_ts="20000101-000001")
         omitted_text = omitted_path.read_text(encoding="utf-8")
+        omitted_transcript = omitted_path.with_name("transcript.md")
         assert "Not selected for this run." in omitted_text
+        assert "Manual recovery required" in omitted_transcript.read_text(
+            encoding="utf-8"
+        )
+
+        manual_input = base / "manual-input.txt"
+        manual_input.write_text("00:00 Manual fallback text.", encoding="utf-8")
+        complete_manual_transcript(omitted_transcript, manual_input)
+        completed_manual = omitted_transcript.read_text(encoding="utf-8")
+        assert "Complete via manual fallback" in completed_manual
+        assert "Automatic failure reason" in completed_manual
+        assert "00:00 Manual fallback text." in completed_manual
+        assert MANUAL_RECOVERY_START not in completed_manual
+        assert "Manual transcript pending." not in completed_manual
 
         failed_effective = build_effective_prompts(
             selected_phase_defs(True, True, True), "Failed Fixture", duration)
@@ -457,32 +742,43 @@ def run_self_test() -> bool:
 
         failed_results, failed_errors = execute_phases(failed_effective, failed_runner)
         failed_path = save_outputs(
-            base, "Failed Fixture", duration, "https://youtu.be/fixture",
+            base, "Failed Fixture", duration, url_forms[0],
             "summarize", DEFAULT_MODEL, failed_effective, failed_results,
-            failed_errors, "default", "full video", run_ts="20000101-000002")
+            failed_errors, blocked_transcript, "default", "full video",
+            run_ts="20000101-000002")
         failed_text = failed_path.read_text(encoding="utf-8")
         assert "Deep Summary extraction failed; see Extraction Errors." in failed_text
         assert "Not selected for this run." not in failed_text
+        assert "**Automatic retrieval:** Failed" in failed_path.with_name(
+            "transcript.md"
+        ).read_text(encoding="utf-8")
 
         success_effective = build_effective_prompts(
             selected_phase_defs(True, False, False), "Success Fixture", duration)
         success_path = save_outputs(
-            base, "Success Fixture", duration, "https://youtu.be/fixture",
+            base, "Success Fixture", duration, url_forms[0],
             "summarize", DEFAULT_MODEL, success_effective,
             {"procedure": procedure_result, "deep_summary": acts}, [],
-            "default", "full video", run_ts="20000101-000003")
+            successful_transcript, "default", "full video",
+            run_ts="20000101-000003")
         success_text = success_path.read_text(encoding="utf-8")
-        success_prompts = success_path.with_name("prompts.md").read_text(encoding="utf-8")
+        success_prompts = success_path.with_name("prompts.md").read_text(
+            encoding="utf-8"
+        )
+        success_transcript = success_path.with_name("transcript.md").read_text(
+            encoding="utf-8"
+        )
 
         assert "## Procedure" in success_text and "## Detailed Summary" in success_text
         assert "\n### Overview\n" in success_text and "\n### Steps\n" in success_text
+        assert "\n#### 1.) Video Title and Length\n" in success_text
+        assert "\n#### STEP 1: Fixture\n" in success_text
         assert "\n### 🎭 ACT I: Start\n" in success_text
         assert "\n### 🎭 FINAL ACT: Key Takeaways\n" in success_text
-        assert "### Overview child" in success_text and "#### Overview detail" in success_text
-        assert "### STEP 1: Fixture" in success_text and "#### Step detail" in success_text
         assert "### Act child" in success_text and "#### Act detail" in success_text
-        assert "```markdown\n## Overview\n## Steps\n```" in success_text
-        assert "```markdown\n## 🎭 ACT II: Code sample\n```" in success_text
+        assert "```markdown\n## Overview\n### 2.) Fenced child\n## Steps\n```" in success_text
+        assert "Complete via automatic retrieval" in success_transcript
+        assert "[00:00:00.080–00:00:01.580] Hola" in success_transcript
         assert f"- **Duration:** {duration}" in success_text
         duration_rule = (
             f"This video's exact total length is {duration}; use it verbatim as the "
@@ -496,11 +792,16 @@ def run_self_test() -> bool:
 
         for report_path in (omitted_path, failed_path, success_path):
             assert report_path.name == "report.md"
+            assert report_path.with_name("prompts.md").is_file()
+            assert report_path.with_name("transcript.md").is_file()
             report_text = report_path.read_text(encoding="utf-8")
             assert "## Procedure" in report_text
             assert "## Detailed Summary" in report_text
 
-    print("Self-test passed: duration, prompts, nesting, fences, and report states.")
+    print(
+        "Self-test passed: duration, URLs, prompts, nesting, fences, reports, "
+        "and transcript states."
+    )
     return True
 
 def main() -> None:
@@ -521,7 +822,19 @@ def main() -> None:
     parser.add_argument("--check-setup", action="store_true")
     parser.add_argument("--dump-prompts", action="store_true")
     parser.add_argument("--self-test", action="store_true")
+    parser.add_argument("--complete-transcript", type=Path)
+    parser.add_argument("--manual-transcript-file", type=Path)
     args = parser.parse_args()
+    if bool(args.complete_transcript) != bool(args.manual_transcript_file):
+        parser.error(
+            "--complete-transcript and --manual-transcript-file must be used together"
+        )
+    if args.complete_transcript:
+        completed = complete_manual_transcript(
+            args.complete_transcript, args.manual_transcript_file
+        )
+        print(f"Completed: {completed}")
+        return
     if args.dump_prompts:
         print(f"Wrote {dump_prompts()}")
         return
