@@ -1,7 +1,0 @@
-interface:
-  display_name: "Inspect"
-  short_description: "Inspect code batches or audit any file/artifact"
-  default_prompt: "Use $inspect to verify a recently applied code batch (any language) and sync the current-session working context, or to audit any file, skill, document, or artifact for mistakes, issues, consistency, or things to learn/adapt. Report findings and stand by for the next step."
-
-policy:
-  allow_implicit_invocation: true

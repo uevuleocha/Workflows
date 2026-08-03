@@ -1,0 +1,8 @@
+interface:
+  display_name: "Ecosystem cAlgo Greenlight"
+  short_description: "cAlgo-first C# work with runtime proof"
+  default_prompt: "Use $ecosystem-calgo-greenlight for the named Uzzy Ecosystem C# task. Enter Eco-Greenlight mode; edit and build the live cAlgo project first; apply the Uzzy code-shape staples for imports, parameter subregions, lean fields, concise XML summaries, intent-focused comments, and bottom helper/Bridge types outside the main class but inside the namespace; after agent builds, never offload routine restart/reload work to the user; after user builds, allow a targeted manual cTrader action only after the automatic evidence check fails; use explicit user-controlled parameter gates when required; invoke $inspect for bounded post-build log/database/output evidence review; synchronize verified live source back to the workspace; and return the compulsory six-part manifest and verification ledger."
+
+policy:
+  allow_implicit_invocation: false
+

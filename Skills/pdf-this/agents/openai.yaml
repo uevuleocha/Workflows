@@ -1,0 +1,7 @@
+interface:
+  display_name: "PDF This"
+  short_description: "Create, inspect, convert, or fill PDFs"
+  default_prompt: "Use $pdf-this to create, inspect, verify, convert, fill, or recover a professional PDF artifact."
+
+policy:
+  allow_implicit_invocation: true

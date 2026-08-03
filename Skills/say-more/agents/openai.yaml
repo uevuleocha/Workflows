@@ -1,0 +1,8 @@
+interface:
+  display_name: "Say More"
+  short_description: "Explain it more clearly"
+  default_prompt: "Use $say-more to explain the referenced topic more clearly with plain language and a concise analogy."
+
+policy:
+  allow_implicit_invocation: true
+

@@ -1,0 +1,7 @@
+interface:
+  display_name: "Finalize Brainstorm"
+  short_description: "Close a verified Brainstorm safely"
+  default_prompt: "Use $finalize-brainstorm to verify and close the exact active Brainstorm without losing its history."
+
+policy:
+  allow_implicit_invocation: false

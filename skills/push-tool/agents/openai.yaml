@@ -1,7 +1,0 @@
-interface:
-  display_name: "Push Tool"
-  short_description: "Copy a cAlgo tool folder into the workspace"
-  default_prompt: "Use $push-tool to sync the current cTrader tool folder from cAlgo\\Sources into Uzzy Ecosystem\\Sources."
-
-policy:
-  allow_implicit_invocation: false

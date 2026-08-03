@@ -1,0 +1,7 @@
+interface:
+  display_name: "HTML This"
+  short_description: "Create, inspect, or convert HTML and PDFs"
+  default_prompt: "Use $html-this to create or inspect self-contained HTML, or convert a PDF into accessible page-faithful HTML."
+
+policy:
+  allow_implicit_invocation: true

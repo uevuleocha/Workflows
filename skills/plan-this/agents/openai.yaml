@@ -1,7 +1,0 @@
-interface:
-  display_name: "Plan This"
-  short_description: "Create polished active plans"
-  default_prompt: "Use $plan-this to create or update an active implementation plan with the full colored Estimated Effort table required at every depth, including Compact and mini plans."
-
-policy:
-  allow_implicit_invocation: true

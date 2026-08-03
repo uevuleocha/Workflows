@@ -1,0 +1,7 @@
+interface:
+  display_name: "Plan This"
+  short_description: "Create polished active plans"
+  default_prompt: "Use $plan-this to create or update an active implementation plan with mandatory Markdown task and verification checklists plus the full colored Estimated Effort table at every depth, following the Uzzy SR Plan 20/21 pattern."
+
+policy:
+  allow_implicit_invocation: true

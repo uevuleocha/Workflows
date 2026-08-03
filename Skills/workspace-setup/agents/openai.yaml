@@ -1,0 +1,7 @@
+interface:
+  display_name: "Workspace Setup"
+  short_description: "Set up, audit, or restore parity for any workspace"
+  default_prompt: "Use $workspace-setup to inspect this workspace against the universal standards checklist, classify it as new or existing, determine its parity verdict, and brief me on what remains before making any changes."
+
+policy:
+  allow_implicit_invocation: true

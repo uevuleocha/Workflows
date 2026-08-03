@@ -1,0 +1,7 @@
+interface:
+  display_name: "Inspect"
+  short_description: "Read, understand, verify, or audit a target"
+  default_prompt: "Use $inspect to read and familiarize yourself with a named target by default, without auditing or grading it. Select code-batch verification only when recent changes should be verified, select general audit only when evaluation is requested, and preserve the bounded read-only Ecosystem runtime-evidence review requested by $ecosystem-calgo-greenlight."
+
+policy:
+  allow_implicit_invocation: true

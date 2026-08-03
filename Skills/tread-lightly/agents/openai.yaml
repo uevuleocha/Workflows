@@ -1,0 +1,7 @@
+interface:
+  display_name: "Tread Lightly"
+  short_description: "Protect secrets during sensitive file work"
+  default_prompt: "Use $tread-lightly to handle this sensitive file without exposing or persisting secret values."
+
+policy:
+  allow_implicit_invocation: true

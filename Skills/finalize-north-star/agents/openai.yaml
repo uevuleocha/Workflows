@@ -1,0 +1,7 @@
+interface:
+  display_name: "Finalize North Star"
+  short_description: "Verify and archive a completed North Star"
+  default_prompt: "Use $finalize-north-star to verify the selected live North Star, enforce precise standalone or same-pass pursuit ownership without duplicate timing, finalize and move the same numbered artifact to Historical without overwriting, report helper timing exactly once, and retain the selected star footer if closure is refused or deferred."
+
+policy:
+  allow_implicit_invocation: false

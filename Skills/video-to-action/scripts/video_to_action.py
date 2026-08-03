@@ -1,0 +1,1312 @@
+#!/usr/bin/env python3
+"""Deterministic YouTube report and transcript extraction.
+
+The script is the sole writer of each run's report.md, transcript.md, and
+prompts.md. It never invokes report-this or session-summary; it only conforms
+structurally to the local report package. Real runs require
+orchestrator-supplied phase choices.
+"""
+
+import argparse
+import json
+import os
+import re
+import sys
+import tempfile
+import time
+from datetime import datetime
+from pathlib import Path
+from urllib.parse import parse_qs, urlparse
+
+DEFAULT_MODEL = "gemini-3.6-flash"
+DEFAULT_FALLBACK_MODEL = "gemini-3.5-flash"
+DEFAULT_TIER = "free"
+FREE_TIER_MODELS = frozenset({
+    "gemini-3.6-flash",
+    "gemini-3.5-flash",
+    "gemini-3.5-flash-lite",
+})
+PRIMARY_ATTEMPTS = 3
+PRIMARY_BACKOFF_SECONDS = (1.0, 3.0)
+DEFAULT_OUTPUT_DIR = Path("Archive") / "Historical" / "Video-to-action"
+MANUAL_TRANSCRIPT_URL = "https://youtubetotranscript.com/"
+MANUAL_RECOVERY_START = "<!-- MANUAL_RECOVERY_START -->"
+MANUAL_RECOVERY_END = "<!-- MANUAL_RECOVERY_END -->"
+SETUP_TASK_HINT = (
+    "Setup is incomplete. See the pending video-to-action setup task under "
+    "Archive\\Live\\Tasks\\<Subject>\\ for key and dependency setup."
+)
+
+PROCEDURE_PROMPT = r'''Analyze this YouTube video and produce BOTH an overview
+and detailed steps in one response. Use this exact order.
+
+## Overview
+
+Begin with exactly: Here is a structured breakdown of the video:
+
+### 1.) Video Title and Length
+* **Video Title:** {use the exact supplied title; never infer or alter it}
+* **Length:** {use the exact supplied duration verbatim}
+
+### 2.) Summary
+{2-3 concrete sentences describing what the video teaches}
+
+### 3.) Prerequisites
+{tools, software, or knowledge needed, as bullets}
+
+### 4.) Main Sections
+{chronological chapters with approximate timestamp ranges, as bullets}
+
+### 5.) Key Outcomes
+{what the viewer can do after watching, as bullets}
+
+## Steps
+
+Format every step as follows and separate steps with `---`:
+
+### STEP {n}: {short title}
+* **TIMESTAMP:** {MM:SS-MM:SS}
+* **ACTION:** {specific imperative action}
+* **DETAILS:** {exact values, settings, and demonstrated choices}
+* **VISUAL REFERENCE:** {expected screen or result}
+* **COMMON MISTAKES:** {stated pitfall, well-founded `(inferred)` pitfall, or
+  `None notable` only when nothing meaningful applies}
+
+Put code, commands, or JSON in fenced Markdown blocks. Prefix uncertain subtle
+visual actions with `LOW CONFIDENCE:` and direct the reader to the timestamp.
+If and only if video metadata exposes a title, add a metadata-title bullet and
+compare it with the supplied title; otherwise omit that bullet entirely.'''
+
+DEEP_SUMMARY_PROMPT = r'''Create a long, faithful, chronological deep summary of
+this YouTube video. Only summarize content actually present in the video. Map
+acts to timestamped chapters or meaningful chronological beats.
+
+Return ONLY ACT sections using this exact heading contract:
+
+## 🎭 ACT I: {specific chronological title}
+**Timestamp:** {approximate range}
+{Detailed faithful narrative of what happens, what is explained, and why it
+matters. Clearly label any inference.}
+
+Continue with `## 🎭 ACT II:`, `## 🎭 ACT III:`, and as many sequential acts as
+needed. End exactly with:
+
+## 🎭 FINAL ACT: Key Takeaways
+{Thorough synthesis of the video's conclusions, lessons, and cautions.}
+
+Do not include session pickup, active-plan status, next-session context, or any
+other work-session template content. Do not fabricate inaccessible details.'''
+
+TECHNICAL_PROMPT = r'''Extract all code, commands, configurations, and technical
+details actually shown in this coding/software video.
+
+Include code snippets, terminal commands, configuration values, file paths,
+dependencies, packages, and required environment variables. Put every snippet,
+command, and configuration in fenced Markdown blocks. Mark partial or inferred
+content `LOW CONFIDENCE:`. Never expose real secret values.'''
+
+PHASE_DEFS = {
+    "procedure": {"key": "procedure", "title": "Procedure", "prompt": PROCEDURE_PROMPT},
+    "deep_summary": {
+        "key": "deep_summary", "title": "Deep Summary", "prompt": DEEP_SUMMARY_PROMPT,
+    },
+    "technical": {"key": "technical", "title": "Technical", "prompt": TECHNICAL_PROMPT},
+}
+
+
+def load_env_files() -> None:
+    from dotenv import load_dotenv
+    for candidate in (Path.cwd() / ".env", Path(__file__).resolve().parent / ".env"):
+        if candidate.is_file():
+            load_dotenv(candidate)
+
+
+def api_key_name(tier: str) -> str:
+    return "GEMINI_API_KEY_PAID" if tier == "paid" else "GEMINI_API_KEY"
+
+
+def resolve_model_policy(tier: str, requested_primary: str,
+                         requested_fallback: str) -> dict:
+    """Resolve deterministic free/paid model policy without making an API call."""
+    if tier not in ("free", "paid"):
+        raise ValueError("tier must be free or paid")
+    primary = requested_primary
+    fallback = requested_fallback
+    overrides = []
+    if tier == "free":
+        if primary not in FREE_TIER_MODELS:
+            overrides.append(
+                f"Primary `{primary}` is not approved for free mode; "
+                f"using `{DEFAULT_MODEL}`."
+            )
+            primary = DEFAULT_MODEL
+        if fallback not in FREE_TIER_MODELS:
+            overrides.append(
+                f"Fallback `{fallback}` is not approved for free mode; "
+                f"using `{DEFAULT_FALLBACK_MODEL}`."
+            )
+            fallback = DEFAULT_FALLBACK_MODEL
+    if fallback == primary:
+        replacement = (
+            DEFAULT_FALLBACK_MODEL
+            if primary != DEFAULT_FALLBACK_MODEL else DEFAULT_MODEL
+        )
+        if tier == "paid" or replacement in FREE_TIER_MODELS:
+            overrides.append(
+                f"Fallback matched primary; using distinct `{replacement}`."
+            )
+            fallback = replacement
+    return {
+        "tier": tier,
+        "requested_primary": requested_primary,
+        "requested_fallback": requested_fallback,
+        "primary": primary,
+        "fallback": fallback,
+        "overrides": overrides,
+    }
+
+
+def check_setup(tier: str = DEFAULT_TIER, verbose: bool = True) -> bool:
+    ok = True
+    try:
+        from google import genai  # noqa: F401
+    except ImportError:
+        ok = False
+        if verbose:
+            print("MISSING: google-genai (pip install google-genai).")
+    try:
+        import dotenv  # noqa: F401
+    except ImportError:
+        ok = False
+        if verbose:
+            print("MISSING: python-dotenv (pip install python-dotenv).")
+    try:
+        import youtube_transcript_api  # noqa: F401
+    except ImportError:
+        ok = False
+        if verbose:
+            print(
+                "MISSING: youtube-transcript-api "
+                "(pip install youtube-transcript-api)."
+            )
+    if ok:
+        load_env_files()
+        key_name = api_key_name(tier)
+        if os.environ.get(key_name):
+            if verbose:
+                print(f"OK: {key_name} is set (value not displayed).")
+        else:
+            ok = False
+            if verbose:
+                print(f"MISSING: {key_name} is not set.")
+    if verbose:
+        print("Setup check passed. No API call was made." if ok else SETUP_TASK_HINT)
+    return ok
+
+
+def selected_phase_defs(deep_summary: bool, technical: bool,
+                        coding_video: bool) -> list[dict]:
+    if technical and not coding_video:
+        raise ValueError("--technical requires --coding-video")
+    phases = [PHASE_DEFS["procedure"]]
+    if deep_summary:
+        phases.append(PHASE_DEFS["deep_summary"])
+    if technical:
+        phases.append(PHASE_DEFS["technical"])
+    return phases
+
+
+def build_prompts_doc() -> str:
+    sections = [
+        "# Video-to-Action — Orchestrator Prompts (Template)", "",
+        "Auto-generated from `scripts/video_to_action.py` by `--dump-prompts`.",
+        "Free tier is the non-blocking default. The primary model is",
+        f"`{DEFAULT_MODEL}` and the one-attempt fallback after three recognized",
+        f"transient primary failures is `{DEFAULT_FALLBACK_MODEL}`.", "",
+        "The Procedure call always runs. Deep Summary is opt-in. Technical is",
+        "opt-in and requires an explicit coding/software relevance confirmation.",
+        "Choices already present in the request are reused without reconfirmation.",
+        "Per-run prompts.md stores each exact selected prompt once and associates",
+        "all sanitized model-attempt provenance with that prompt.", "",
+    ]
+    for key in ("procedure", "deep_summary", "technical"):
+        pd = PHASE_DEFS[key]
+        qualifier = {
+            "procedure": "always",
+            "deep_summary": "opt-in",
+            "technical": "opt-in; coding/software only",
+        }[key]
+        sections += [f"## {pd['title']} ({qualifier})", "", "```text",
+                     pd["prompt"], "```", ""]
+    return "\n".join(sections)
+
+
+def dump_prompts() -> Path:
+    target = Path(__file__).resolve().parent.parent / "PROMPTS.md"
+    target.write_text(build_prompts_doc(), encoding="utf-8")
+    return target
+
+
+def parse_offset(value: str) -> str:
+    value = value.strip()
+    if re.fullmatch(r"\d+", value):
+        return f"{value}s"
+    parts = value.split(":")
+    if len(parts) in (2, 3) and all(re.fullmatch(r"\d+", p) for p in parts):
+        seconds = 0
+        for part in parts:
+            seconds = seconds * 60 + int(part)
+        return f"{seconds}s"
+    raise argparse.ArgumentTypeError("use seconds, MM:SS, or HH:MM:SS")
+
+
+def normalize_duration(value: str) -> str:
+    """Validate MM:SS or HH:MM:SS and return a zero-padded value."""
+    value = value.strip()
+    short = re.fullmatch(r"(\d{1,2}):([0-5]\d)", value)
+    if short:
+        return f"{int(short.group(1)):02d}:{int(short.group(2)):02d}"
+    long = re.fullmatch(r"(\d{1,3}):([0-5]\d):([0-5]\d)", value)
+    if long:
+        return (f"{int(long.group(1)):02d}:{int(long.group(2)):02d}:"
+                f"{int(long.group(3)):02d}")
+    raise argparse.ArgumentTypeError("duration must be MM:SS or HH:MM:SS")
+
+
+def demote_embedded_headings(text: str, block: str) -> str:
+    """Demote selected H2 headings outside fenced code blocks only."""
+    lines = text.splitlines()
+    in_fence = False
+    fence_marker = None
+    output = []
+    for line in lines:
+        stripped = line.lstrip()
+        marker = stripped[:3]
+        if marker in ("```", "~~~"):
+            if not in_fence:
+                in_fence = True
+                fence_marker = marker
+            elif marker == fence_marker:
+                in_fence = False
+                fence_marker = None
+            output.append(line)
+            continue
+        if not in_fence:
+            if block == "procedure" and line in ("## Overview", "## Steps"):
+                line = "#" + line
+            elif block == "procedure" and (
+                    re.match(r"^### \d+(?:\.\)|\)) ", line) or
+                    line.startswith("### STEP ")):
+                line = "#" + line
+            elif block == "deep_summary" and (
+                    line.startswith("## 🎭 ACT ") or
+                    line.startswith("## 🎭 FINAL ACT:")):
+                line = "#" + line
+        output.append(line)
+    return "\n".join(output)
+
+def sanitize_title(text: str, fallback: str = "video") -> str:
+    text = re.sub(r'[<>:"/\\|?*\x00-\x1f]', "-", text)
+    text = re.sub(r"[^\w\s()-]", "", text)
+    text = re.sub(r"\s+", " ", text)
+    text = re.sub(r"-{2,}", "-", text).strip()[:70].rstrip(" .-")
+    return text or fallback
+
+
+def parse_youtube_video_id(url: str) -> str:
+    """Return a validated video ID from supported public YouTube URL forms."""
+    parsed = urlparse(url.strip())
+    host = (parsed.hostname or "").lower()
+    if host.startswith("www."):
+        host = host[4:]
+    if host.startswith("m."):
+        host = host[2:]
+
+    video_id = ""
+    parts = [part for part in parsed.path.split("/") if part]
+    if host == "youtu.be" and parts:
+        video_id = parts[0]
+    elif host in ("youtube.com", "music.youtube.com"):
+        if parsed.path == "/watch":
+            video_id = parse_qs(parsed.query).get("v", [""])[0]
+        elif len(parts) >= 2 and parts[0] in ("shorts", "embed"):
+            video_id = parts[1]
+
+    if not re.fullmatch(r"[A-Za-z0-9_-]{11}", video_id):
+        raise ValueError(
+            "a supported public YouTube URL with a valid video ID is required"
+        )
+    return video_id
+
+
+def is_youtube_url(url: str) -> bool:
+    try:
+        parse_youtube_video_id(url)
+        return True
+    except ValueError:
+        return False
+
+
+def select_transcript_track(transcripts) -> object:
+    """Prefer original manual tracks, then original generated tracks."""
+    tracks = list(transcripts)
+    if not tracks:
+        raise LookupError("no caption tracks are available")
+
+    def is_english(track) -> bool:
+        return str(getattr(track, "language_code", "")).lower().startswith("en")
+
+    groups = (
+        [track for track in tracks if not track.is_generated and is_english(track)],
+        [track for track in tracks if not track.is_generated and not is_english(track)],
+        [track for track in tracks if track.is_generated and is_english(track)],
+        [track for track in tracks if track.is_generated and not is_english(track)],
+    )
+    return next(group[0] for group in groups if group)
+
+
+def fetch_transcript(url: str, api_factory=None) -> dict:
+    """Fetch one original caption track and return a failure-isolated result."""
+    video_id = parse_youtube_video_id(url)
+    try:
+        if api_factory is None:
+            from youtube_transcript_api import YouTubeTranscriptApi
+            api_factory = YouTubeTranscriptApi
+        api = api_factory()
+        track = select_transcript_track(api.list(video_id))
+        fetched = track.fetch()
+        snippets = [
+            {
+                "text": snippet.text,
+                "start": float(snippet.start),
+                "duration": float(snippet.duration),
+            }
+            for snippet in fetched
+        ]
+        if not snippets:
+            raise LookupError("the selected caption track is empty")
+        return {
+            "status": "complete",
+            "video_id": video_id,
+            "language": track.language,
+            "language_code": track.language_code,
+            "is_generated": bool(track.is_generated),
+            "snippets": snippets,
+        }
+    except Exception as exc:  # noqa: BLE001 - every caption failure is isolated
+        unavailable = {
+            "NoTranscriptFound", "TranscriptsDisabled", "VideoUnavailable",
+            "NoTranscriptAvailable", "LookupError",
+        }
+        status = "unavailable" if type(exc).__name__ in unavailable else "failed"
+        return {
+            "status": status,
+            "video_id": video_id,
+            "reason": f"{type(exc).__name__}: {exc}",
+            "snippets": [],
+        }
+
+
+def format_timestamp(seconds: float) -> str:
+    milliseconds = max(0, round(seconds * 1000))
+    hours, remainder = divmod(milliseconds, 3_600_000)
+    minutes, remainder = divmod(remainder, 60_000)
+    secs, millis = divmod(remainder, 1000)
+    return f"{hours:02d}:{minutes:02d}:{secs:02d}.{millis:03d}"
+
+
+def build_transcript_doc(title: str, url: str, result: dict) -> str:
+    """Render an automatic transcript or an honest manual-recovery artifact."""
+    status = result["status"]
+    lines = [
+        f"# {title} — Video Transcript", "", "## Transcript Metadata", "",
+        f"- **Source:** {url}",
+        f"- **Video ID:** {result['video_id']}",
+    ]
+    if status == "complete":
+        track_type = (
+            "Automatically generated" if result["is_generated"] else "Manual"
+        )
+        lines += [
+            "- **Status:** Complete via automatic retrieval",
+            "- **Automatic retrieval:** Complete",
+            f"- **Language:** {result['language']} ({result['language_code']})",
+            f"- **Caption track:** {track_type}",
+            "- **Manual source:** Not used", "",
+            "## Accuracy Note", "",
+            "This is the available YouTube caption track, not a human-verified",
+            "transcription of the audio. Automatic captions may contain recognition",
+            "errors, missing punctuation, absent speaker labels, and awkward breaks.",
+            "", "## Transcript", "",
+        ]
+        for snippet in result["snippets"]:
+            end = snippet["start"] + snippet["duration"]
+            lines.append(
+                f"[{format_timestamp(snippet['start'])}–{format_timestamp(end)}] "
+                f"{snippet['text']}"
+            )
+    else:
+        automatic_label = "Unavailable" if status == "unavailable" else "Failed"
+        lines += [
+            "- **Status:** Manual recovery required",
+            f"- **Automatic retrieval:** {automatic_label}",
+            f"- **Automatic failure reason:** {result['reason']}",
+            "- **Manual source:** Not yet supplied", "",
+            MANUAL_RECOVERY_START,
+            "## Manual Recovery", "",
+            "Automatic caption retrieval did not complete. To recover manually:", "",
+            f"1. Open {MANUAL_TRANSCRIPT_URL}",
+            "2. Paste the original YouTube URL and generate the transcript.",
+            "3. Copy the transcript itself; do not provide only the generated page URL.",
+            "4. Give the copied transcript to the agent for this run.",
+            "5. The helper will replace these instructions while preserving the",
+            "   automatic-failure provenance above.", "",
+            "Manual transcript pending.",
+            MANUAL_RECOVERY_END,
+        ]
+    return "\n".join(lines) + "\n"
+
+
+def complete_manual_transcript(transcript_path: Path, manual_path: Path) -> Path:
+    """Complete a failed transcript artifact without rerunning Gemini."""
+    existing = transcript_path.read_text(encoding="utf-8")
+    manual_text = manual_path.read_text(encoding="utf-8").strip()
+    if not manual_text:
+        raise ValueError("manual transcript file is empty")
+    pattern = re.compile(
+        rf"{re.escape(MANUAL_RECOVERY_START)}.*?{re.escape(MANUAL_RECOVERY_END)}",
+        re.DOTALL,
+    )
+    if not pattern.search(existing):
+        raise ValueError(
+            "transcript does not contain a pending manual-recovery block"
+        )
+    completed = existing.replace(
+        "- **Status:** Manual recovery required",
+        "- **Status:** Complete via manual fallback",
+        1,
+    ).replace(
+        "- **Manual source:** Not yet supplied",
+        f"- **Manual source:** User-supplied copy from {MANUAL_TRANSCRIPT_URL}",
+        1,
+    )
+    completed = pattern.sub(
+        "## Accuracy Note\n\n"
+        "This transcript was supplied by the user from a third-party caption "
+        "tool and is preserved as supplied. The automatic retrieval result "
+        "remains recorded above.\n\n## Transcript\n\n" + manual_text,
+        completed,
+        count=1,
+    )
+    transcript_path.write_text(completed.rstrip() + "\n", encoding="utf-8")
+    return transcript_path
+
+
+def inject_ground_truth(prompt: str, title: str, duration: str,
+                        include_title: bool) -> str:
+    duration_rule = (
+        f"This video's exact total length is {duration}; use it verbatim as the "
+        f"Length, and ensure every timestamp falls within 00:00–{duration}."
+    )
+    if include_title:
+        title_rule = (f'The exact video title is: "{title}". Use it verbatim. '
+                      "It is user-supplied and authoritative.")
+        return f"{title_rule}\n{duration_rule}\n\n{prompt}"
+    return f"{duration_rule}\n\n{prompt}"
+
+
+def build_effective_prompts(phase_defs: list[dict], title: str,
+                            duration: str) -> list[dict]:
+    effective = []
+    for pd in phase_defs:
+        prompt = pd["prompt"]
+        if pd["key"] in ("procedure", "deep_summary"):
+            prompt = inject_ground_truth(
+                prompt, title, duration, include_title=pd["key"] == "procedure")
+        effective.append({**pd, "prompt": prompt})
+    return effective
+
+
+def run_phase(client, model: str, url: str, prompt: str,
+              start: str | None, end: str | None, low_res: bool) -> str:
+    from google.genai import types
+    metadata = {}
+    if start:
+        metadata["start_offset"] = start
+    if end:
+        metadata["end_offset"] = end
+    file_args = {"file_data": types.FileData(file_uri=url)}
+    if metadata:
+        file_args["video_metadata"] = types.VideoMetadata(**metadata)
+    config = None
+    if low_res:
+        config = types.GenerateContentConfig(
+            media_resolution=types.MediaResolution.MEDIA_RESOLUTION_LOW)
+    response = client.models.generate_content(
+        model=model,
+        contents=types.Content(parts=[types.Part(**file_args), types.Part(text=prompt)]),
+        config=config,
+    )
+    return response.text or ""
+
+
+def structured_error_code(exc: Exception) -> int | None:
+    """Return a structured HTTP-style status code when the SDK exposes one."""
+    for attribute in ("status_code", "code"):
+        value = getattr(exc, attribute, None)
+        if callable(value):
+            continue
+        value = getattr(value, "value", value)
+        if isinstance(value, int):
+            return value
+        match = re.fullmatch(r"\s*(\d{3})\s*", str(value or ""))
+        if match:
+            return int(match.group(1))
+    return None
+
+
+def sanitize_error(exc: Exception) -> str:
+    """Bound error provenance and redact credential-shaped or configured values."""
+    message = f"{type(exc).__name__}: {exc}"
+    for key_name in ("GEMINI_API_KEY", "GEMINI_API_KEY_PAID"):
+        value = os.environ.get(key_name)
+        if value:
+            message = message.replace(value, "[REDACTED]")
+    message = re.sub(r"AIza[A-Za-z0-9_-]{20,}", "[REDACTED]", message)
+    message = re.sub(
+        r"([?&](?:key|api_key)=)[^&\s]+", r"\1[REDACTED]", message,
+        flags=re.IGNORECASE,
+    )
+    return message.replace("\r", " ").replace("\n", " ")[:500]
+
+
+def is_transient_capacity_error(exc: Exception) -> bool:
+    """Retry only recognized temporary capacity failures; never generic 429s."""
+    code = structured_error_code(exc)
+    status = str(getattr(exc, "status", "") or "").upper()
+    if code == 503 or status == "UNAVAILABLE":
+        return True
+    if code is not None:
+        return False
+    message = str(exc)
+    return bool(
+        re.search(r"\b503\b", message)
+        and re.search(
+            r"UNAVAILABLE|high demand|overload|temporar(?:y|ily)",
+            message,
+            flags=re.IGNORECASE,
+        )
+    )
+
+
+def execute_phase_with_recovery(pd: dict, runner, policy: dict,
+                                sleeper=time.sleep) -> tuple[str | None, list]:
+    """Run one phase with three primary attempts and one bounded fallback."""
+    attempts = []
+    primary_exhausted_transiently = False
+    for attempt_number in range(1, PRIMARY_ATTEMPTS + 1):
+        try:
+            text = runner(pd, policy["primary"])
+            if not text.strip():
+                raise RuntimeError("empty response")
+            attempts.append({
+                "phase": pd["key"], "role": "primary",
+                "attempt": attempt_number, "attempt_limit": PRIMARY_ATTEMPTS,
+                "model": policy["primary"], "status": "success",
+            })
+            return text, attempts
+        except Exception as exc:  # noqa: BLE001
+            transient = is_transient_capacity_error(exc)
+            attempts.append({
+                "phase": pd["key"], "role": "primary",
+                "attempt": attempt_number, "attempt_limit": PRIMARY_ATTEMPTS,
+                "model": policy["primary"], "status": "failed",
+                "transient": transient, "error": sanitize_error(exc),
+            })
+            if not transient:
+                return None, attempts
+            if attempt_number < PRIMARY_ATTEMPTS:
+                sleeper(PRIMARY_BACKOFF_SECONDS[attempt_number - 1])
+            else:
+                primary_exhausted_transiently = True
+
+    if primary_exhausted_transiently:
+        try:
+            text = runner(pd, policy["fallback"])
+            if not text.strip():
+                raise RuntimeError("empty response")
+            attempts.append({
+                "phase": pd["key"], "role": "fallback",
+                "attempt": 1, "attempt_limit": 1,
+                "model": policy["fallback"], "status": "success",
+            })
+            return text, attempts
+        except Exception as exc:  # noqa: BLE001
+            attempts.append({
+                "phase": pd["key"], "role": "fallback",
+                "attempt": 1, "attempt_limit": 1,
+                "model": policy["fallback"], "status": "failed",
+                "transient": is_transient_capacity_error(exc),
+                "error": sanitize_error(exc),
+            })
+    return None, attempts
+
+
+def execute_phases(effective: list[dict], runner, policy: dict,
+                   sleeper=time.sleep) -> tuple[dict, list, list, dict]:
+    results, errors, attempts, successful_models = {}, [], [], {}
+    for pd in effective:
+        text, phase_attempts = execute_phase_with_recovery(
+            pd, runner, policy, sleeper=sleeper
+        )
+        attempts.extend(phase_attempts)
+        if text is not None:
+            results[pd["key"]] = text
+            successful_models[pd["key"]] = phase_attempts[-1]["model"]
+        else:
+            final_attempt = phase_attempts[-1]
+            errors.append({
+                "phase": pd["key"],
+                "error": final_attempt.get("error", "phase failed"),
+            })
+    return results, errors, attempts, successful_models
+
+
+def build_attempt_provenance(attempts: list[dict]) -> list[str]:
+    lines = []
+    for item in attempts:
+        label = (
+            f"{item['role']} {item['attempt']}/{item['attempt_limit']}"
+        )
+        if item["status"] == "success":
+            outcome = "success"
+        else:
+            classification = (
+                "transient capacity" if item.get("transient")
+                else "non-retryable"
+            )
+            outcome = f"{classification} failure — {item['error']}"
+        lines.append(
+            f"- `{item['phase']}` — {label} — `{item['model']}` — {outcome}"
+        )
+    return lines
+
+
+def compile_report(title: str, duration: str, url: str, intent: str,
+                   policy: dict, phases_run: list[str], results: dict,
+                   errors: list, attempts: list[dict],
+                   successful_models: dict) -> str:
+    status = "failed" if not results else ("partial" if errors else "complete")
+    success_text = ", ".join(
+        f"{phase}={model}" for phase, model in successful_models.items()
+    ) or "none"
+    lines = [
+        f"# {title} — Video Extraction Report", "", "## Report Metadata", "",
+        f"- **Source:** {url}",
+        f"- **Duration:** {duration}",
+        f"- **Extracted:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+        f"- **Intent:** {intent}",
+        f"- **API tier policy:** {policy['tier']}",
+        f"- **Primary model:** {policy['primary']}",
+        f"- **Fallback model:** {policy['fallback']}",
+        f"- **Successful models:** {success_text}",
+        f"- **Calls selected:** {', '.join(phases_run)}",
+        f"- **Status:** {status}", "",
+    ]
+    if policy["overrides"]:
+        lines += ["## Preflight Policy Overrides", ""]
+        lines += [f"- {item}" for item in policy["overrides"]]
+        lines.append("")
+    lines += ["## Model Attempt Provenance", ""]
+    lines += build_attempt_provenance(attempts)
+    lines += ["", "## Procedure", "",
+        demote_embedded_headings(
+            results.get("procedure", "Procedure extraction failed; see Extraction Errors."),
+            "procedure"), "",
+    ]
+    if "technical" in results:
+        lines += ["### Code, Commands & Configuration", "", results["technical"], ""]
+    lines += ["## Detailed Summary", ""]
+    deep_summary_selected = "deep_summary" in phases_run
+    if "deep_summary" in results:
+        lines += [demote_embedded_headings(results["deep_summary"], "deep_summary"), ""]
+    elif deep_summary_selected:
+        lines += ["Deep Summary extraction failed; see Extraction Errors.", ""]
+    else:
+        lines += ["Not selected for this run.", ""]
+    if errors:
+        lines += ["## Extraction Errors", ""]
+        lines += [f"- Phase `{e['phase']}` failed: {e['error']}" for e in errors]
+        lines.append("")
+    lines += [
+        "## Notes", "",
+        "- Gemini produced all extracted video content; the orchestrating agent did not synthesize it.",
+        "- Primary retries and fallback attempts reuse the exact phase prompt shown in prompts.md.",
+        "- Verify code and LOW CONFIDENCE items against the referenced timestamps.",
+        "- Acting on extracted steps requires separate user authorization.", "",
+    ]
+    return "\n".join(lines)
+
+
+def build_run_prompts_doc(url: str, policy: dict, resolution: str, clip: str,
+                          title: str, duration: str, effective: list[dict],
+                          attempts: list[dict], successful_models: dict) -> str:
+    success_text = ", ".join(
+        f"{phase}={model}" for phase, model in successful_models.items()
+    ) or "none"
+    lines = [
+        "# Prompts sent this run", "", f"**Source:** {url}",
+        f"**API tier policy:** {policy['tier']}",
+        f"**Requested primary model:** {policy['requested_primary']}",
+        f"**Primary model used:** {policy['primary']}",
+        f"**Requested fallback model:** {policy['requested_fallback']}",
+        f"**Fallback model used:** {policy['fallback']}",
+        f"**Successful models:** {success_text}",
+        f"**Resolution:** {resolution}", f"**Clip:** {clip}",
+        f"**Title supplied:** {title}", f"**Duration supplied:** {duration}",
+        f"**Calls selected:** {', '.join(pd['key'] for pd in effective)}", "",
+        "## Model Attempt Provenance", "",
+    ]
+    lines += build_attempt_provenance(attempts)
+    if policy["overrides"]:
+        lines += ["", "## Preflight Policy Overrides", ""]
+        lines += [f"- {item}" for item in policy["overrides"]]
+    lines.append("")
+    for pd in effective:
+        lines += [f"## {pd['title']}", "", "```text", pd["prompt"], "```", ""]
+    return "\n".join(lines)
+
+def save_outputs(output_base: Path, title: str, duration: str, url: str,
+                 intent: str, policy: dict, effective: list[dict],
+                 results: dict, errors: list, attempts: list[dict],
+                 successful_models: dict, transcript_result: dict,
+                 resolution: str, clip: str, run_ts: str | None = None) -> Path:
+    run_ts = run_ts or datetime.now().strftime("%Y%m%d-%H%M%S-%f")
+    output_dir = output_base / f"{run_ts} - {sanitize_title(title)}"
+    output_dir.mkdir(parents=True, exist_ok=False)
+    phases = [pd["key"] for pd in effective]
+    report_path = output_dir / "report.md"
+    report_path.write_text(
+        compile_report(
+            title, duration, url, intent, policy, phases, results, errors,
+            attempts, successful_models,
+        ),
+        encoding="utf-8",
+    )
+    (output_dir / "prompts.md").write_text(
+        build_run_prompts_doc(
+            url, policy, resolution, clip, title, duration, effective,
+            attempts, successful_models,
+        ),
+        encoding="utf-8",
+    )
+    (output_dir / "transcript.md").write_text(
+        build_transcript_doc(title, url, transcript_result), encoding="utf-8"
+    )
+    (output_base / "latest.json").write_text(json.dumps({
+        "latest_run": run_ts, "run_dir": str(output_dir), "url": url,
+        "title": title, "duration": duration, "intent": intent,
+        "tier": policy["tier"], "primary_model": policy["primary"],
+        "fallback_model": policy["fallback"],
+        "successful_models": successful_models,
+        "completed": bool(results),
+        "timestamp": datetime.now().isoformat(),
+    }, indent=2, ensure_ascii=False), encoding="utf-8")
+    return report_path
+
+
+def run_extraction(url: str, intent: str, requested_model: str,
+                   requested_fallback_model: str, tier: str,
+                   start: str | None, end: str | None, low_res: bool,
+                   output_base: Path, title: str, duration: str,
+                   deep_summary: bool, technical: bool,
+                   coding_video: bool) -> int:
+    from google import genai
+    policy = resolve_model_policy(
+        tier, requested_model, requested_fallback_model
+    )
+    phases = selected_phase_defs(deep_summary, technical, coding_video)
+    effective = build_effective_prompts(phases, title, duration)
+    load_env_files()
+    key_name = api_key_name(tier)
+    client = genai.Client(api_key=os.environ[key_name])
+    print(
+        f"Video-to-Action — {len(effective)} selected phase(s); "
+        f"{tier}-tier policy; primary {policy['primary']}; "
+        f"fallback {policy['fallback']}"
+    )
+    if tier == "free":
+        print("Preflight: free tier is the non-blocking default for this run.")
+    for override in policy["overrides"]:
+        print(f"Preflight override: {override}")
+
+    def runner(pd, selected_model):
+        print(f"  Phase: {pd['title']} — model {selected_model} ...")
+        return run_phase(
+            client, selected_model, url, pd["prompt"], start, end, low_res
+        )
+
+    results, errors, attempts, successful_models = execute_phases(
+        effective, runner, policy
+    )
+    transcript_result = fetch_transcript(url)
+    resolution = "low" if low_res else "default"
+    clip = f"{start or 'start'} -> {end or 'end'}" if start or end else "full video"
+    report_path = save_outputs(
+        output_base, title, duration, url, intent, policy, effective,
+        results, errors, attempts, successful_models, transcript_result,
+        resolution, clip,
+    )
+    print(f"Saved: {report_path}")
+    return 0 if results else 1
+
+def run_self_test() -> bool:
+    fixture_root = Path.cwd() / "tmp"
+    fixture_root.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(dir=fixture_root) as temp:
+        base = Path(temp)
+        assert DEFAULT_MODEL == "gemini-3.6-flash"
+        assert DEFAULT_FALLBACK_MODEL == "gemini-3.5-flash"
+        assert normalize_duration("4:05") == "04:05"
+        assert normalize_duration("1:02:03") == "01:02:03"
+        for invalid in ("4", "4:5", "04:60", "1:60:00", "abc"):
+            try:
+                normalize_duration(invalid)
+                raise AssertionError(f"invalid duration accepted: {invalid}")
+            except argparse.ArgumentTypeError:
+                pass
+
+        expected_id = "0-QDPnEIkvw"
+        url_forms = (
+            f"https://www.youtube.com/watch?v={expected_id}",
+            f"https://youtu.be/{expected_id}",
+            f"https://youtube.com/shorts/{expected_id}",
+            f"https://youtube.com/embed/{expected_id}",
+        )
+        assert all(parse_youtube_video_id(url) == expected_id for url in url_forms)
+        for invalid_url in ("https://example.com/watch?v=0-QDPnEIkvw", "bad"):
+            try:
+                parse_youtube_video_id(invalid_url)
+                raise AssertionError(f"invalid YouTube URL accepted: {invalid_url}")
+            except ValueError:
+                pass
+
+        phase_counts = [
+            len(selected_phase_defs(False, False, False)),
+            len(selected_phase_defs(True, False, False)),
+            len(selected_phase_defs(True, True, True)),
+        ]
+        assert phase_counts == [1, 2, 3]
+        try:
+            selected_phase_defs(False, True, False)
+            raise AssertionError("technical relevance gate failed")
+        except ValueError:
+            pass
+
+        free_policy = resolve_model_policy(
+            "free", DEFAULT_MODEL, DEFAULT_FALLBACK_MODEL
+        )
+        assert free_policy["primary"] == "gemini-3.6-flash"
+        assert free_policy["fallback"] == "gemini-3.5-flash"
+        free_override = resolve_model_policy(
+            "free", "gemini-paid-only", "gemini-other-paid"
+        )
+        assert free_override["primary"] == DEFAULT_MODEL
+        assert free_override["fallback"] == DEFAULT_FALLBACK_MODEL
+        assert len(free_override["overrides"]) == 2
+        paid_policy = resolve_model_policy(
+            "paid", "gemini-paid-only", "gemini-paid-fallback"
+        )
+        assert paid_policy["primary"] == "gemini-paid-only"
+        assert paid_policy["fallback"] == "gemini-paid-fallback"
+
+        class FakeSdkError(Exception):
+            def __init__(self, message, code, status=""):
+                super().__init__(message)
+                self.code = code
+                self.status = status
+
+        procedure_def = PHASE_DEFS["procedure"]
+        retry_models, retry_sleeps = [], []
+        retry_outcomes = [
+            FakeSdkError("high demand", 503, "UNAVAILABLE"),
+            FakeSdkError("high demand", 503, "UNAVAILABLE"),
+            "primary success",
+        ]
+
+        def retry_runner(pd, model):
+            retry_models.append(model)
+            outcome = retry_outcomes.pop(0)
+            if isinstance(outcome, Exception):
+                raise outcome
+            return outcome
+
+        retry_text, retry_attempts = execute_phase_with_recovery(
+            procedure_def, retry_runner, free_policy,
+            sleeper=retry_sleeps.append,
+        )
+        assert retry_text == "primary success"
+        assert retry_models == [DEFAULT_MODEL] * 3
+        assert retry_sleeps == list(PRIMARY_BACKOFF_SECONDS)
+        assert len(retry_attempts) == 3
+
+        fallback_models = []
+        fallback_outcomes = [
+            FakeSdkError("high demand", 503, "UNAVAILABLE"),
+            FakeSdkError("high demand", 503, "UNAVAILABLE"),
+            FakeSdkError("high demand", 503, "UNAVAILABLE"),
+            "fallback success",
+        ]
+
+        def fallback_runner(pd, model):
+            fallback_models.append(model)
+            outcome = fallback_outcomes.pop(0)
+            if isinstance(outcome, Exception):
+                raise outcome
+            return outcome
+
+        fallback_text, fallback_attempts = execute_phase_with_recovery(
+            procedure_def, fallback_runner, free_policy, sleeper=lambda _: None
+        )
+        assert fallback_text == "fallback success"
+        assert fallback_models == [DEFAULT_MODEL] * 3 + [DEFAULT_FALLBACK_MODEL]
+        assert len(fallback_attempts) == 4
+        assert fallback_attempts[-1]["role"] == "fallback"
+
+        exhausted_outcomes = [
+            FakeSdkError("primary unavailable", 503, "UNAVAILABLE"),
+            FakeSdkError("primary unavailable", 503, "UNAVAILABLE"),
+            FakeSdkError("primary unavailable", 503, "UNAVAILABLE"),
+            FakeSdkError("fallback unavailable", 503, "UNAVAILABLE"),
+        ]
+
+        def exhausted_runner(pd, model):
+            raise exhausted_outcomes.pop(0)
+
+        exhausted_text, exhausted_attempts = execute_phase_with_recovery(
+            procedure_def, exhausted_runner, free_policy, sleeper=lambda _: None
+        )
+        assert exhausted_text is None
+        assert len(exhausted_attempts) == 4
+        assert exhausted_attempts[-1]["role"] == "fallback"
+        assert exhausted_attempts[-1]["status"] == "failed"
+
+        for code in (401, 429):
+            nonretry_models = []
+
+            def nonretry_runner(pd, model, error_code=code):
+                nonretry_models.append(model)
+                raise FakeSdkError("not retryable", error_code)
+
+            text_result, attempt_result = execute_phase_with_recovery(
+                procedure_def, nonretry_runner, free_policy,
+                sleeper=lambda _: None,
+            )
+            assert text_result is None
+            assert len(nonretry_models) == 1
+            assert len(attempt_result) == 1
+            assert not attempt_result[0]["transient"]
+
+        configured_secret = os.environ.get("GEMINI_API_KEY")
+        try:
+            os.environ["GEMINI_API_KEY"] = "AIzaFixtureSecretValueThatMustNeverAppear"
+            redacted = sanitize_error(FakeSdkError(
+                "key=AIzaFixtureSecretValueThatMustNeverAppear", 503
+            ))
+            assert "FixtureSecret" not in redacted
+            assert "[REDACTED]" in redacted
+        finally:
+            if configured_secret is None:
+                os.environ.pop("GEMINI_API_KEY", None)
+            else:
+                os.environ["GEMINI_API_KEY"] = configured_secret
+
+        class Snippet:
+            def __init__(self, text, start, duration):
+                self.text, self.start, self.duration = text, start, duration
+
+        class Track:
+            def __init__(self, language, code, generated, snippets):
+                self.language = language
+                self.language_code = code
+                self.is_generated = generated
+                self._snippets = snippets
+
+            def fetch(self):
+                return self._snippets
+
+        manual_spanish = Track(
+            "Spanish", "es", False, [Snippet("Hola", 0.08, 1.5)]
+        )
+        generated_english = Track(
+            "English", "en", True, [Snippet("Hello", 0.08, 1.5)]
+        )
+
+        class FakeApi:
+            def list(self, video_id):
+                assert video_id == expected_id
+                return [generated_english, manual_spanish]
+
+        successful_transcript = fetch_transcript(url_forms[0], FakeApi)
+        assert successful_transcript["status"] == "complete"
+        assert successful_transcript["language_code"] == "es"
+        assert not successful_transcript["is_generated"]
+
+        class TranscriptsDisabled(Exception):
+            pass
+
+        class DisabledApi:
+            def list(self, video_id):
+                raise TranscriptsDisabled("captions disabled")
+
+        unavailable_transcript = fetch_transcript(url_forms[0], DisabledApi)
+        assert unavailable_transcript["status"] == "unavailable"
+
+        class RequestBlocked(Exception):
+            pass
+
+        class BlockedApi:
+            def list(self, video_id):
+                raise RequestBlocked("request blocked")
+
+        blocked_transcript = fetch_transcript(url_forms[0], BlockedApi)
+        assert blocked_transcript["status"] == "failed"
+
+        duration = "14:34"
+        procedure_result = (
+            "## Overview\n### 1.) Video Title and Length\n#### Overview detail\n"
+            "```markdown\n## Overview\n### 2.) Fenced child\n## Steps\n```\n"
+            "## Steps\n### STEP 1: Fixture\n#### Step detail"
+        )
+        acts = (
+            "## 🎭 ACT I: Start\n### Act child\n#### Act detail\n"
+            "```markdown\n## 🎭 ACT II: Code sample\n```\n"
+            "## 🎭 FINAL ACT: Key Takeaways"
+        )
+
+        omitted_effective = build_effective_prompts(
+            selected_phase_defs(False, False, False), "Omitted Fixture", duration
+        )
+        omitted_results, omitted_errors, omitted_attempts, omitted_models = (
+            execute_phases(
+                omitted_effective,
+                lambda pd, model: procedure_result,
+                free_policy,
+                sleeper=lambda _: None,
+            )
+        )
+        omitted_path = save_outputs(
+            base / "omitted", "Omitted Fixture", duration, url_forms[0],
+            "summarize", free_policy, omitted_effective, omitted_results,
+            omitted_errors, omitted_attempts, omitted_models,
+            unavailable_transcript, "default", "full video",
+            run_ts="20000101-000001",
+        )
+        omitted_text = omitted_path.read_text(encoding="utf-8")
+        omitted_transcript = omitted_path.with_name("transcript.md")
+        assert "Not selected for this run." in omitted_text
+        assert "Manual recovery required" in omitted_transcript.read_text(
+            encoding="utf-8"
+        )
+
+        manual_input = base / "manual-input.txt"
+        manual_input.write_text("00:00 Manual fallback text.", encoding="utf-8")
+        complete_manual_transcript(omitted_transcript, manual_input)
+        completed_manual = omitted_transcript.read_text(encoding="utf-8")
+        assert "Complete via manual fallback" in completed_manual
+        assert "Automatic failure reason" in completed_manual
+        assert "00:00 Manual fallback text." in completed_manual
+        assert MANUAL_RECOVERY_START not in completed_manual
+
+        isolated_effective = build_effective_prompts(
+            selected_phase_defs(True, True, True), "Isolated Fixture", duration
+        )
+
+        def isolated_runner(pd, model):
+            if pd["key"] == "deep_summary":
+                raise FakeSdkError("invalid fixture", 400)
+            return procedure_result if pd["key"] == "procedure" else "fixture technical"
+
+        isolated_results, isolated_errors, isolated_attempts, isolated_models = (
+            execute_phases(
+                isolated_effective, isolated_runner, free_policy,
+                sleeper=lambda _: None,
+            )
+        )
+        assert set(isolated_results) == {"procedure", "technical"}
+        assert [item["phase"] for item in isolated_errors] == ["deep_summary"]
+        isolated_path = save_outputs(
+            base / "isolated", "Isolated Fixture", duration, url_forms[0],
+            "summarize", free_policy, isolated_effective, isolated_results,
+            isolated_errors, isolated_attempts, isolated_models,
+            blocked_transcript, "default", "full video",
+            run_ts="20000101-000002",
+        )
+        isolated_text = isolated_path.read_text(encoding="utf-8")
+        assert "Deep Summary extraction failed; see Extraction Errors." in isolated_text
+        assert "Not selected for this run." not in isolated_text
+
+        success_effective = build_effective_prompts(
+            selected_phase_defs(True, False, False), "Success Fixture", duration
+        )
+        fixture_outcomes = {
+            "procedure": [
+                FakeSdkError("high demand", 503, "UNAVAILABLE"),
+                FakeSdkError("high demand", 503, "UNAVAILABLE"),
+                FakeSdkError("high demand", 503, "UNAVAILABLE"),
+                procedure_result,
+            ],
+            "deep_summary": [acts],
+        }
+
+        def success_runner(pd, model):
+            outcome = fixture_outcomes[pd["key"]].pop(0)
+            if isinstance(outcome, Exception):
+                raise outcome
+            return outcome
+
+        success_results, success_errors, success_attempts, success_models = (
+            execute_phases(
+                success_effective, success_runner, free_policy,
+                sleeper=lambda _: None,
+            )
+        )
+        single_base = base / "single-invocation"
+        success_path = save_outputs(
+            single_base, "Success Fixture", duration, url_forms[0],
+            "summarize", free_policy, success_effective, success_results,
+            success_errors, success_attempts, success_models,
+            successful_transcript, "default", "full video",
+            run_ts="20000101-000003",
+        )
+        run_directories = [item for item in single_base.iterdir() if item.is_dir()]
+        assert len(run_directories) == 1
+        assert (single_base / "latest.json").is_file()
+
+        success_text = success_path.read_text(encoding="utf-8")
+        success_prompts = success_path.with_name("prompts.md").read_text(
+            encoding="utf-8"
+        )
+        success_transcript = success_path.with_name("transcript.md").read_text(
+            encoding="utf-8"
+        )
+        assert "**Primary model:** gemini-3.6-flash" in success_text
+        assert "**Fallback model:** gemini-3.5-flash" in success_text
+        assert "fallback 1/1" in success_text
+        assert "procedure=gemini-3.5-flash" in success_text
+        assert "fallback 1/1" in success_prompts
+        assert "## Procedure" in success_text and "## Detailed Summary" in success_text
+        assert "\n### Overview\n" in success_text and "\n### Steps\n" in success_text
+        assert "\n#### 1.) Video Title and Length\n" in success_text
+        assert "\n#### STEP 1: Fixture\n" in success_text
+        assert "\n### 🎭 ACT I: Start\n" in success_text
+        assert "\n### 🎭 FINAL ACT: Key Takeaways\n" in success_text
+        assert "```markdown\n## Overview\n### 2.) Fenced child\n## Steps\n```" in success_text
+        assert "Complete via automatic retrieval" in success_transcript
+        assert "[00:00:00.080–00:00:01.580] Hola" in success_transcript
+        duration_rule = (
+            f"This video's exact total length is {duration}; use it verbatim as the "
+            f"Length, and ensure every timestamp falls within 00:00–{duration}."
+        )
+        assert duration_rule in success_effective[0]["prompt"]
+        assert duration_rule in success_effective[1]["prompt"]
+        assert f"**Duration supplied:** {duration}" in success_prompts
+        assert success_effective[0]["prompt"] in success_prompts
+        assert success_effective[1]["prompt"] in success_prompts
+
+        for report_path in (omitted_path, isolated_path, success_path):
+            assert report_path.name == "report.md"
+            assert report_path.with_name("prompts.md").is_file()
+            assert report_path.with_name("transcript.md").is_file()
+
+    print(
+        "Self-test passed: free-tier policy, bounded retry/fallback, phase "
+        "selection and isolation, single-folder output, provenance, prompts, "
+        "URLs, headings, transcripts, and secret redaction."
+    )
+    return True
+
+def main() -> None:
+    try:
+        load_env_files()
+    except ImportError:
+        pass
+    parser = argparse.ArgumentParser(description="Extract a deterministic video report")
+    parser.add_argument("url", nargs="?")
+    parser.add_argument(
+        "--intent", default="summarize",
+        choices=["follow", "summarize", "learn"],
+    )
+    parser.add_argument(
+        "--tier", default=os.environ.get("GEMINI_API_TIER", DEFAULT_TIER),
+        choices=["free", "paid"],
+    )
+    parser.add_argument(
+        "--model", default=os.environ.get("VIDEO_TO_ACTION_MODEL", DEFAULT_MODEL)
+    )
+    parser.add_argument(
+        "--fallback-model",
+        default=os.environ.get(
+            "VIDEO_TO_ACTION_FALLBACK_MODEL", DEFAULT_FALLBACK_MODEL
+        ),
+    )
+    parser.add_argument("--start", type=parse_offset)
+    parser.add_argument("--end", type=parse_offset)
+    parser.add_argument("--resolution", default="default", choices=["default", "low"])
+    parser.add_argument("--output-dir", default=os.environ.get(
+        "VIDEO_TO_ACTION_OUTPUT_DIR", str(DEFAULT_OUTPUT_DIR)))
+    parser.add_argument("--title")
+    parser.add_argument("--duration", type=normalize_duration)
+    parser.add_argument("--deep-summary", action="store_true")
+    parser.add_argument("--technical", action="store_true")
+    parser.add_argument("--coding-video", action="store_true")
+    parser.add_argument("--check-setup", action="store_true")
+    parser.add_argument("--dump-prompts", action="store_true")
+    parser.add_argument("--self-test", action="store_true")
+    parser.add_argument("--complete-transcript", type=Path)
+    parser.add_argument("--manual-transcript-file", type=Path)
+    args = parser.parse_args()
+    if bool(args.complete_transcript) != bool(args.manual_transcript_file):
+        parser.error(
+            "--complete-transcript and --manual-transcript-file must be used together"
+        )
+    if args.complete_transcript:
+        completed = complete_manual_transcript(
+            args.complete_transcript, args.manual_transcript_file
+        )
+        print(f"Completed: {completed}")
+        return
+    if args.dump_prompts:
+        print(f"Wrote {dump_prompts()}")
+        return
+    if args.self_test:
+        sys.exit(0 if run_self_test() else 1)
+    if args.check_setup:
+        sys.exit(0 if check_setup(args.tier) else 1)
+
+    missing = []
+    if not args.url:
+        missing.append("public YouTube URL")
+    if not args.title or not args.title.strip():
+        missing.append("exact title (--title)")
+    if not args.duration:
+        missing.append("exact duration (--duration)")
+    if missing:
+        parser.error("missing required inputs: " + ", ".join(missing))
+    if not is_youtube_url(args.url):
+        parser.error("a valid public YouTube URL is required")
+    if args.technical and not args.coding_video:
+        parser.error("--technical requires --coding-video")
+    if not check_setup(args.tier, verbose=False):
+        check_setup(args.tier, verbose=True)
+        sys.exit(1)
+    sys.exit(run_extraction(
+        args.url, args.intent, args.model, args.fallback_model, args.tier,
+        args.start, args.end, args.resolution == "low", Path(args.output_dir),
+        args.title.strip(), args.duration, args.deep_summary, args.technical,
+        args.coding_video,
+    ))
+
+
+if __name__ == "__main__":
+    main()

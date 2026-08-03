@@ -1,0 +1,7 @@
+interface:
+  display_name: "North Star"
+  short_description: "Pursue a durable objective turn by turn"
+  default_prompt: "Use $north-star to create, resume, or reopen an IN PROGRESS North Star, open one helper-timed pursuit for each agent turn that advances it, close that pursuit before every final response so user waiting time is never counted, report the latest pursuit and grand total exactly once, and invoke finalize-north-star when every verification item is proven."
+
+policy:
+  allow_implicit_invocation: false

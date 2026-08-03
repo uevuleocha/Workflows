@@ -1,0 +1,7 @@
+interface:
+  display_name: "Ecosystem Default Parameter Change"
+  short_description: "Apply named cAlgo parameter defaults safely"
+  default_prompt: "Use $ecosystem-default-parameter-change for the named cAlgo parameters. Resolve the exact live cAlgo tool, declaration or bounded group, current source default, and user-requested new value; use two-step mode unless the user requests the optional source-default restore; run the live cAlgo project builds unless the user says they will; apply the declaration-only disappear/reappear cycle without synchronizing intermediate states; verify every edited line and full Tools\\Sources workspace diff; sync only the verified final live source back to the workspace and prove parity; distinguish indicator persistence from cBot display-only state; and report every build, parameter, diff, synchronization, and remaining cBot user action."
+
+policy:
+  allow_implicit_invocation: false

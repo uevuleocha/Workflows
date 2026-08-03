@@ -1,0 +1,7 @@
+interface:
+  display_name: "Set The Stage"
+  short_description: "Show what remains for each current subject"
+  default_prompt: "Use $set-the-stage to review the current context and give me one concise section per subject showing what remains, outstanding verification, blockers or unknowns, and the best next move. Use durable artifacts when relevant, but do not require, edit, or link them."
+
+policy:
+  allow_implicit_invocation: true
