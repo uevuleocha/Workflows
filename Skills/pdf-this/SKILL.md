@@ -143,8 +143,9 @@ python -X utf8 "<skill-dir>/scripts/pdf_this.py" FORM.pdf --to form --values val
 python -X utf8 "<skill-dir>/scripts/pdf_this.py" FORM.pdf --to form --values values.json --flatten
 ```
 
-Use `--output`, `--title`, `--artifact-kind`, `--status`, `--page-size`, and
-`--force` when authorized. The helper refuses collisions by default.
+Use `--output`, `--title`, `--artifact-kind`, `--status`, `--page-size`, and `--force` when authorized. The helper refuses collisions by default.
+
+Every normal `--to pdf` creation requires canonical Agent Provenance. Markdown or HTML may carry exactly one native canonical table directly. Text, CSV, or JSON without that table must provide a UTF-8 ordered JSON object through `--provenance-json`; its first four entries must be `Content owner`, `Original writing agent`, `Created`, and `Artifact role`. Reject multiple native provenance sections or tables and reject `--provenance-json` when native canonical provenance is already present, so the complete artifact contains exactly one canonical provenance table. Use `--provenance-exempt-reason` only for an identified operational, schema-sensitive, third-party, or otherwise excluded input. The reason is an explicit source-preservation exception, not a general bypass.
 
 Prefer the host document runtime. Semantic generation and forms require
 `reportlab` and `pypdf`; richer extraction may use `pdfplumber`; visual checks
@@ -156,6 +157,8 @@ install dependencies silently.
 For a new standalone PDF artifact, visibly render the standard
 `Agent Provenance` fields near the top and an append-only `Agent Change Log`
 near the bottom. Preserve both in the embedded native source.
+
+The visible provenance block must be a compact professional two-column `Field | Value` table containing exactly one non-empty canonical row, in this order, for `Content owner`, `Original writing agent`, `Created`, and `Artifact role`. Semantic generation uses stable 34/66 percent column widths, readable typography, wrapped long values, a repeated header row, and safe page splitting without clipping. Reject missing provenance, duplicate or empty canonical rows, aliases such as `Original writer`, and incorrect canonical row order. Separately labelled conversion or rendition history may follow the four canonical rows without replacing original authorship. Faithful HTML-to-PDF conversion preserves the source HTML provenance table through browser printing instead of rebuilding it.
 
 For conversion of an existing artifact:
 
@@ -181,19 +184,22 @@ Do not deliver until every applicable check passes:
 2. Confirm readable metadata and selectable/searchable text when expected.
 3. Confirm the exact embedded source exists and round-trips when this skill
    created the artifact from a semantic source.
-4. Render every page for short PDFs and representative pages for long PDFs;
+4. Confirm semantic Agent Provenance contains the four canonical facts in the
+   professional two-column table, with wrapped values and no clipping or
+   damaging split; confirm browser export preserves the HTML table unchanged.
+5. Render every page for short PDFs and representative pages for long PDFs;
    inspect clipping, overlap, blank charts, missing tables or sources, broken
    glyphs, margins, headers, footers, numbering, and transitions. For semantic
    Markdown, confirm a leading H1 that matches the document title does not
    duplicate the first-page title, while a different H1 remains visible.
-5. For report exports, reject app-only controls and leaked runtime details such
+6. For report exports, reject app-only controls and leaked runtime details such
    as share/edit/refresh/publish controls, drag handles, manifest/package paths,
    validator state, widget labels, or local temporary paths.
-6. For forms, perform the logical field-tree and widget checks required by
+7. For forms, perform the logical field-tree and widget checks required by
    Mode H; visual rendering alone is insufficient.
-7. Confirm path, extension, permanent number, topic, lifecycle suffix, and
+8. Confirm path, extension, permanent number, topic, lifecycle suffix, and
    sibling consistency.
-8. Repair the source, renderer invocation, stylesheet, or form operation and
+9. Repair the source, renderer invocation, stylesheet, or form operation and
    regenerate before handoff when a check fails.
 
 If visual inspection or a required dependency is unavailable, report the gap

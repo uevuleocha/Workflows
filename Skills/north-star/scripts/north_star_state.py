@@ -374,6 +374,59 @@ def command_finish(args): raise NorthStarError("The finish command is retired; u
 def command_status(args):
     _,_,_,_,runs=load_context(args.artifact); return dict(select_run(runs,args.run_id,allow_terminal=True)["state"])
 
+def command_format_receipt(args):
+    """Output production user-facing receipt text for testable output contracts."""
+    state = command_status(args)
+    normalize_state(state)
+    rtype = args.type
+    # All receipt types refuse open timing state
+    if state.get("active_pursuit"):
+        raise NorthStarError("Close the authoritative pursuit before producing receipt output.")
+    if state.get("provisional"):
+        raise NorthStarError("Close or discard the provisional timer before producing receipt output.")
+    if rtype == "timing-statement":
+        latest = latest_pursuit(state)
+        if not latest:
+            raise NorthStarError("No completed pursuit available for timing statement.")
+        total = human_duration(total_seconds(state))
+        dur = human_duration(latest["duration_seconds"])
+        summary = latest["summary"]
+        num = latest["number"]
+        print(f"Pursuit {num}: {dur} — {summary}. Grand total: {total}.")
+    elif rtype == "fallback-disclosure":
+        latest = latest_pursuit(state)
+        if not latest or latest.get("timing_source") != "provisional_fallback":
+            raise NorthStarError("Latest pursuit is not a provisional fallback.")
+        print("Full-turn fallback scoping was used for this pursuit — precise authoritative timing was missed.")
+    elif rtype == "paused-footer":
+        if state.get("status") != "paused":
+            raise NorthStarError("North Star is not paused.")
+        indicator = state.get("indicator", "?")
+        print(f'Mode = {indicator} (PAUSED — say "resume North Star" to continue)')
+    elif rtype == "finalizer-receipt":
+        if state.get("status") not in ("finalized", "reached"):
+            raise NorthStarError("North Star is not finalized.")
+        subject = args.subject
+        if not subject:
+            raise NorthStarError("--subject is required for finalizer-receipt.")
+        import re
+        m = re.search(r"^(\d+)\.\) ", Path(args.artifact).name)
+        n_num = m.group(1) if m else "?"
+        latest = latest_pursuit(state)
+        if not latest:
+            raise NorthStarError("No completed pursuit for finalizer receipt.")
+        total = human_duration(total_seconds(state))
+        dur = human_duration(latest["duration_seconds"])
+        summary = latest["summary"]
+        p_num = latest["number"]
+        resolved = Path(args.artifact).resolve().as_posix()
+        # Application-valid absolute Markdown link with angle brackets for spaces
+        link = f"[{subject} North Star {n_num}](<{resolved}>)"
+        print(f"North Star {n_num} was verified and finalized. Pursuit {p_num}: {dur} — {summary}. Grand total: {total}. {link}")
+    else:
+        raise NorthStarError(f"Unknown receipt type: {rtype}")
+    return state
+
 def print_result(state,as_json=False):
     normalize_state(state); latest=latest_pursuit(state); output=dict(state); output["active_pursuit_seconds_current"]=total_seconds(state); output["active_pursuit_time_current"]=human_duration(total_seconds(state)); output["grand_total_seconds"]=total_seconds(state); output["grand_total_time"]=human_duration(total_seconds(state)); output["latest_pursuit"]=latest
     if as_json: print(json.dumps(output,ensure_ascii=False,indent=2,sort_keys=True)); return
@@ -408,10 +461,14 @@ def build_parser():
     p=subs.add_parser("finalize"); add_common(p); p.add_argument("--evidence",action="append"); p.add_argument("--note"); p.set_defaults(handler=command_finalize)
     p=subs.add_parser("end"); add_common(p); p.add_argument("--note"); p.set_defaults(handler=command_end)
     p=subs.add_parser("status"); add_common(p); p.add_argument("--json",action="store_true"); p.set_defaults(handler=command_status)
+    p=subs.add_parser("format-receipt"); add_common(p); p.add_argument("--type",required=True,choices=("timing-statement","fallback-disclosure","paused-footer","finalizer-receipt")); p.add_argument("--subject",help="Required for finalizer-receipt"); p.set_defaults(handler=command_format_receipt)
     return parser
 def main():
     args=build_parser().parse_args()
-    try: state=args.handler(args); print_result(state,getattr(args,"json",False)); return 0
+    try: state=args.handler(args)
     except NorthStarError as exc: print(f"north-star: {exc}",file=sys.stderr); return 2
     except OSError as exc: print(f"north-star: filesystem error: {exc}",file=sys.stderr); return 3
+    if state is not None and args.command != "format-receipt":
+        print_result(state,getattr(args,"json",False))
+    return 0
 if __name__=="__main__": raise SystemExit(main())

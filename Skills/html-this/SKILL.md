@@ -134,10 +134,9 @@ python -X utf8 "<skill-dir>/scripts/html_this.py" INPUT.html --to markdown
 python -X utf8 "<skill-dir>/scripts/html_this.py" INPUT.html --to inspect
 ```
 
-Use `--output`, `--title`, `--artifact-kind`, `--status`, and `--force` when
-authorized. The helper refuses collisions by default. Complex fresh artifacts
-may use richer semantic HTML, but must preserve the same source packet,
-self-contained boundary, accessibility, and verification rules.
+Use `--output`, `--title`, `--artifact-kind`, `--status`, and `--force` when authorized. The helper refuses collisions by default. Complex fresh artifacts may use richer semantic HTML, but must preserve the same source packet, self-contained boundary, accessibility, and verification rules.
+
+Every normal `--to html` creation requires canonical Agent Provenance. Markdown or HTML may carry exactly one native canonical table directly. Text, CSV, JSON, PDF, or another source without that table must provide a UTF-8 ordered JSON object through `--provenance-json`; its first four entries must be `Content owner`, `Original writing agent`, `Created`, and `Artifact role`. Reject multiple native provenance sections or tables and reject `--provenance-json` when native canonical provenance is already present, so the complete artifact contains exactly one canonical provenance table. Use `--provenance-exempt-reason` only for an identified operational, schema-sensitive, third-party, or otherwise excluded input. The reason is an explicit source-preservation exception, not a general bypass.
 
 PDF conversion requires `pypdf` for semantic extraction and uses Poppler for
 page images when available. Prefer the host document runtime and do not install
@@ -148,6 +147,8 @@ dependencies silently.
 For a new standalone HTML artifact, visibly render the standard
 `Agent Provenance` fields near the top and an append-only `Agent Change Log`
 near the bottom. Preserve both in the embedded native source.
+
+The visible provenance block must be a polished two-column `Field | Value` table containing exactly one non-empty canonical row, in this order, for `Content owner`, `Original writing agent`, `Created`, and `Artifact role`. Use semantic `<table>` markup, column headers, row headers, an accessible responsive wrapper, readable borders and spacing, long-value wrapping, narrow-screen behavior, light/dark theme compatibility, and print styling. A concise caption is encouraged. Do not use a provenance `<dl>`, loose bullets, or indented label/value pairs. Reject missing provenance, duplicate or empty canonical rows, aliases such as `Original writer`, and incorrect canonical row order. Separately labelled conversion or rendition history may follow the four canonical rows without replacing or duplicating original authorship.
 
 For conversion of an existing artifact:
 
@@ -175,14 +176,16 @@ Before handoff:
    non-empty title, and valid structural balance.
 4. Confirm required assets are inline, images have useful alternative text,
    headings remain semantic, links are visible, and keyboard focus is usable.
-5. For PDF conversion, confirm embedded PDF bytes are identical, page count
+5. Confirm Agent Provenance uses scoped column/row headers, contains all four
+   canonical facts, has responsive and print styling, and is not a `<dl>`.
+6. For PDF conversion, confirm embedded PDF bytes are identical, page count
    matches, every rendered page is present when Poppler is available, and
    accessible extracted text accompanies the visual rendition.
-6. Inspect the rendered page at desktop, narrow viewport, and print layout when
+7. Inspect the rendered page at desktop, narrow viewport, and print layout when
    browser access permits. Otherwise disclose that visual rendering was not run.
-7. For an artifact set, confirm every sibling expresses the same content and
+8. For an artifact set, confirm every sibling expresses the same content and
    lifecycle state.
-8. Repair and regenerate before handoff when a check fails.
+9. Repair and regenerate before handoff when a check fails.
 
 When creating or updating this skill, validate the folder with
 `quick_validate.py` in UTF-8 mode and smoke-test Markdown, text, CSV, JSON,

@@ -66,9 +66,11 @@ Apply exactly one of these branches:
 
 - **Standalone substantive finalization:** when this skill performs review or
   verification that advances the North Star, call `provisional-start` at turn
-  open, `pursuit-start` at the actual beginning of that work, and
-  `pursuit-stop` at its actual end. Keep unrelated same-turn work outside that
-  interval.
+  open. When precise scoping is possible, call `pursuit-start` at the actual
+  beginning of that work and `pursuit-stop` at its actual end. When precise
+  scoping was genuinely missed, call `provisional-commit` to create one
+  disclosed full-turn fallback row. Keep unrelated same-turn work outside
+  the pursuit interval in either case.
 - **Same-pass finalization:** when the parent North Star workflow already
   stopped the pursuit at the actual end of its work, use that closed pursuit.
   The parent's `pursuit-stop` already discarded the provisional timer. Do not
@@ -107,10 +109,11 @@ Finalization is evidence-based. Before closing:
    current-session evidence, or durable recorded evidence.
 5. Confirm the constraints and boundaries were respected.
 6. Confirm no stop condition represents an unresolved failure or blocker.
-7. Confirm any substantive standalone pursuit was closed with `pursuit-stop`,
-   or that same-pass finalization is using the parent's already-closed pursuit;
-   in every case, confirm `active_pursuit` is `null` and `provisional` is
-   `null`, and no duplicate or manufactured pursuit was added.
+7. Confirm any substantive standalone pursuit was closed with `pursuit-stop`
+   (precise) or `provisional-commit` (disclosed fallback), or that same-pass
+   finalization is using the parent's already-closed pursuit; in every case,
+   confirm `active_pursuit` is `null` and `provisional` is `null`, and no
+   duplicate or manufactured pursuit was added.
 
 Existence, age, or a nearly complete checklist is not completion evidence.
 Never invent evidence, silently check unsupported criteria, or extend pursuit
@@ -167,11 +170,19 @@ These are authoritative; never compute a duration or total from timestamps.
 Use the current local date in the finalized presentation.
 ## Mandatory Completion Receipt
 
-Every successful finalization must contain this exact populated statement:
+Every successful finalization must use the production formatter:
 
 ```text
-North Star <N> was verified and finalized. Pursuit <P>: <pursuit-duration> — <one-line summary>. Grand total: <grand-total>. <artifact link>
+python -X utf8 "<north-star-dir>/scripts/north_star_state.py" format-receipt \
+  --artifact "<finalized-historical-path>" \
+  --type finalizer-receipt \
+  --subject "<Subject>"
 ```
+
+The formatter outputs the exact populated statement and a clickable Markdown
+artifact link. It refuses to produce output while `active_pursuit` or
+`provisional` timing remains open. Agents must use the formatter rather than
+independently composing equivalent wording.
 
 - `<N>` is the permanent North Star number.
 - `<P>`, pursuit duration, and summary come from `latest_pursuit` after the
@@ -190,14 +201,14 @@ incomplete because there is no pursued evidence-bearing turn to report.
 
 For successful finalization, confirm all of the following before replying:
 
-1. any substantive pursued work has a matching `pursuit-start` and
-   `pursuit-stop`, while same-pass or no-pursuit closure added no duplicate or
-   manufactured entry;
+1. any substantive pursued work was closed through `pursuit-stop` (precise) or
+   `provisional-commit` (disclosed fallback), while same-pass or no-pursuit
+   closure added no duplicate or manufactured entry;
 2. no provisional timer or authoritative pursuit remains open;
 3. `finalize` succeeded and the Live source is absent;
-3. latest pursuit and grand total came from helper output, not inference;
-4. the populated statement appears exactly once; and
-5. no separate pre-finalization timing line duplicates it.
+4. latest pursuit and grand total came from helper output, not inference;
+5. the populated statement appears exactly once; and
+6. no separate pre-finalization timing line duplicates it.
 
 For refused or deferred finalization, confirm all of the following before
 replying:
@@ -209,9 +220,10 @@ replying:
 3. the artifact remains `IN PROGRESS` or `PAUSED`; and
 4. the selected active or paused star footer is the final line of the response.
 
-A response is incomplete if pursued work lacks `pursuit-start`, if a provisional
-timer remains open, if an entry is manufactured, if timing is agent-computed or
-duplicated, or if an active or paused run's selected star footer is missing.
+A response is incomplete if pursued work lacks both `pursuit-start` (precise) and
+`provisional-commit` (fallback), if a provisional timer remains open, if an entry
+is manufactured, if timing is agent-computed or duplicated, or if an active or
+paused run's selected star footer is missing.
 
 A continuous run completed in the current pass must be finalized in that same
 pass when authority and evidence permit. Finalization itself does not extend

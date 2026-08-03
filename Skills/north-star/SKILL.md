@@ -227,8 +227,9 @@ net; precise authoritative pursuit timing remains the preferred ledger source.
    work ends in that turn, even if unrelated conversation or work follows before
    the final response. `pursuit-stop` discards the provisional timer
    automatically — authoritative timing wins.
-7. **Report exactly once** using the values returned by `pursuit-stop` and the
-   preserved statement shape.
+7. **Report exactly once** using the values returned by `pursuit-stop` (precise
+   timing) or `provisional-commit` (disclosed fallback), and the preserved
+   statement shape.
 
 Do not leave a pursuit or provisional timer open while waiting for the user.
 Commentary about the active work remains inside the same pursuit; unrelated
@@ -323,18 +324,29 @@ backward-compatible `active_pursuit_seconds_current` and
 ### Reporting contract
 
 For every response from a turn that pursued the North Star, report exactly one
-timing statement in this unchanged shape:
+timing statement using the production formatter:
 
 ```text
-Pursuit <N>: <duration> — <one-line summary>. Grand total: <duration>.
+python -X utf8 "<skill-dir>/scripts/north_star_state.py" format-receipt \
+  --artifact "<live-path>" --type timing-statement
 ```
 
-Use only values returned by the helper after `pursuit-stop` (precise
-authoritative timing) or `provisional-commit` (disclosed full-turn fallback).
-Never compute a duration or total from timestamps. If a turn performed no North
-Star pursuit, do not manufacture a ledger entry or timing statement. The star
-footer remains compulsory because footer presence follows active lifecycle, not
-whether that turn contained pursuit.
+The formatter outputs the unchanged contract shape:
+`Pursuit <N>: <duration> — <summary>. Grand total: <duration>.`
+
+For fallback pursuits, also emit the disclosure:
+
+```text
+python -X utf8 "<skill-dir>/scripts/north_star_state.py" format-receipt \
+  --artifact "<live-path>" --type fallback-disclosure
+```
+
+The formatter refuses to produce response text while `active_pursuit` or
+`provisional` timing remains open. Agents must use the formatter rather than
+independently composing equivalent wording. Never compute a duration or total from
+timestamps. If a turn performed no North Star pursuit, do not manufacture a ledger
+entry or timing statement. The star footer remains compulsory because footer
+presence follows active lifecycle, not whether that turn contained pursuit.
 
 For continuous same-pass finalization, `finalize-north-star` owns the one timing
 statement in its completion receipt. Do not print a separate pre-finalization
@@ -347,8 +359,9 @@ A North Star response is incomplete when any of these conditions is true:
 
 1. The timing statement is absent on a turn that pursued the North Star.
 2. A duration or total was computed, inferred, backdated, or guessed instead
-   of read from the values returned by `pursuit-stop`. A finalizer may re-read
-   those same frozen values from helper state but must never recompute them.
+   of read from the helper-derived values returned by `pursuit-stop` or
+   `provisional-commit`. A finalizer may re-read those same frozen values from
+   helper state but must never recompute them.
 3. More than one North Star timing statement appears in the response.
 4. A ledger entry or timing statement was manufactured for a turn that
    performed no North Star pursuit.
@@ -421,7 +434,11 @@ Use the helper commands documented in `references/state-helper.md`:
 - `pursuit-remove` makes an auditable correction and sequentially renumbers;
 - `reopen` returns a terminal artifact to Live with its ledger intact;
 - `status --json` reports the latest pursuit, provisional state, and
-  helper-computed grand total; and
+  helper-computed grand total;
+- `format-receipt --type <kind>` outputs the exact production user-facing text
+  for timing statements, fallback disclosure, paused footers, and finalizer
+  receipts — agents must use this rather than independently composing equivalent
+  wording; and
 - `end` archives an explicitly abandoned run without pretending it succeeded.
 
 After interruption, inspect actual workspace state and reverify uncertain work.
@@ -520,9 +537,10 @@ When updating pursuit timing, reporting, or footer enforcement, additionally
 prove all of the following:
 
 - the named **Incomplete North Star Response — Failure Conditions** block
-  exists and states all five required timing failures: missing pursued-turn
-  statement, computed rather than `pursuit-stop`-returned duration, duplicate timing
-  statements, manufactured no-pursuit entry, and missing `pursuit-start`;
+  exists and states all required timing failures: missing pursued-turn
+  statement, computed rather than helper-derived duration, duplicate timing
+  statements, manufactured no-pursuit entry, and missing `pursuit-start` or
+  `provisional-commit`;
 - footer omission is also an explicit failure;
 - the selected star footer is compulsory on every active response in both
   continuous and phased styles, including turns with no pursuit;
@@ -532,7 +550,8 @@ prove all of the following:
 - imprecise scoping uses and discloses the full-turn fallback without guessed
   timestamps;
 - every pursued response uses exactly one unchanged-shape timing statement
-  sourced from `pursuit-stop`, and a no-pursuit turn manufactures none;
+  sourced from the helper via `pursuit-stop` (precise) or `provisional-commit`
+  (fallback), and a no-pursuit turn manufactures none;
 - waiting between pursuits never changes the grand total;
 - continuous same-pass finalization reports latest pursuit and grand total
   exactly once through `finalize-north-star`;

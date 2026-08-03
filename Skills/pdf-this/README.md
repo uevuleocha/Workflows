@@ -1,9 +1,6 @@
 # PDF This
 
-Creates, converts, reads, inspects, verifies, fills, and flattens professional
-PDF artifacts. It browser-renders static HTML and reports faithfully, embeds
-exact sources for recovery, validates AcroForms, and preserves the producing
-skill's numbering and lifecycle ownership.
+Creates, converts, reads, inspects, verifies, fills, and flattens professional PDF artifacts. It browser-renders static HTML and reports faithfully, renders canonical Agent Provenance as exactly one professional `Field | Value` table, embeds exact sources for recovery, validates AcroForms, and preserves the producing skill's numbering and lifecycle ownership. Normal creation requires canonical provenance in the source or through the structured provenance input, rejects native-plus-structured ambiguity, and limits explicit exemptions to excluded operational or schema-sensitive inputs.
 
 ## Related skills
 

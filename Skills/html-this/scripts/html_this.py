@@ -36,6 +36,143 @@ FORMAT_BY_SUFFIX = {
     ".pdf": "pdf",
 }
 
+CANONICAL_PROVENANCE_FIELDS = (
+    "Content owner",
+    "Original writing agent",
+    "Created",
+    "Artifact role",
+)
+
+def validate_provenance_rows(headers: list[str], rows: list[list[str]]) -> None:
+    """Require exactly one ordered, non-empty row per canonical fact."""
+    if [cell.casefold() for cell in headers] != ["field", "value"]:
+        raise ValueError("Agent Provenance must use a two-column Field | Value table")
+    if len(rows) < len(CANONICAL_PROVENANCE_FIELDS):
+        raise ValueError("Agent Provenance table is missing one or more canonical facts")
+    normalized = []
+    for row in rows:
+        if len(row) != 2 or not row[0].strip() or not row[1].strip():
+            raise ValueError("Agent Provenance rows require non-empty Field and Value cells")
+        normalized.append(row[0].strip().casefold())
+    expected = [field.casefold() for field in CANONICAL_PROVENANCE_FIELDS]
+    if normalized[:4] != expected:
+        raise ValueError("Agent Provenance canonical rows must use the required identity and order")
+    for field in expected:
+        if normalized.count(field) != 1:
+            raise ValueError("Agent Provenance canonical rows must appear exactly once")
+
+
+def markdown_provenance_rows(source: str) -> list[list[str]] | None:
+    lines = source.replace("\r\n", "\n").replace("\r", "\n").split("\n")
+    sections = [
+        index
+        for index, line in enumerate(lines)
+        if re.fullmatch(r"#{1,6}\s+Agent Provenance\s*", line.strip(), re.I)
+    ]
+    if len(sections) > 1:
+        raise ValueError("Artifact must contain exactly one Agent Provenance section")
+    for index in sections:
+        cursor = index + 1
+        while cursor < len(lines) and not lines[cursor].strip():
+            cursor += 1
+        if cursor + 1 >= len(lines) or "|" not in lines[cursor] or not is_table_separator(lines[cursor + 1]):
+            raise ValueError("Agent Provenance must be presented as a Field | Value table")
+        headers = split_table_row(lines[cursor])
+        cursor += 2
+        rows: list[list[str]] = []
+        while cursor < len(lines) and "|" in lines[cursor] and lines[cursor].strip():
+            rows.append(split_table_row(lines[cursor]))
+            cursor += 1
+        validate_provenance_rows(headers, rows)
+        return rows
+    return None
+
+
+def html_provenance_rows(source: str) -> list[list[str]] | None:
+    tables = re.findall(
+        r'<table\b[^>]*class=["\'][^"\']*\bprovenance-table\b[^"\']*["\'][^>]*>(.*?)</table>',
+        source,
+        re.I | re.S,
+    )
+    if len(tables) > 1:
+        raise ValueError("Artifact must contain exactly one canonical provenance table")
+    if not tables:
+        return None
+    markup = tables[0]
+    headers = [
+        html.unescape(re.sub(r"<[^>]+>", "", value)).strip()
+        for value in re.findall(r'<th\b[^>]*scope=["\']col["\'][^>]*>(.*?)</th>', markup, re.I | re.S)
+    ]
+    rows = [
+        [
+            html.unescape(re.sub(r"<[^>]+>", "", match.group(1))).strip(),
+            html.unescape(re.sub(r"<[^>]+>", "", match.group(2))).strip(),
+        ]
+        for match in re.finditer(
+            r'<tr\b[^>]*>\s*<th\b[^>]*scope=["\']row["\'][^>]*>(.*?)</th>\s*<td\b[^>]*>(.*?)</td>\s*</tr>',
+            markup,
+            re.I | re.S,
+        )
+    ]
+    validate_provenance_rows(headers, rows)
+    return rows
+
+
+def load_structured_provenance(path: Path | None) -> list[list[str]] | None:
+    if path is None:
+        return None
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict):
+        raise ValueError("Structured provenance JSON must be one Field-to-Value object")
+    rows = [[str(key), str(value)] for key, value in payload.items()]
+    validate_provenance_rows(["Field", "Value"], rows)
+    return rows
+
+
+def provenance_table_html(rows: list[list[str]]) -> str:
+    validate_provenance_rows(["Field", "Value"], rows)
+    body = "".join(
+        f'<tr><th scope="row">{inline_markup(field)}</th><td>{inline_markup(value)}</td></tr>'
+        for field, value in rows
+    )
+    return (
+        '<section class="provenance-section"><h2>Agent Provenance</h2>'
+        '<div class="table-scroll provenance-table-wrap" role="region" '
+        'aria-label="Agent provenance" tabindex="0"><table class="provenance-table">'
+        '<caption>Durable artifact ownership and role</caption><thead><tr>'
+        '<th scope="col">Field</th><th scope="col">Value</th></tr></thead><tbody>'
+        + body
+        + "</tbody></table></div></section>"
+    )
+
+
+def require_creation_provenance(
+    source: str | bytes,
+    source_format: str,
+    structured_rows: list[list[str]] | None,
+    exemption_reason: str | None,
+) -> list[list[str]] | None:
+    if exemption_reason:
+        return None
+    native_rows = None
+    if source_format == "markdown" and isinstance(source, str):
+        native_rows = markdown_provenance_rows(source)
+    elif source_format == "html" and isinstance(source, str):
+        native_rows = html_provenance_rows(source)
+    if structured_rows and native_rows:
+        raise ValueError(
+            "Structured provenance cannot be combined with source-native canonical provenance"
+        )
+    if structured_rows:
+        return structured_rows
+    if native_rows:
+        return None
+    raise ValueError(
+        "New first-party durable artifacts require canonical Agent Provenance; "
+        "provide it in Markdown/HTML, use --provenance-json, or document an "
+        "excluded operational/schema-sensitive input with --provenance-exempt-reason"
+    )
+
 
 def inline_markup(value: str) -> str:
     escaped = html.escape(value, quote=False)
@@ -88,6 +225,7 @@ def render_markdown(source: str, document_title: str | None = None) -> str:
     code_lang = ""
     code_lines: list[str] = []
     index = 0
+    current_heading = ""
 
     def flush_paragraph() -> None:
         if paragraph:
@@ -139,13 +277,26 @@ def render_markdown(source: str, document_title: str | None = None) -> str:
             while index < len(lines) and "|" in lines[index] and lines[index].strip():
                 rows.append(split_table_row(lines[index]))
                 index += 1
-            out.append('<div class="table-scroll"><table><thead><tr>')
-            out.extend(f"<th>{inline_markup(cell)}</th>" for cell in headers)
+            provenance = current_heading.casefold() == "agent provenance"
+            if provenance:
+                validate_provenance_rows(headers, rows)
+            wrapper_class = "table-scroll provenance-table-wrap" if provenance else "table-scroll"
+            table_class = ' class="provenance-table"' if provenance else ""
+            region = ' role="region" aria-label="Agent provenance" tabindex="0"' if provenance else ""
+            out.append(f'<div class="{wrapper_class}"{region}><table{table_class}>')
+            if provenance:
+                out.append('<caption>Durable artifact ownership and role</caption>')
+            out.append("<thead><tr>")
+            out.extend(f'<th scope="col">{inline_markup(cell)}</th>' for cell in headers)
             out.append("</tr></thead><tbody>")
             for row in rows:
                 padded = row + [""] * (len(headers) - len(row))
                 out.append("<tr>")
-                out.extend(f"<td>{inline_markup(cell)}</td>" for cell in padded[: len(headers)])
+                if provenance:
+                    out.append(f'<th scope="row">{inline_markup(padded[0])}</th>')
+                    out.append(f"<td>{inline_markup(padded[1])}</td>")
+                else:
+                    out.extend(f"<td>{inline_markup(cell)}</td>" for cell in padded[: len(headers)])
                 out.append("</tr>")
             out.append("</tbody></table></div>")
             continue
@@ -156,6 +307,7 @@ def render_markdown(source: str, document_title: str | None = None) -> str:
             close_list()
             level = len(heading.group(1))
             label = heading.group(2).strip()
+            current_heading = label
             anchor = re.sub(r"[^a-z0-9]+", "-", label.lower()).strip("-")
             out.append(f'<h{level} id="{html.escape(anchor)}">{inline_markup(label)}</h{level}>')
             index += 1
@@ -208,6 +360,8 @@ def render_markdown(source: str, document_title: str | None = None) -> str:
             flush_paragraph()
             close_list()
         else:
+            if current_heading.casefold() == "agent provenance":
+                raise ValueError("Agent Provenance must be presented as a Field | Value table")
             paragraph.append(stripped)
         index += 1
 
@@ -539,19 +693,20 @@ STYLE = """
     --danger:#b4233c; --info:#176b9f; --ok:#39731f; --warn:#8a5d00; --accent:#6540a8;
   }
 }
-* { box-sizing:border-box; }
-html { scroll-behavior:smooth; }
+* { box-sizing:border-box; min-width:0; }
+html { scroll-behavior:smooth; overflow-x:hidden; }
 body {
   margin:0; padding:30px 22px 80px; background:var(--bg); color:var(--ink);
   font:15px/1.62 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  overflow-x:hidden;
 }
-.wrap { max-width:1120px; margin:0 auto; }
+.wrap { width:100%; max-width:1120px; margin:0 auto; }
 .artifact-header { margin-bottom:28px; }
 h1 { font-size:clamp(25px,4vw,34px); line-height:1.18; margin:0 0 7px; letter-spacing:-.025em; }
 h2 { font-size:20px; margin:42px 0 10px; padding-bottom:8px; border-bottom:1px solid var(--line); }
 h3 { font-size:16px; margin:25px 0 8px; color:var(--accent); }
 h4,h5,h6 { margin:20px 0 7px; }
-p { margin:10px 0; }
+p { margin:10px 0; overflow-wrap:anywhere; }
 .subtitle,.meta,.foot { color:var(--dim); }
 .meta { display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; font-size:12px; }
 .pill {
@@ -571,17 +726,25 @@ blockquote,.callout {
   border:1px solid var(--line); border-left:4px solid var(--warn); border-radius:7px;
 }
 ul,ol { padding-left:24px; }
-li { margin:5px 0; }
+li { margin:5px 0; overflow-wrap:anywhere; }
 .check { list-style:none; margin-left:-20px; }
 .check input { margin-right:8px; accent-color:var(--ok); }
 .table-scroll { overflow-x:auto; -webkit-overflow-scrolling:touch; margin:16px 0; }
 table { border-collapse:collapse; width:100%; min-width:560px; font-size:13.5px; }
+caption { padding:0 0 8px; color:var(--dim); font-size:12px; text-align:left; }
 th,td { text-align:left; padding:8px 10px; border-bottom:1px solid var(--line); vertical-align:top; }
 th {
   background:var(--panel2); color:var(--dim); font-size:12px; text-transform:uppercase;
   letter-spacing:.04em; white-space:nowrap;
 }
 tbody tr:hover { background:var(--panel); }
+.provenance-table-wrap { width:100%; max-width:100%; overflow-x:hidden; border:1px solid var(--line); border-radius:9px; }
+.provenance-table { width:100%; max-width:100%; min-width:0; table-layout:fixed; }
+.provenance-table caption { padding:10px 12px 4px; }
+.provenance-table th:first-child { width:34%; }
+.provenance-table tbody th { background:transparent; color:var(--ink); text-transform:none; letter-spacing:0; white-space:normal; }
+.provenance-table th,.provenance-table td { overflow-wrap:anywhere; word-break:normal; }
+.provenance-table tbody tr:last-child th,.provenance-table tbody tr:last-child td { border-bottom:0; }
 hr { border:0; border-top:1px solid var(--line); margin:30px 0; }
 img,svg { max-width:100%; height:auto; }
 .foot { margin-top:50px; padding-top:14px; border-top:1px solid var(--line); font-size:12px; }
@@ -597,6 +760,9 @@ dd { margin:0; overflow-wrap:anywhere; }
 @media (max-width:680px) {
   body { padding:22px 14px 60px; }
   h2 { margin-top:34px; }
+  h1 { overflow-wrap:anywhere; }
+  .provenance-table th:first-child { width:40%; }
+  .provenance-table th,.provenance-table td { padding:8px; }
 }
 @media print {
   :root { --bg:#fff; --panel:#fff; --panel2:#f2f4f7; --line:#ccd2d8; --ink:#111; --dim:#444; }
@@ -605,6 +771,8 @@ dd { margin:0; overflow-wrap:anywhere; }
   a { color:#111; text-decoration:underline; }
   pre { white-space:pre-wrap; color:#111; background:#f5f5f5; break-inside:avoid; }
   table,blockquote,.callout { break-inside:avoid; }
+  .provenance-table-wrap { overflow:visible; border-color:#777; }
+  .provenance-table { min-width:0; }
   h1,h2,h3 { break-after:avoid; }
   .foot { display:none; }
 }
@@ -660,6 +828,27 @@ def inspect_html(document: str) -> dict[str, object]:
         re.I,
     )
     packet = extract_source_packet_bytes(document)
+    provenance_table = re.search(
+        r'<table\b[^>]*class=["\'][^"\']*\bprovenance-table\b[^"\']*["\'][^>]*>(.*?)</table>',
+        document,
+        re.I | re.S,
+    )
+    provenance_markup = provenance_table.group(1) if provenance_table else ""
+    provenance_rows = []
+    for match in re.finditer(
+        r'<tr\b[^>]*>\s*<th\b[^>]*scope=["\']row["\'][^>]*>(.*?)</th>\s*<td\b[^>]*>(.*?)</td>\s*</tr>',
+        provenance_markup,
+        re.I | re.S,
+    ):
+        provenance_rows.append([
+            html.unescape(re.sub(r"<[^>]+>", "", match.group(1))).strip(),
+            html.unescape(re.sub(r"<[^>]+>", "", match.group(2))).strip(),
+        ])
+    try:
+        validate_provenance_rows(["Field", "Value"], provenance_rows)
+        canonical_provenance = True
+    except ValueError:
+        canonical_provenance = False
     checks = {
         "doctype_count": len(re.findall(r"<!doctype\s+html", document, re.I)),
         "html_open_count": len(re.findall(r"<html\b", document, re.I)),
@@ -672,6 +861,11 @@ def inspect_html(document: str) -> dict[str, object]:
         "external_asset_urls": external_assets,
         "images": len(image_tags),
         "images_missing_alt": len(missing_alt),
+        "provenance_table": bool(provenance_table),
+        "provenance_canonical_rows": canonical_provenance,
+        "provenance_definition_list": bool(
+            re.search(r"<h[1-6][^>]*>\s*Agent Provenance\s*</h[1-6]>\s*<dl\b", document, re.I)
+        ),
     }
     checks["structure_valid"] = bool(
         checks["doctype_count"] == 1
@@ -730,6 +924,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--title")
     parser.add_argument("--artifact-kind", default="Durable Artifact")
     parser.add_argument("--status", default="Current")
+    parser.add_argument("--provenance-json", type=Path)
+    parser.add_argument("--provenance-exempt-reason")
     parser.add_argument("--force", action="store_true")
     return parser.parse_args()
 
@@ -761,6 +957,17 @@ def main() -> int:
         else:
             source = input_path.read_text(encoding="utf-8")
             body = render_source(source, source_format, title)
+        structured_rows = load_structured_provenance(
+            args.provenance_json.resolve() if args.provenance_json else None
+        )
+        injected_rows = require_creation_provenance(
+            source,
+            source_format,
+            structured_rows,
+            args.provenance_exempt_reason,
+        )
+        if injected_rows:
+            body = provenance_table_html(injected_rows) + "\n" + body
         document = build_document(
             body,
             source,
@@ -813,4 +1020,3 @@ if __name__ == "__main__":
     except Exception as error:
         print(f"html-this: {error}", file=sys.stderr)
         raise SystemExit(1)
-

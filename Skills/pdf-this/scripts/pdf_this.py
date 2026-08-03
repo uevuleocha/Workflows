@@ -59,6 +59,134 @@ FORMAT_BY_SUFFIX = {
 }
 SOURCE_PREFIX = "pdf-this-source."
 HTML_PACKET_ID = "html-this-source"
+CANONICAL_PROVENANCE_FIELDS = (
+    "Content owner",
+    "Original writing agent",
+    "Created",
+    "Artifact role",
+)
+
+
+def validate_provenance_rows(headers: list[str], rows: list[list[str]]) -> None:
+    """Require exactly one ordered, non-empty row per canonical fact."""
+    if [cell.casefold() for cell in headers] != ["field", "value"]:
+        raise ValueError("Agent Provenance must use a two-column Field | Value table")
+    if len(rows) < len(CANONICAL_PROVENANCE_FIELDS):
+        raise ValueError("Agent Provenance table is missing one or more canonical facts")
+    normalized = []
+    for row in rows:
+        if len(row) != 2 or not row[0].strip() or not row[1].strip():
+            raise ValueError("Agent Provenance rows require non-empty Field and Value cells")
+        normalized.append(row[0].strip().casefold())
+    expected = [field.casefold() for field in CANONICAL_PROVENANCE_FIELDS]
+    if normalized[:4] != expected:
+        raise ValueError("Agent Provenance canonical rows must use the required identity and order")
+    for field in expected:
+        if normalized.count(field) != 1:
+            raise ValueError("Agent Provenance canonical rows must appear exactly once")
+
+
+def markdown_provenance_rows(source: str) -> list[list[str]] | None:
+    lines = source.replace("\r\n", "\n").replace("\r", "\n").split("\n")
+    sections = [
+        index
+        for index, line in enumerate(lines)
+        if re.fullmatch(r"#{1,6}\s+Agent Provenance\s*", line.strip(), re.I)
+    ]
+    if len(sections) > 1:
+        raise ValueError("Artifact must contain exactly one Agent Provenance section")
+    for index in sections:
+        cursor = index + 1
+        while cursor < len(lines) and not lines[cursor].strip():
+            cursor += 1
+        if cursor + 1 >= len(lines) or "|" not in lines[cursor] or not is_table_separator(lines[cursor + 1]):
+            raise ValueError("Agent Provenance must be presented as a Field | Value table")
+        headers = split_table_row(lines[cursor])
+        cursor += 2
+        rows: list[list[str]] = []
+        while cursor < len(lines) and "|" in lines[cursor] and lines[cursor].strip():
+            rows.append(split_table_row(lines[cursor]))
+            cursor += 1
+        validate_provenance_rows(headers, rows)
+        return rows
+    return None
+
+
+def load_structured_provenance(path: Path | None) -> list[list[str]] | None:
+    if path is None:
+        return None
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict):
+        raise ValueError("Structured provenance JSON must be one Field-to-Value object")
+    rows = [[str(key), str(value)] for key, value in payload.items()]
+    validate_provenance_rows(["Field", "Value"], rows)
+    return rows
+
+
+def html_provenance_rows(source: str) -> list[list[str]] | None:
+    tables = re.findall(
+        r'<table\b[^>]*class=["\'][^"\']*\bprovenance-table\b[^"\']*["\'][^>]*>(.*?)</table>',
+        source,
+        re.I | re.S,
+    )
+    if len(tables) > 1:
+        raise ValueError("Artifact must contain exactly one canonical provenance table")
+    if not tables:
+        return None
+    table = tables[0]
+    headers = [
+        html.unescape(re.sub(r"<[^>]+>", "", value)).strip()
+        for value in re.findall(r'<th\b[^>]*scope=["\']col["\'][^>]*>(.*?)</th>', table, re.I | re.S)
+    ]
+    rows = []
+    for match in re.finditer(
+        r'<tr\b[^>]*>\s*<th\b[^>]*scope=["\']row["\'][^>]*>(.*?)</th>\s*<td\b[^>]*>(.*?)</td>\s*</tr>',
+        table,
+        re.I | re.S,
+    ):
+        rows.append([
+            html.unescape(re.sub(r"<[^>]+>", "", match.group(1))).strip(),
+            html.unescape(re.sub(r"<[^>]+>", "", match.group(2))).strip(),
+        ])
+    validate_provenance_rows(headers, rows)
+    return rows
+
+
+def require_creation_provenance(
+    source: str,
+    source_format: str,
+    structured_rows: list[list[str]] | None,
+    exemption_reason: str | None,
+) -> list[list[str]] | None:
+    if exemption_reason:
+        return None
+    if source_format == "html":
+        native_rows = html_provenance_rows(source)
+        if structured_rows and native_rows:
+            raise ValueError(
+                "Structured provenance cannot be combined with source-native canonical provenance"
+            )
+        if native_rows:
+            return None
+        raise ValueError(
+            "New first-party durable HTML artifacts require a canonical semantic "
+            "Agent Provenance table in the source HTML; --provenance-json cannot "
+            "be injected into the browser-print path"
+        )
+    native_rows = markdown_provenance_rows(source) if source_format == "markdown" else None
+    if structured_rows and native_rows:
+        raise ValueError(
+            "Structured provenance cannot be combined with source-native canonical provenance"
+        )
+    if structured_rows:
+        return structured_rows
+    if native_rows:
+        return None
+    raise ValueError(
+        "New first-party durable artifacts require canonical Agent Provenance; "
+        "provide it in Markdown/HTML, use --provenance-json, or document an "
+        "excluded operational/schema-sensitive input with --provenance-exempt-reason"
+    )
 
 
 def safe_text(value: str) -> str:
@@ -316,7 +444,7 @@ def build_styles():
     return styles
 
 
-def table_flowable(rows: list[list[str]], available_width: float, styles):
+def table_flowable(rows: list[list[str]], available_width: float, styles, provenance: bool = False):
     if not rows:
         return Spacer(1, 1)
     width = max(1, len(rows[0]))
@@ -342,7 +470,11 @@ def table_flowable(rows: list[list[str]], available_width: float, styles):
                 for cell in row
             ]
         )
-    col_widths = [available_width / width] * width
+    col_widths = (
+        [available_width * 0.34, available_width * 0.66]
+        if provenance and width == 2
+        else [available_width / width] * width
+    )
     table = Table(rendered, colWidths=col_widths, repeatRows=1, hAlign="LEFT")
     table.setStyle(
         TableStyle(
@@ -355,6 +487,7 @@ def table_flowable(rows: list[list[str]], available_width: float, styles):
                 ("TOPPADDING", (0, 0), (-1, -1), 5),
                 ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
                 ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f8fafc")]),
+                *(((("FONTNAME", (0, 1), (0, -1), "Helvetica-Bold"),)) if provenance else ()),
             ]
         )
     )
@@ -393,6 +526,7 @@ def markdown_story(
     index = 0
     in_code = False
     code_lines: list[str] = []
+    current_heading = ""
 
     def flush_paragraph() -> None:
         if paragraph:
@@ -430,13 +564,17 @@ def markdown_story(
             while index < len(lines) and "|" in lines[index] and lines[index].strip():
                 rows.append(split_table_row(lines[index]))
                 index += 1
-            story.extend([table_flowable(rows, available_width, styles), Spacer(1, 8)])
+            provenance = current_heading.casefold() == "agent provenance"
+            if provenance:
+                validate_provenance_rows(rows[0], rows[1:])
+            story.extend([table_flowable(rows, available_width, styles, provenance), Spacer(1, 8)])
             continue
 
         heading = re.match(r"^(#{1,6})\s+(.+)$", stripped)
         if heading:
             flush_paragraph()
             level = len(heading.group(1))
+            current_heading = heading.group(2).strip()
             style_name = "H1x" if level == 1 else "H2x" if level == 2 else "H3x"
             story.append(Paragraph(paragraph_markup(heading.group(2)), styles[style_name]))
             index += 1
@@ -495,6 +633,8 @@ def markdown_story(
         if not stripped:
             flush_paragraph()
         else:
+            if current_heading.casefold() == "agent provenance":
+                raise ValueError("Agent Provenance must be presented as a Field | Value table")
             paragraph.append(stripped)
         index += 1
 
@@ -609,6 +749,7 @@ def create_pdf(
     status: str,
     page_size: str,
     force: bool,
+    provenance_rows: list[list[str]] | None = None,
 ) -> None:
     target.parent.mkdir(parents=True, exist_ok=True)
     if target.exists() and not force:
@@ -640,6 +781,17 @@ def create_pdf(
                 styles["ArtifactMeta"],
             ),
         ]
+        if provenance_rows:
+            story.append(Paragraph("Agent Provenance", styles["H1x"]))
+            story.append(
+                table_flowable(
+                    [["Field", "Value"], *provenance_rows],
+                    doc.width,
+                    styles,
+                    True,
+                )
+            )
+            story.append(Spacer(1, 8))
         story.extend(
             source_story(
                 normalized_source,
@@ -1084,6 +1236,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--title")
     parser.add_argument("--artifact-kind", default="Durable Artifact")
     parser.add_argument("--status", default="Current")
+    parser.add_argument("--provenance-json", type=Path)
+    parser.add_argument("--provenance-exempt-reason")
     parser.add_argument("--page-size", choices=("letter", "a4"), default="letter")
     parser.add_argument("--values", type=Path, help="UTF-8 JSON object for --to form")
     parser.add_argument("--flatten", action="store_true")
@@ -1136,6 +1290,15 @@ def main() -> int:
         source = input_path.read_text(encoding="utf-8")
         source_format = infer_format(input_path, args.source_format)
         title = args.title or input_path.stem
+        structured_rows = load_structured_provenance(
+            args.provenance_json.resolve() if args.provenance_json else None
+        )
+        injected_rows = require_creation_provenance(
+            source,
+            source_format,
+            structured_rows,
+            args.provenance_exempt_reason,
+        )
         if source_format == "html":
             create_pdf_from_html(
                 output,
@@ -1158,6 +1321,7 @@ def main() -> int:
                 args.status,
                 args.page_size,
                 args.force,
+                injected_rows,
             )
             normalized_source, normalized_format = normalize_source(source, source_format)
             renderer = "reportlab"
@@ -1196,4 +1360,3 @@ if __name__ == "__main__":
     except Exception as error:
         print(f"pdf-this: {error}", file=sys.stderr)
         raise SystemExit(1)
-

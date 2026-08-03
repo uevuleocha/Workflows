@@ -230,6 +230,37 @@ The user-facing timing statement is:
 Pursuit <N>: <duration> — <summary>. Grand total: <duration>.
 ```
 
+## Production Receipt Formatting
+
+`format-receipt` is the production output contract for user-facing North Star
+text. Agents must use it rather than independently composing equivalent wording.
+All receipt types refuse when `active_pursuit` or `provisional` timing remains
+open, consistent with the no-open-state-before-response invariant. `paused-footer`
+additionally requires the North Star to be paused.
+
+```text
+python -X utf8 "<skill-dir>/scripts/north_star_state.py" format-receipt \
+  --artifact "<path>" --type <kind> [--subject <Subject>]
+```
+
+### Receipt types
+
+| Type | Guard | Output |
+|------|-------|--------|
+| `timing-statement` | Refuses if `active_pursuit` or `provisional` is open | `Pursuit <N>: <duration> — <summary>. Grand total: <duration>.` |
+| `fallback-disclosure` | Refuses if `active_pursuit` or `provisional` is open; refuses if latest pursuit is not a provisional fallback | `Full-turn fallback scoping was used for this pursuit — precise authoritative timing was missed.` |
+| `paused-footer` | Refuses if `active_pursuit` or `provisional` is open; refuses if status is not `paused` | `Mode = <indicator> (PAUSED — say "resume North Star" to continue)` |
+| `finalizer-receipt` | Refuses if `active_pursuit` or `provisional` is open; refuses if status is not `finalized`; requires `--subject` | `North Star <N> was verified and finalized. Pursuit <P>: <duration> — <summary>. Grand total: <total>. [<Subject> North Star <N>](<absolute-path>)` |
+
+### Errors
+
+- Every receipt type refuses with a clear error when `active_pursuit` or
+  `provisional` is open.
+- `fallback-disclosure` refuses when the latest pursuit is not a fallback.
+- `paused-footer` refuses when the North Star is not paused.
+- `finalizer-receipt` refuses when the artifact is not finalized or when
+  `--subject` is missing.
+
 ## Finalize Or End
 
 Close the current pursuit and discard any open provisional timer first.

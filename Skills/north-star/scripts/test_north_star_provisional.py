@@ -268,23 +268,33 @@ def test15():
     prov_discard(art); s = status_json(art)
     assert s["provisional"] is None
 
-@test("16. Genuine legacy artifact: loads without provisional field")
+@test("16. Genuine legacy artifact: key absent before helper loads it")
 def test16():
-    art = artifact_path("Legacy", "Legacy Artifact")
-    # A newly created artifact has schema_version>=3 with provisional defaulting null.
-    # Verify it loads cleanly and provisional is absent/null.
-    s = status_json(art)
-    assert s["provisional"] is None
-    assert "provisional" in s
-    # Also verify the artifact file itself does not contain 'provisional' in the
-    # decoded state marker (true legacy: field never written until first use).
-    raw = art.read_text(encoding="utf-8")
     import base64, re
+    art = artifact_path("Legacy", "Legacy Artifact")
+    # Strip the provisional key from the encoded state marker so the fixture
+    # genuinely lacks it — not merely defaults to null.
+    raw = art.read_text(encoding="utf-8")
     STATE_RE = re.compile(r"<!-- north-star:state-b64 (?P<payload>[A-Za-z0-9_\-=]+) -->")
     m = STATE_RE.search(raw)
     assert m, "state marker must exist"
-    decoded = json.loads(base64.urlsafe_b64decode(m.group("payload")).decode("utf-8"))
-    assert decoded.get("provisional") is None, "legacy artifact has no provisional field or it is null"
+    payload = m.group("payload")
+    decoded = json.loads(base64.urlsafe_b64decode(payload).decode("utf-8"))
+    # Remove the provisional key if present (it is in current-format artifacts)
+    decoded.pop("provisional", None)
+    # Re-encode and write back
+    new_payload = base64.urlsafe_b64encode(json.dumps(decoded, ensure_ascii=False, separators=(",",":")).encode("utf-8")).decode("ascii")
+    new_raw = raw.replace(payload, new_payload)
+    art.write_text(new_raw, encoding="utf-8")
+    # Now re-read and assert the key is genuinely absent BEFORE the helper touches it
+    raw2 = art.read_text(encoding="utf-8")
+    m2 = STATE_RE.search(raw2)
+    decoded2 = json.loads(base64.urlsafe_b64decode(m2.group("payload")).decode("utf-8"))
+    assert "provisional" not in decoded2, "legacy fixture must genuinely lack the provisional key"
+    # The current helper must load it safely and normalize with provisional: null
+    s = status_json(art)
+    assert s["provisional"] is None, "helper exposes provisional: null for legacy fixture"
+    assert "provisional" in s, "provisional key present in normalized status output"
 
 @test("17. Terminal run (ended): provisional-start refused")
 def test17():
@@ -371,27 +381,38 @@ def test23():
     s2 = status_json(finalized[0])
     assert len(s2["pursuits"]) == before, "no row manufactured by no-pursuit finalizer"
 
-@test("24. Fallback disclosure: committed row carries visible timing_source marker")
+@test("24. Fallback disclosure: format-receipt outputs exact disclosure sentence")
 def test24():
     art = artifact_path("Disclose", "Fallback Disclosure")
     prov_start(art)
-    proc = prov_commit(art, "Disclosed fallback work")
-    assert proc is not None
+    prov_commit(art, "Disclosed fallback work")
+    # State: timing_source marker present
     s = status_json(art)
-    row = s["pursuits"][-1]
-    assert row.get("timing_source") == "provisional_fallback"
-    assert "provisional_fallback" in json.dumps(s["pursuits"])
+    assert s["pursuits"][-1].get("timing_source") == "provisional_fallback"
+    # Production output: the literal disclosure sentence
+    proc = run("format-receipt", "--artifact", str(art), "--type", "fallback-disclosure")
+    assert proc is not None
+    expected = "Full-turn fallback scoping was used for this pursuit — precise authoritative timing was missed."
+    assert proc.stdout.strip() == expected, f"expected exact disclosure sentence, got: {proc.stdout.strip()}"
 
-@test("25. Exactly-once timing: a pursued turn produces exactly one ledger row")
+@test("25. Exactly-once timing: format-receipt outputs exact contract-shape statement")
 def test25():
     art = artifact_path("ExactlyOnce", "Exactly One Row")
     before = len(status_json(art)["pursuits"])
     prov_start(art); pursuit_start(art, "Work"); pursuit_stop(art, "Work done")
     s = status_json(art)
-    assert len(s["pursuits"]) == before + 1, "exactly one row added"
+    assert len(s["pursuits"]) == before + 1, "exactly one row added to ledger"
     assert s["provisional"] is None
+    # Production output: the exact timing statement in contract shape
+    proc = run("format-receipt", "--artifact", str(art), "--type", "timing-statement")
+    assert proc is not None
+    stdout = proc.stdout.strip()
+    assert stdout.startswith("Pursuit "), f"timing statement must start with 'Pursuit', got: {stdout[:50]}"
+    assert " — " in stdout, "timing statement must contain ' — ' separator"
+    assert ". Grand total: " in stdout, "timing statement must contain '. Grand total: '"
+    assert stdout.endswith("."), "timing statement must end with '.'"
 
-@test("26. Paused footer behavior: no timing state, status is paused, provisional is null")
+@test("26. Paused footer: format-receipt outputs exact paused footer text")
 def test26():
     art = artifact_path("PausedFooter", "Paused Footer")
     pursuit_start(art, "Pre-pause work"); pursuit_stop(art, "Pre-pause done")
@@ -400,9 +421,87 @@ def test26():
     assert s["status"] == "paused"
     assert s["provisional"] is None
     assert s["active_pursuit"] is None
+    # Production output: the exact paused footer text
+    proc = run("format-receipt", "--artifact", str(art), "--type", "paused-footer")
+    assert proc is not None
+    stdout = proc.stdout.strip()
+    assert "Mode = " in stdout, "paused footer must start with 'Mode = '"
+    assert "PAUSED" in stdout, "paused footer must contain 'PAUSED'"
+    assert 'say "resume North Star" to continue' in stdout, "paused footer must contain resume instruction"
     # provisional-start must refuse while paused
-    proc = run("provisional-start","--artifact",str(art), expect_ok=False)
+    proc2 = run("provisional-start","--artifact",str(art), expect_ok=False)
+    assert proc2 is not None and proc2.returncode != 0
+
+@test("27. format-receipt timing-statement refuses when authoritative pursuit is open")
+def test27():
+    art = artifact_path("FmtGuard1", "Format Guard Auth")
+    pursuit_start(art, "Open work")
+    proc = run("format-receipt", "--artifact", str(art), "--type", "timing-statement", expect_ok=False)
     assert proc is not None and proc.returncode != 0
+    assert "pursuit" in proc.stderr.lower() or "authoritative" in proc.stderr.lower()
+    pursuit_stop(art, "Done")
+
+@test("28. format-receipt timing-statement refuses when provisional is open")
+def test28():
+    art = artifact_path("FmtGuard2", "Format Guard Prov")
+    prov_start(art)
+    proc = run("format-receipt", "--artifact", str(art), "--type", "timing-statement", expect_ok=False)
+    assert proc is not None and proc.returncode != 0
+    assert "provisional" in proc.stderr.lower()
+    prov_discard(art)
+
+@test("29. Finalizer-receipt: forward-slash link, exact number and path")
+def test29():
+    art = artifact_path("FinRcpt", "Finalizer Receipt Test")
+    pursuit_start(art, "Final work"); pursuit_stop(art, "Final work done")
+    do_checkpoint(art, 1); do_checkpoint(art, 2)
+    do_finalize(art)
+    hist = WORKSPACE / "Archive" / "Historical" / "North Stars" / "FinRcpt"
+    finalized = list(hist.glob("*_finalized.md"))
+    assert len(finalized) == 1
+    final_path = finalized[0].resolve()
+    # Permanent number from filename
+    import re
+    m = re.match(r"^(\d+)\.\) ", final_path.name)
+    assert m, "finalized artifact must have permanent N.) prefix"
+    perm_num = m.group(1)
+    expected_dest = final_path.as_posix()
+    # Production finalizer receipt
+    proc = run("format-receipt", "--artifact", str(final_path), "--type", "finalizer-receipt", "--subject", "FinRcpt")
+    assert proc is not None
+    stdout = proc.stdout.strip()
+    # Contract shape
+    assert f"North Star {perm_num} was verified and finalized." in stdout, f"wrong number or shape: {stdout[:80]}"
+    assert ". Pursuit " in stdout
+    assert ". Grand total: " in stdout
+    # Exact forward-slash link with subject and number
+    expected_link = f"[FinRcpt North Star {perm_num}](<{expected_dest}>)"
+    assert expected_link in stdout, f"expected link: {expected_link}\ngot: {stdout}"
+    # Reject prohibited forms
+    assert "file:///" not in stdout, "must not contain file:// URI"
+    assert "\\" not in stdout.split("](<")[1].split(">)")[0] if "](<" in stdout else True, "destination must not contain backslashes"
+
+@test("30. format-receipt paused-footer refuses when timing is open")
+def test30():
+    art = artifact_path("PFGuard", "Paused Footer Guard")
+    pursuit_start(art, "Work"); pursuit_stop(art, "Work done")
+    do_pause(art)
+    # Normal paused footer still works
+    proc = run("format-receipt", "--artifact", str(art), "--type", "paused-footer", "--subject", "PFGuard")
+    assert proc is not None
+    assert "PAUSED" in proc.stdout
+    # Now test: paused-footer refuses with open authoritative pursuit
+    art2 = artifact_path("PFGuard2", "Paused Footer Guard 2")
+    pursuit_start(art2, "Open work")
+    proc2 = run("format-receipt", "--artifact", str(art2), "--type", "paused-footer", "--subject", "PFGuard2", expect_ok=False)
+    assert proc2 is not None and proc2.returncode != 0
+    pursuit_stop(art2, "Done")
+    # And: paused-footer refuses with open provisional
+    art3 = artifact_path("PFGuard3", "Paused Footer Guard 3")
+    prov_start(art3)
+    proc3 = run("format-receipt", "--artifact", str(art3), "--type", "paused-footer", "--subject", "PFGuard3", expect_ok=False)
+    assert proc3 is not None and proc3.returncode != 0
+    prov_discard(art3)
 
 # ══════════════════════════════════════════════════════════════════════
 # MAIN
@@ -426,7 +525,10 @@ def main():
         ("Mixed","Mixed Timing"), ("RegressPS","Regression ProvStart Guard"),
         ("Standalone","Standalone Finalize"), ("NoPursuitFin","No Pursuit Finalizer"),
         ("Disclose","Fallback Disclosure"), ("ExactlyOnce","Exactly One Row"),
-        ("PausedFooter","Paused Footer"),
+        ("PausedFooter","Paused Footer"), ("FmtGuard1","Format Guard Auth"),
+        ("FmtGuard2","Format Guard Prov"), ("FinRcpt","Finalizer Receipt Test"),
+        ("PFGuard","Paused Footer Guard"), ("PFGuard2","Paused Footer Guard 2"),
+        ("PFGuard3","Paused Footer Guard 3"),
     ]
     for subj, top in subjects_topics:
         create_ns(subj, top)
@@ -436,10 +538,11 @@ def main():
     test9(); test10(); test11(); test12(); test13(); test14(); test15()
     test16(); test17(); test18(); test19(); test20()
     test21(); test22(); test23(); test24(); test25(); test26()
+    test27(); test28(); test29(); test30()
 
     print(f"\n{'='*60}")
     print(f"Results: {PASS}/{TOTAL} subprocess checks passed, {FAIL} failed")
-    print(f"Named test cases: 26")
+    print(f"Named test cases: 30")
     teardown()
     return 0 if FAIL == 0 else 1
 

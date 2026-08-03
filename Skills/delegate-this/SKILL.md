@@ -415,7 +415,7 @@ For **multi-agent skill work inside one Workflows repository**, the default
 synchronization model is **centralized**:
 
 - **Workers edit and validate local masters only.** Each worker edits its owned
-  `skills/<name>/` files, runs validation locally, and returns its deliverables
+  `Skills/<name>/` files, runs validation locally, and returns its deliverables
   (diffs, reports, validation output).
 - **Workers never pause merely to ask about sync.** Sync is the orchestrator's
   concern, not the worker's gate.

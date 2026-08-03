@@ -53,6 +53,14 @@ next number.
 - A semantic derivative is not an exact visual copy. Page images may preserve
   PDF appearance in HTML while accessible extracted text preserves semantics.
 
+## Agent Provenance Presentation
+
+When a first-party durable artifact carries `Agent Provenance`, visibly present its canonical facts in a two-column `Field | Value` table near the top. The rows are `Content owner`, `Original writing agent`, `Created`, and `Artifact role`. Use `Not recorded` rather than guessing unavailable creator evidence. Keep any conversion or rendition agent distinct from immutable original authorship.
+
+Normal first-party creation must not silently omit provenance. Require exactly one native canonical table in Markdown/HTML input or truthful ordered structured fields for another semantic input. Reject multiple native provenance sections or tables and reject simultaneous native and structured canonical provenance so the complete artifact contains exactly one canonical table. The four canonical rows are non-empty, unique, and in the required order; `Original writer` is not an alias for `Original writing agent`. An explicit exemption reason is allowed only for an operational, schema-sensitive, third-party, or otherwise excluded source-preservation path.
+
+Format renderers may improve the visible table presentation but must not alter the exact embedded source or attachment. HTML uses semantic column and row headers, an accessible responsive wrapper, long-value wrapping, theme-aware styling, and print-safe behavior. Semantic PDF generation uses stable field and value column widths, wrapped cells, a preserved/repeated header row, and safe page splitting. Faithful HTML-to-PDF printing preserves the source HTML table.
+
 ## Renderer Selection
 
 Choose a renderer appropriate to the source rather than forcing one serializer

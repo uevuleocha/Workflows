@@ -17,9 +17,9 @@ This is the core design principle: **every child workspace gets its own local wo
 
 - **Clone path:** `Archive/Live/Documentation/Personal/AI OS & Knowledge Bases/` relative to the target workspace root. This path is fixed across all workspaces.
 - **Clone filename:** the next available `N.)` number in that Subject folder. The hub's copy is `3.)`; a child workspace's copy might be `1.)`, `5.)`, or whatever number is next in that workspace's folder. The number is workspace-local.
-- **Clone presence is the first classification signal:**
-  - No clone found → fresh workspace, full setup case. The agent creates the clone as part of setup.
-  - Clone found → existing workspace, update/parity case. The agent reads the clone, diffs it against the current hub version, and stages only the items that have drifted.
+- **Clone presence is the first baseline signal:**
+  - No clone found → no prior `workspace-setup` baseline exists; the local anchor must be created as part of this run. Clone absence alone does not prove the workspace is new — it only means `workspace-setup` has never established a baseline here. Determine workspace age/state from all available evidence (contract files, Git repo, README, folder structure). An established workspace without a clone is still `Existing workspace` — the missing clone is an anchor/parity gap, not proof of freshness.
+  - Clone found → a prior baseline exists; compare it against the current hub version to detect drift and stage only the items that have changed.
 - **Clone content:** a faithful copy of the universal standards document from the hub, plus clearly separated workspace-specific annotations where appropriate. The universal standards content must remain synchronized with the hub; workspace-specific notes live in their own clearly delimited section so future syncs can update the shared content without touching local vocabulary.
 - **Sync is transport, not authorship.** Updating the clone is not new authorship — it is synchronization of the hub's standards into the workspace's local reference. Preserve provenance from the source; do not overwrite workspace-specific provenance or local annotations.
 
@@ -57,7 +57,7 @@ When invoked in any non-hub workspace, use the standards document as the univers
 
 1. Look for the local clone of the standards document first (see The Local Clone section above).
 2. If the clone exists, read it as the workspace's current known baseline. Diff it against the current hub version to detect what has drifted.
-3. If the clone is absent, plan a full setup and create the clone as part of execution.
+3. If the clone is absent, record the missing clone as an anchor/parity gap. Determine `New workspace` versus `Existing workspace` from complete workspace evidence (contract files, Git repo, README, folder structure), not from clone absence. Assign the appropriate parity verdict independently. Stage creation of the missing local anchor as part of the relevant execution phase — clone absence alone must never force `Full setup required`.
 4. Adapt hub material to the target workspace's purpose and the user's current instructions. Never blindly copy hub-only cosmology, nested-workspace, submodule, or hub `.gitignore` rules into an ordinary workspace unless it manages the same concerns.
 
 ## Inspection
@@ -90,8 +90,8 @@ If the hub copy has moved, locate the current numbered artifact in the same Subj
 After inspection, issue both labels:
 
 **Workspace state:**
-- `New workspace` — no prior setup evidence (no local clone, minimal structure)
-- `Existing workspace` — prior setup evidence found (local clone or existing contract files)
+- `New workspace` — the workspace itself is genuinely new (no CLAUDE.md, no AGENTS.md, no .git, no README). Determine this from complete workspace evidence, not from clone absence alone.
+- `Existing workspace` — the workspace already has contract files, a Git repository, or other workspace markers. An existing workspace without a local standards clone is still `Existing workspace` — the missing clone is an anchor/parity gap to be filled, not proof of freshness.
 
 **Parity verdict:**
 - `Full setup required` — the workspace lacks most or all required structure
@@ -210,6 +210,7 @@ Any of these means the run is not done:
 - It creates duplicate standards copies, renumbers an existing copy, overwrites local provenance, or silently discards workspace-specific rules.
 - It mutates a workspace before providing the required briefing and obtaining applicable authority.
 - It makes `set-the-stage` own setup execution or duplicates the complete checklist into that skill.
+- `SKILL.md` or `README.md` says or implies that every workspace without a local standards clone is necessarily a fresh workspace.
 - Required files, routing branches, validations, or evidence are missing.
 - It claims completion without evidence or claims global availability from a local-master-only change.
 

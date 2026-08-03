@@ -95,7 +95,7 @@ Resolve the path stack before creating or syncing. The user should normally have
 
 Preferred discovery order:
 
-1. If the host workspace contains a `skills/` folder and a canonical contract file such as `CLAUDE.md`, `AGENTS.md`, or `GEMINI.md`, treat `<project root>/skills/` as the local master candidate.
+1. If the host workspace contains a `Skills/` or `skills/` folder and a canonical contract file such as `CLAUDE.md`, `AGENTS.md`, or `GEMINI.md`, treat the exact existing folder, preserving its casing, as the local master candidate. If both variants exist and no canonical contract identifies the intended master, stop and ask rather than guessing.
 2. If no local master candidate is obvious, ask the user whether they want a local master folder, where it should live, and whether it should be the machine's single canonical local master.
 3. Resolve global install candidates from the user's home directory:
    - Codex: `~/.codex/skills/`
@@ -111,7 +111,7 @@ Maintainer defaults for Uzo's machine:
 
 ```text
 Local master:
-C:\Users\Admin\Uzzys Universe\MilkyWay\Tools\Workflows\skills\[Skill-name]\SKILL.md
+C:\Users\Admin\Uzzys Universe\MilkyWay\Tools\Workflows\Skills\[Skill-name]\SKILL.md
 
 Codex global:
 C:\Users\Admin\.codex\skills\[Skill-name]\SKILL.md
@@ -242,7 +242,7 @@ Use stdout only to tell the *user* what went wrong. Never to decide.
 
 Keep the skill focused on the reusable procedure another agent needs. Do not add extra documentation files such as changelogs or install guides unless the user explicitly asks — with one mandatory exception: the README.
 
-**README.md is compulsory for every skill.** Every skill ships a top-level `skills/<name>/README.md` alongside `SKILL.md`, created in the same pass as the skill itself and mirrored to every global copy. Keep it very brief — a shelf label, not a second SKILL.md:
+**README.md is compulsory for every skill.** Every skill ships a top-level `Skills/<name>/README.md` alongside `SKILL.md`, created in the same pass as the skill itself and mirrored to every global copy. Keep it very brief — a shelf label, not a second SKILL.md:
 
 - a few sentences saying what the skill does and when to invoke it
 - when the skill depends on, calls, or pairs with other skills, a short "Related skills" (ships-with/requires) list so an adopter taking the skill from a repo grabs the full set

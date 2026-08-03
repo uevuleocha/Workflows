@@ -61,7 +61,7 @@ Workspaces are sometimes **nested inside another workspace** — e.g. a hub with
 Classification per value (destination = `new`, source = `old`):
 
 - **Exact old root** → rewritten to `new`. This is checked *first*, so that even when `old` is itself nested under `new` (source-under-destination) the exact old root is still rewritten rather than swallowed by the already-destination guard.
-- **Already at/under `new`** → left unchanged (idempotent). This is the guard that prevents a doubled, corrupt path like `…\Workflows\MilkyWay\Tools\Workflows\skills` when `new` is nested under `old`.
+- **Already at/under `new`** → left unchanged (idempotent). This is the guard that prevents a doubled, corrupt path like `…\Workflows\MilkyWay\Tools\Workflows\Skills` when `new` is nested under `old`.
 - **A different subtree of `old`** → for a plain *side-by-side* move the `old` prefix is swapped for `new`; for a *nested* move (either direction) the value is **left unchanged** rather than fabricating a `new`-relative path (`old\Family\Heart` must never become `new\Family\Heart`).
 
 `remap_cwd` enforces this, and verification rejects both residual old-workspace values **and** doubled-destination values (a doubled path begins with `new` and would otherwise pass unnoticed). The chat's true residence is guaranteed by the transcript's destination folder plus the Desktop record's `cwd`/`originCwd`, not by stamping every per-line breadcrumb.

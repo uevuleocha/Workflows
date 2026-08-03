@@ -32,7 +32,7 @@ Treat these as direct invocation and begin the workflow:
 
 ## Modes
 
-- **Mode A — Skills (fully built).** Propagate a folder-style skill (or all skills) from the local master `skills/` folder to each global skills target.
+- **Mode A — Skills (fully built).** Propagate a folder-style skill (or all skills) from the local master `Skills/` folder to each global skills target.
 - **Mode B — Agents / Sub-agents (stub, not implemented).** Reserved for propagating custom sub-agents once the user starts saving them. See the Mode B section.
 
 Pick the mode from context. Default to Mode A unless the user clearly names an agent/sub-agent artifact.
@@ -43,7 +43,7 @@ Resolve these before copying. On Uzo's machine the maintainer defaults are:
 
 ```text
 Local master:
-C:\Users\Admin\Uzzys Universe\MilkyWay\Tools\Workflows\skills\<skill>\
+C:\Users\Admin\Uzzys Universe\MilkyWay\Tools\Workflows\Skills\<skill>\
 
 Codex global:
 C:\Users\Admin\.codex\skills\<skill>\
@@ -83,7 +83,7 @@ description: Personal reusable skills synced from the Workflows local master. Cr
 
 ## Mode A Workflow
 
-1. **Resolve scope.** A named skill, a comma-separated list of skills, or `all` (every folder under the local master `skills/`).
+1. **Resolve scope.** A named skill, a comma-separated list of skills, or `all` (every folder under the local master `Skills/`).
 2. **Confirm each named skill exists in the local master.** If a named skill is missing locally, stop and report it — this skill never creates artifacts.
 3. **Validate the local master first.** Run `quick_validate.py` (UTF-8 mode) on each in-scope local master skill and read each result per `Reading the Validator's Result`. If any skill exits `1` with empty stderr, it is invalid: stop and report — never propagate a broken skill to the global targets. If any run exits `1` with non-empty stderr, or exits anything other than `0` or `1`, validation did not complete: stop, and copy nothing.
 4. **Verify target base directories.** For each of Codex, Claude, Antigravity, Hermes, and zCode, confirm the global skills base directory exists. If one is missing, stop and ask for the replacement path for that target (do not guess).
