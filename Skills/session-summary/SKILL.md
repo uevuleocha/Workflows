@@ -21,10 +21,7 @@ Treat these as direct invocation and begin the skill workflow:
 - `use the session-summary skill`
 - clear equivalents where the user explicitly names this skill
 
-A direct invocation is authorization to infer the required values, create any
-needed in-project summary directories, write the summary, and return the
-completed-values template in the same turn. Do not add a separate preview,
-confirmation, or greenlight step.
+A direct invocation is authorization to infer the required values, create any needed in-project summary directories, write the summary, and return the completed-values template in the same turn. Do not add a separate preview, confirmation, or greenlight step.
 
 For natural trigger phrases, confirm first before running the saved-summary workflow or creating/editing files:
 
@@ -47,19 +44,13 @@ Do you want me to run the `session-summary` skill and create a saved session sum
 
 If the user only wants a quick chat answer, do not create a file.
 
-For natural trigger phrases, the affirmative answer to the confirmation
-question authorizes the complete saved-summary workflow. Do not ask for a
-second confirmation after inferring the required values.
+For natural trigger phrases, the affirmative answer to the confirmation question authorizes the complete saved-summary workflow. Do not ask for a second confirmation after inferring the required values.
 
 ## Required Inputs
 
 Four values drive the summary file: **Subject**, **Topic**, **Session Number**, and **Directory**.
 
-**Inference is mandatory and compulsory.** You MUST infer all four values from
-the session and the workspace. Do not present a blank template, and do not ask
-the user to supply a value you could have derived yourself. Presenting empty
-fields, or asking for approval of inferred values, is a protocol violation.
-Your job is to do the legwork and save the summary in the same turn.
+**Inference is mandatory and compulsory.** You MUST infer all four values from the session and the workspace. Do not present a blank template, and do not ask the user to supply a value you could have derived yourself. Presenting empty fields, or asking for approval of inferred values, is a protocol violation. Your job is to do the legwork and save the summary in the same turn.
 
 How to infer each value:
 
@@ -78,15 +69,9 @@ Reference examples:
   - A specific in-project directory the user named: use it exactly
   - A directory outside the project root: stop and ask before proceeding
 
-Immediately before writing, verify that the resolved filename is still
-available. Never overwrite an existing summary accidentally. If another file
-already occupies the inferred number, advance to the next available integer
-and use that number consistently in the filename, summary metadata, and
-completion receipt.
+Immediately before writing, verify that the resolved filename is still available. Never overwrite an existing summary accidentally. If another file already occupies the inferred number, advance to the next available integer and use that number consistently in the filename, summary metadata, and completion receipt.
 
-**Save first, then present the completed-values template.** After writing the
-file, always show the template pre-filled with the values actually used. This
-is a completion receipt, not an approval request. Use this wording:
+**Save first, then present the completed-values template.** After writing the file, always show the template pre-filled with the values actually used. This is a completion receipt, not an approval request. Use this wording:
 
 ```text
 Created and saved using these inferred values:
@@ -105,15 +90,17 @@ Key:
 8.) Where "x.)" = [Session Number]
 ```
 
-Fill every numbered line with a concrete value, never a blank. Also provide a
-clickable path to the saved artifact when the current interface supports local
-file links. If the user dislikes the inferred Subject, Topic, Session Number,
-Directory, filename, or content, treat their follow-up as a normal correction:
-update or move the artifact as requested and return the revised completed-values
-template. Do not make uncertainty about naming or categorization into a
-pre-write approval gate. Pause only when a higher-priority project contract,
-filesystem restriction, unsafe overwrite, or explicitly requested
-outside-project destination genuinely requires user input.
+Fill every numbered line with a concrete value, never a blank. Also provide a clickable path to the saved artifact when the current interface supports local file links. If the user dislikes the inferred Subject, Topic, Session Number, Directory, filename, or content, treat their follow-up as a normal correction: update or move the artifact as requested and return the revised completed-values template. Do not make uncertainty about naming or categorization into a pre-write approval gate. Pause only when a higher-priority project contract, filesystem restriction, unsafe overwrite, or explicitly requested outside-project destination genuinely requires user input.
+
+## Caller-Supplied Overrides
+
+A caller — the user directly, or an orchestrating skill such as `finalize-session` — may supply any of the four values explicitly. Supplied values are honored; everything not supplied stays inferred under the rules above. Inference remains mandatory for every unsupplied value, and a caller never turns an unsupplied value into a question.
+
+- **Subject, Topic, Directory** — use a supplied value exactly as given. A Directory outside the project root still stops and asks.
+- **Session Number** — a supplied number replaces the inferred `highest + 1` starting point. It does **not** relax the no-overwrite rule: immediately before writing, verify the resolved filename is still available, and if the supplied number is already occupied, advance to the next available integer and use that number consistently in the filename, metadata, and receipt. Never overwrite an existing summary to satisfy an override.
+- **Receipt honesty** — the completed-values template always reports the values actually used, not the values requested. When an override was superseded by collision safety, say so in one short line beside the receipt.
+
+Never confuse a caller's chat-session identifier with this artifact's permanent Session Number. They are separate namespaces; an orchestrator that supplies only a chat identifier has supplied no summary number at all.
 
 ## Required Review
 
@@ -165,8 +152,7 @@ Example:
 <project root>\Archive\Historical\Summaries\Uzzy TRUTH\9.) QS LCA Extraction.md
 ```
 
-If the directory does not exist, create it as part of the same authorized
-summary pass when file creation is allowed.
+If the directory does not exist, create it as part of the same authorized summary pass when file creation is allowed.
 
 **Archive folder rule.** Session summaries always live under `Archive/` (in `Archive/Historical/Summaries/[Subject]/`). If the `Archive/` folder does not yet exist in the workspace, create it yourself — along with the needed `Summaries/[Subject]/` subfolders — when file creation is allowed. Never redirect the summary into any other folder (such as `Documentation/`) as a fallback. The summary folder always nests inside `Archive/`.
 
@@ -347,47 +333,26 @@ If the user asks for "EVERY SINGLE THING", interpret that as:
 
 ## Delegated Return Reports (Session-Summary Family)
 
-A **delegated return report** is a session-summary family member that a
-returning agent writes when its delegation assignment completes. It is reserved
-and mandated by `delegate-this`, but its **shape** lives here because it is a
-session summary.
+A **delegated return report** is a session-summary family member that a returning agent writes when its delegation assignment completes. It is reserved and mandated by `delegate-this`, but its **shape** lives here because it is a session summary.
 
 A return report:
 
-- uses **session-summary structure** — the 🎭 ACTS narrative, metadata header,
-  Definition of Done ACT, and final-state block — exactly as a normal summary;
-- carries a **lowercase child prefix** (`Na.)`, `Nb.)`, …) from the **Summary
-  family** master `N` (the Summary Subject namespace), reserved by the
-  orchestrator. The orchestrator/master summary is `N.)`; return reports inherit
-  that Summary master number (e.g. `9.)` → reports `9a.)`, `9b.)`, …);
-- has a filename that **ends in `Report.md`** (for example,
-  `9a.) claude_packet1_wave1_Report.md`);
-- lives under `<project root>\Archive\Historical\Summaries\<Subject>\`, beside
-  the orchestrator/master summary;
-- adds one delegation-specific section: an **append-only `## Feedback`
-  ledger**, placed after the session-summary body (after the `## Next Session
-  Pickup` block).
+- uses **session-summary structure** — the 🎭 ACTS narrative, metadata header, Definition of Done ACT, and final-state block — exactly as a normal summary;
+- carries a **lowercase child prefix** (`Na.)`, `Nb.)`, …) from the **Summary family** master `N` (the Summary Subject namespace), reserved by the orchestrator. The orchestrator/master summary is `N.)`; return reports inherit that Summary master number (e.g. `9.)` → reports `9a.)`, `9b.)`, …);
+- has a filename that **ends in `Report.md`** (for example, `9a.) claude_packet1_wave1_Report.md`);
+- lives under `<project root>\Archive\Historical\Summaries\<Subject>\`, beside the orchestrator/master summary;
+- adds one delegation-specific section: an **append-only `## Feedback` ledger**, placed after the session-summary body (after the `## Next Session Pickup` block).
 
-**Separate namespace anchor.** The Summary family's master `N` comes from the
-Summary Subject namespace only — it is independent of the delegation's Plan/Task
-number and of the Delegation record's own number. The families are connected by
-explicit path pointers, not a shared number; do not expect the Summary master
-`N` to match the Plan or Delegation `N`.
+**Separate namespace anchor.** The Summary family's master `N` comes from the Summary Subject namespace only — it is independent of the delegation's Plan/Task number and of the Delegation record's own number. The families are connected by explicit path pointers, not a shared number; do not expect the Summary master `N` to match the Plan or Delegation `N`.
 
 ### Feedback ledger rules
 
 The `## Feedback` section is append-only:
 
-- **Existing report content is immutable.** Never rewrite a returned
-  deliverable, ACT, or earlier line of the report.
-- **Earlier feedback entries are immutable.** Once written, a feedback line is
-  never edited or deleted — corrections are added as new lines.
-- **Feedback is appendable only while the delegation is active.** The
-  orchestrator (and, when relevant, the returning worker) may append feedback
-  lines while the delegation is `_dispatched`.
-- **The entire report freezes when `finalize-delegation` closes the
-  delegation.** After the record becomes `_completed`, no further feedback may
-  be appended — the report is a closed historical artifact.
+- **Existing report content is immutable.** Never rewrite a returned deliverable, ACT, or earlier line of the report.
+- **Earlier feedback entries are immutable.** Once written, a feedback line is never edited or deleted — corrections are added as new lines.
+- **Feedback is appendable only while the delegation is active.** The orchestrator (and, when relevant, the returning worker) may append feedback lines while the delegation is `_dispatched`.
+- **The entire report freezes when `finalize-delegation` closes the delegation.** After the record becomes `_completed`, no further feedback may be appended — the report is a closed historical artifact.
 
 Example:
 
@@ -400,47 +365,25 @@ Example:
 
 ### Thin dependency
 
-This skill owns the **report/feedback shape** only. It does **not** know about
-delegation routing, packets, or lifecycle moves — that is `delegate-this`
-(reserve + mandate) and `finalize-delegation` (freeze on close). When asked to
-write a return report, use the reserved prefix supplied by the orchestrator,
-use session-summary structure, append `## Feedback`, and stop there.
+This skill owns the **report/feedback shape** only. It does **not** know about delegation routing, packets, or lifecycle moves — that is `delegate-this` (reserve + mandate) and `finalize-delegation` (freeze on close). When asked to write a return report, use the reserved prefix supplied by the orchestrator, use session-summary structure, append `## Feedback`, and stop there.
 
 ## Agent Provenance For Durable Artifacts
 
-This skill applies the workspace's first-party durable-artifact provenance rule
-to session summaries, including migration handoffs and execution reports.
+This skill applies the workspace's first-party durable-artifact provenance rule to session summaries, including migration handoffs and execution reports.
 
 For every in-scope artifact:
 
-- place an `## Agent Provenance` section near the top with `Content owner`,
-  `Original writing agent`, `Created`, and `Artifact role`;
-- use a stable truthful agent-family label such as `Codex Agent`, `Claude Agent`,
-  `Antigravity Agent`, `Hermes Agent`, or `zCode Agent`;
+- place an `## Agent Provenance` section near the top with `Content owner`, `Original writing agent`, `Created`, and `Artifact role`;
+- use a stable truthful agent-family label such as `Codex Agent`, `Claude Agent`, `Antigravity Agent`, `Hermes Agent`, or `zCode Agent`;
 - keep the original writing-agent entry immutable;
-- keep an append-only `## Agent Change Log` near the bottom, recording the date,
-  acting agent, action, and concise scope for every material edit;
-- if a legacy artifact lacks reliable creator evidence, use `Not recorded` rather
-  than guessing, then log the current agent's actual change; and
+- keep an append-only `## Agent Change Log` near the bottom, recording the date, acting agent, action, and concise scope for every material edit;
+- if a legacy artifact lacks reliable creator evidence, use `Not recorded` rather than guessing, then log the current agent's actual change; and
 - treat copying or global synchronization as transport, not authorship.
 
-Keep `Content owner` for now. In Uzo's personal artifacts it normally resolves
-to `Uzo`; do not confuse content ownership with the agent that performed the
-filesystem write. Do not inject provenance into product source, third-party
-files, databases, generated caches, skill definitions, schema-sensitive or
-machine-consumed files, or other operational files unless their schema
-explicitly supports it.
+Keep `Content owner` for now. In Uzo's personal artifacts it normally resolves to `Uzo`; do not confuse content ownership with the agent that performed the filesystem write. Do not inject provenance into product source, third-party files, databases, generated caches, skill definitions, schema-sensitive or machine-consumed files, or other operational files unless their schema explicitly supports it.
 
 ## Durable Artifact Format Handling
 
-This skill owns summary scope, ACTS structure, metadata, Subject, permanent
-number, path, delegation-report shape, and content. When co-invoked with
-`html-this` or `pdf-this`, run the complete summary workflow but save only the
-requested `.html` or `.pdf` artifact unless the user requests multiple formats.
-Pass the requested format through when this skill is called by a migration or
-delegation workflow.
+This skill owns summary scope, ACTS structure, metadata, Subject, permanent number, path, delegation-report shape, and content. When co-invoked with `html-this` or `pdf-this`, run the complete summary workflow but save only the requested `.html` or `.pdf` artifact unless the user requests multiple formats. Pass the requested format through when this skill is called by a migration or delegation workflow.
 
-Treat same-stem `.md`, `.html`, and `.pdf` variants as one summary-family
-artifact and one reserved prefix. Update every existing sibling consistently.
-Return-report names use `Report.html` or `Report.pdf` in the requested format.
-This section overrides `.md`-only examples only for the co-invoked run.
+Treat same-stem `.md`, `.html`, and `.pdf` variants as one summary-family artifact and one reserved prefix. Update every existing sibling consistently. Return-report names use `Report.html` or `Report.pdf` in the requested format. This section overrides `.md`-only examples only for the co-invoked run.

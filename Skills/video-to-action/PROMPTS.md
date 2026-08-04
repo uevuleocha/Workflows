@@ -1,15 +1,8 @@
 # Video-to-Action — Orchestrator Prompts (Template)
 
-Auto-generated from `scripts/video_to_action.py` by `--dump-prompts`.
-Free tier is the non-blocking default. The primary model is
-`gemini-3.6-flash` and the one-attempt fallback after three recognized
-transient primary failures is `gemini-3.5-flash`.
+Auto-generated from `scripts/video_to_action.py` by `--dump-prompts`. Free tier is the non-blocking default. The primary model is `gemini-3.6-flash` and the one-attempt fallback after three recognized transient primary failures is `gemini-3.5-flash`.
 
-The Procedure call always runs. Deep Summary is opt-in. Technical is
-opt-in and requires an explicit coding/software relevance confirmation.
-Choices already present in the request are reused without reconfirmation.
-Per-run prompts.md stores each exact selected prompt once and associates
-all sanitized model-attempt provenance with that prompt.
+The Procedure call always runs. Deep Summary is opt-in. Technical is opt-in and requires an explicit coding/software relevance confirmation. Choices already present in the request are reused without reconfirmation. Per-run prompts.md stores each exact selected prompt once and associates all sanitized model-attempt provenance with that prompt.
 
 ## Procedure (always)
 

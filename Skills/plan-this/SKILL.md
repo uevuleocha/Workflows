@@ -145,12 +145,7 @@ When the user wants to update an existing `_finalized.md` plan, reopen it gracef
 1. Preserve the previous finalized work, completion evidence, and finalization notes.
 2. Add a new phase, checklist section, or dated update section that explains why the plan is active again.
 3. Rename the plan file from `_finalized.md` back to `_active.md`.
-4. **Move the file back from `Historical` to `Live`.** A finalized plan lives in
-   `Archive\Historical\Plans\[Subject]\`; reopening moves it to
-   `Archive\Live\Plans\[Subject]\`, preserving the same `[Subject]` folder and the
-   same `N.) ` number. An active/pending plan must live on the `Live` side so a
-   "scan Live for active work" pass still finds it — never leave a reopened plan
-   stranded in `Historical`.
+4. **Move the file back from `Historical` to `Live`.** A finalized plan lives in `Archive\Historical\Plans\[Subject]\`; reopening moves it to `Archive\Live\Plans\[Subject]\`, preserving the same `[Subject]` folder and the same `N.) ` number. An active/pending plan must live on the `Live` side so a "scan Live for active work" pass still finds it — never leave a reopened plan stranded in `Historical`.
 5. Update the status and lifecycle lines to show that the plan was reopened.
 6. Leave finalization for a later explicit `finalize-plan` pass after the user verifies the reopened work.
 
@@ -158,8 +153,7 @@ Do not delete prior completed sections just because a finalized plan has been re
 
 ## Create Mode
 
-Default directory (the `[Subject]` folder is the broad category, e.g. `Skills/`,
-`Trading/`; it is never numbered):
+Default directory (the `[Subject]` folder is the broad category, e.g. `Skills/`, `Trading/`; it is never numbered):
 
 ```text
 <project root>\Archive\Live\Plans\[Subject]\
@@ -177,22 +171,11 @@ Mini plan filename format, only when the user explicitly asks for a "mini plan":
 N.) <Topic>_mini_active.md
 ```
 
-`N` is assigned **once at creation** as the next integer past the highest `N.) `
-number found across **both** `Archive\Live\Plans\[Subject]\` **and**
-`Archive\Historical\Plans\[Subject]\` combined — the Subject's full Live +
-Historical namespace. Glob both folders, take the global max, add 1. If neither
-folder holds a numbered file, use `1`. This combined-namespace rule prevents
-collisions when the Live folder drains and would otherwise restart at `1` while
-Historical still holds that number.
+`N` is assigned **once at creation** as the next integer past the highest `N.) ` number found across **both** `Archive\Live\Plans\[Subject]\` **and** `Archive\Historical\Plans\[Subject]\` combined — the Subject's full Live + Historical namespace. Glob both folders, take the global max, add 1. If neither folder holds a numbered file, use `1`. This combined-namespace rule prevents collisions when the Live folder drains and would otherwise restart at `1` while Historical still holds that number.
 
-The number is **immutable for the life of the file**: it survives `_active.md` ↔
-`_finalized.md` lifecycle renames and the Live ↔ Historical moves on finalize and
-reopen. Never renumber on finalization or reopening, and never reclaim gaps.
+The number is **immutable for the life of the file**: it survives `_active.md` ↔ `_finalized.md` lifecycle renames and the Live ↔ Historical moves on finalize and reopen. Never renumber on finalization or reopening, and never reclaim gaps.
 
-**Folders are never numbered — only files carry the `N.) ` prefix.** The
-`[Subject]` folder is a plain name (`Skills/`, `Trading/`, `Legacy/`); the numeric
-index lives only on the files inside it, and `N.)` is unique per Subject across
-the combined namespace.
+**Folders are never numbered — only files carry the `N.) ` prefix.** The `[Subject]` folder is a plain name (`Skills/`, `Trading/`, `Legacy/`); the numeric index lives only on the files inside it, and `N.)` is unique per Subject across the combined namespace.
 
 Generate the filename **Topic** as a short **Title Case phrase with spaces** describing the plan's work — typically the `Main Task`, optionally led by the `Primary File or Main Component` (for example, `Prompt-This Suffix Rollout`). Match the workspace's other artifact filenames (`prompt-this`, `doc-this`, `session-summary`): Title Case, spaces, no underscores inside the Topic. Only the lifecycle suffix (`_active`, `_mini_active`) keeps its underscore form. Do not ask the user for the filename unless the derived Topic would be ambiguous or misleading.
 
@@ -323,11 +306,7 @@ Do not populate this field yourself. Do not reason about delegation, routing, pl
 
 ### Child Numbering (Outside Delegation)
 
-Plans can be **children** of a parent plan even outside any delegation — for
-example, when one large plan is split into a parent and sub-plans. This skill
-understands the lowercase child-numbering grammar enough to **allocate the next
-child suffix** and **obey a reserved prefix**; it does **not** absorb the
-delegation workflow.
+Plans can be **children** of a parent plan even outside any delegation — for example, when one large plan is split into a parent and sub-plans. This skill understands the lowercase child-numbering grammar enough to **allocate the next child suffix** and **obey a reserved prefix**; it does **not** absorb the delegation workflow.
 
 Grammar (shared with `delegate-this`):
 
@@ -336,30 +315,16 @@ Grammar (shared with `delegate-this`):
 - child plan (mini or not): `Na.)`, `Nb.)` … `Nz.)`, then `Naa.)`, `Nab.)` …
 - the parent's permanent `N` is inherited by every child **in the Plan family**.
 
-**Separate namespace anchor.** The Plan family's master `N` comes from the
-Plan/Task Subject namespace only. It is independent of any Delegation record
-number or Summary family number — those are separate artifact-type namespaces
-with their own anchors, connected to the Plan by explicit path pointers, not by
-a shared number. Do not scan the Delegation or Summary folders to choose a Plan
-number, and do not expect the numbers to match.
+**Separate namespace anchor.** The Plan family's master `N` comes from the Plan/Task Subject namespace only. It is independent of any Delegation record number or Summary family number — those are separate artifact-type namespaces with their own anchors, connected to the Plan by explicit path pointers, not by a shared number. Do not scan the Delegation or Summary folders to choose a Plan number, and do not expect the numbers to match.
 
 How to assign a child prefix when parenthood applies:
 
-1. **Infer parenthood** from explicit user direction ("this is a sub-plan of …")
-   or clear context. **Ask when parenthood is ambiguous** — do not guess.
-2. **Scan the parent's existing lowercase children** across **both**
-   `Archive\Live\Plans\[Subject]\` and `Archive\Historical\Plans\[Subject]\`
-   (files matching `Na.)` … `Nz.)`, `Naa.)` … for the same parent `N`) to see
-   which suffixes are taken.
+1. **Infer parenthood** from explicit user direction ("this is a sub-plan of …") or clear context. **Ask when parenthood is ambiguous** — do not guess.
+2. **Scan the parent's existing lowercase children** across **both** `Archive\Live\Plans\[Subject]\` and `Archive\Historical\Plans\[Subject]\` (files matching `Na.)` … `Nz.)`, `Naa.)` … for the same parent `N`) to see which suffixes are taken.
 3. **Allocate the next suffix** in alphabetical order, skipping any taken.
-4. **Obey an orchestrator-reserved prefix exactly** when one is supplied (for
-   example, when `delegate-this` reserved `1a.)` for this plan). Never invent or
-   renumber a reserved prefix.
+4. **Obey an orchestrator-reserved prefix exactly** when one is supplied (for example, when `delegate-this` reserved `1a.)` for this plan). Never invent or renumber a reserved prefix.
 
-The child prefix is **permanent**. It survives `_active.md` ↔ `_finalized.md`
-renames and Live ↔ Historical moves; `finalize-plan` preserves it through
-finalization and reopening. An independent mini plan with no parent uses the
-plain `N.)` form, not a child suffix.
+The child prefix is **permanent**. It survives `_active.md` ↔ `_finalized.md` renames and Live ↔ Historical moves; `finalize-plan` preserves it through finalization and reopening. An independent mini plan with no parent uses the plain `N.)` form, not a child suffix.
 
 For compact plans, allow:
 
@@ -458,43 +423,24 @@ If the user asked for the plan only in chat, do not create, update, rename, or f
 
 ## Agent Provenance For Durable Artifacts
 
-This skill applies the workspace's first-party durable-artifact provenance rule
-to active plan artifacts and every later material plan revision.
+This skill applies the workspace's first-party durable-artifact provenance rule to active plan artifacts and every later material plan revision.
 
 For every in-scope artifact:
 
-- place an `## Agent Provenance` section near the top with `Content owner`,
-  `Original writing agent`, `Created`, and `Artifact role`;
-- use a stable truthful agent-family label such as `Codex Agent`, `Claude Agent`,
-  `Antigravity Agent`, `Hermes Agent`, or `zCode Agent`;
+- place an `## Agent Provenance` section near the top with `Content owner`, `Original writing agent`, `Created`, and `Artifact role`;
+- use a stable truthful agent-family label such as `Codex Agent`, `Claude Agent`, `Antigravity Agent`, `Hermes Agent`, or `zCode Agent`;
 - keep the original writing-agent entry immutable;
-- keep an append-only `## Agent Change Log` near the bottom, recording the date,
-  acting agent, action, and concise scope for every material edit;
-- if a legacy artifact lacks reliable creator evidence, use `Not recorded` rather
-  than guessing, then log the current agent's actual change; and
+- keep an append-only `## Agent Change Log` near the bottom, recording the date, acting agent, action, and concise scope for every material edit;
+- if a legacy artifact lacks reliable creator evidence, use `Not recorded` rather than guessing, then log the current agent's actual change; and
 - treat copying or global synchronization as transport, not authorship.
 
-Keep `Content owner` for now. In Uzo's personal artifacts it normally resolves
-to `Uzo`; do not confuse content ownership with the agent that performed the
-filesystem write. Do not inject provenance into product source, third-party
-files, databases, generated caches, skill definitions, schema-sensitive or
-machine-consumed files, or other operational files unless their schema
-explicitly supports it.
+Keep `Content owner` for now. In Uzo's personal artifacts it normally resolves to `Uzo`; do not confuse content ownership with the agent that performed the filesystem write. Do not inject provenance into product source, third-party files, databases, generated caches, skill definitions, schema-sensitive or machine-consumed files, or other operational files unless their schema explicitly supports it.
 
 ## Durable Artifact Format Handling
 
-This skill owns plan content, Prompt Contract, checklists, estimates, Subject,
-permanent number, path, update/reopen behavior, and lifecycle. When co-invoked
-with `html-this` or `pdf-this`, run the full plan workflow and save only the
-requested `.html` or `.pdf` durable artifact unless the user requests multiple
-formats. All Markdown-described structure remains semantically mandatory; only
-serialization changes.
+This skill owns plan content, Prompt Contract, checklists, estimates, Subject, permanent number, path, update/reopen behavior, and lifecycle. When co-invoked with `html-this` or `pdf-this`, run the full plan workflow and save only the requested `.html` or `.pdf` durable artifact unless the user requests multiple formats. All Markdown-described structure remains semantically mandatory; only serialization changes.
 
-Treat same-stem `.md`, `.html`, and `.pdf` variants as one plan and one
-numbering entry. On update or reopen, preflight and update/move every sibling
-together. This section overrides `.md`-only extension examples and validation
-wording only during a co-invoked format run; `_active`, `_mini_active`, and
-finalized lifecycle semantics remain unchanged.
+Treat same-stem `.md`, `.html`, and `.pdf` variants as one plan and one numbering entry. On update or reopen, preflight and update/move every sibling together. This section overrides `.md`-only extension examples and validation wording only during a co-invoked format run; `_active`, `_mini_active`, and finalized lifecycle semantics remain unchanged.
 
 ## Validation
 

@@ -107,12 +107,7 @@ When the user wants to update an existing `_done.md` task, reopen it gracefully:
 1. Add a new phase, checklist section, or dated update section that explains why the task is active again.
 2. Preserve the previous completed work and completion evidence.
 3. Rename the task file from `_done.md` back to `_pending.md`.
-4. **Move the file back from `Historical` to `Live`.** A done task lives in
-   `Archive\Historical\Tasks\[Subject]\`; reopening moves it to
-   `Archive\Live\Tasks\[Subject]\`, preserving the same `[Subject]` folder and the
-   same `N.) ` number. A reopened (pending) task must live on the `Live` side so a
-   "scan Live for active work" pass still finds it — never leave a reopened task
-   stranded in `Historical`.
+4. **Move the file back from `Historical` to `Live`.** A done task lives in `Archive\Historical\Tasks\[Subject]\`; reopening moves it to `Archive\Live\Tasks\[Subject]\`, preserving the same `[Subject]` folder and the same `N.) ` number. A reopened (pending) task must live on the `Live` side so a "scan Live for active work" pass still finds it — never leave a reopened task stranded in `Historical`.
 5. Update the status and lifecycle lines to show that the task was reopened.
 
 Do not delete prior completed sections just because a task has been reopened.
@@ -153,19 +148,13 @@ Ask before writing when:
 
 ## Default Path And Naming
 
-Default directory (the `[Subject]` folder is the broad category, e.g. `Skills/`,
-`Housekeeping/`, `Legacy/`; it is never numbered):
+Default directory (the `[Subject]` folder is the broad category, e.g. `Skills/`, `Housekeeping/`, `Legacy/`; it is never numbered):
 
 ```text
 <project root>\Archive\Live\Tasks\[Subject]\
 ```
 
-Task files always live under `Archive/`, nested inside a `[Subject]` folder (in
-`Archive/Live/Tasks/[Subject]/`). If the workspace contract specifies a different
-task directory, use that contract path instead. Otherwise default to
-`<project root>\Archive\Live\Tasks\[Subject]\` — do not create a separate
-top-level `Tasks/` directory outside `Archive/`, and do not save tasks flat
-directly under `Tasks/` without a Subject folder.
+Task files always live under `Archive/`, nested inside a `[Subject]` folder (in `Archive/Live/Tasks/[Subject]/`). If the workspace contract specifies a different task directory, use that contract path instead. Otherwise default to `<project root>\Archive\Live\Tasks\[Subject]\` — do not create a separate top-level `Tasks/` directory outside `Archive/`, and do not save tasks flat directly under `Tasks/` without a Subject folder.
 
 Filename format:
 
@@ -179,20 +168,11 @@ Mini task filename format, only when the user explicitly asks for a "mini task":
 N.) <Topic>_mini_task_pending.md
 ```
 
-`N` is assigned **once at creation** as the next integer past the highest `N.) `
-number found across **both** `Archive\Live\Tasks\[Subject]\` **and**
-`Archive\Historical\Tasks\[Subject]\` combined — the Subject's full Live +
-Historical namespace. Glob both folders, take the global max, add 1. If neither
-folder holds a numbered file, use `1`. This combined-namespace rule prevents
-collisions when the Live folder drains and would otherwise restart at `1` while
-Historical still holds that number.
+`N` is assigned **once at creation** as the next integer past the highest `N.) ` number found across **both** `Archive\Live\Tasks\[Subject]\` **and** `Archive\Historical\Tasks\[Subject]\` combined — the Subject's full Live + Historical namespace. Glob both folders, take the global max, add 1. If neither folder holds a numbered file, use `1`. This combined-namespace rule prevents collisions when the Live folder drains and would otherwise restart at `1` while Historical still holds that number.
 
-The number is **immutable for the life of the file**: it survives the
-`_pending.md` ↔ `_done.md` rename and the Live ↔ Historical moves on finalize and
-reopen. Never renumber on finalization or reopening, and never reclaim gaps.
+The number is **immutable for the life of the file**: it survives the `_pending.md` ↔ `_done.md` rename and the Live ↔ Historical moves on finalize and reopen. Never renumber on finalization or reopening, and never reclaim gaps.
 
-**Folders are never numbered — only files carry the `N.) ` prefix**, restarting
-at `1` per `[Subject]` folder across the combined namespace.
+**Folders are never numbered — only files carry the `N.) ` prefix**, restarting at `1` per `[Subject]` folder across the combined namespace.
 
 Generate the filename **Topic** as a short **Title Case phrase with spaces** describing the task's work — typically the `Main Task`, optionally led by the `Task Area / Component` (for example, `Global Skill Sync Sweep`). Match the workspace's other artifact filenames (`prompt-this`, `doc-this`, `session-summary`): Title Case, spaces, no underscores inside the Topic. Only the lifecycle suffix (`_pending`, `_mini_task_pending`) keeps its underscore form. Do not ask the user for the filename unless the derived Topic would be ambiguous or misleading.
 
@@ -330,11 +310,7 @@ Do not populate this field yourself. Do not reason about delegation, routing, pl
 
 ## Child Numbering (Outside Delegation)
 
-Tasks can be **children** of a parent task even outside any delegation — for
-example, when one large task is split into a parent and sub-tasks. This skill
-understands the lowercase child-numbering grammar enough to **allocate the next
-child suffix** and **obey a reserved prefix**; it does **not** absorb the
-delegation workflow.
+Tasks can be **children** of a parent task even outside any delegation — for example, when one large task is split into a parent and sub-tasks. This skill understands the lowercase child-numbering grammar enough to **allocate the next child suffix** and **obey a reserved prefix**; it does **not** absorb the delegation workflow.
 
 Grammar (shared with `delegate-this`):
 
@@ -343,30 +319,16 @@ Grammar (shared with `delegate-this`):
 - child task (mini or not): `Na.)`, `Nb.)` … `Nz.)`, then `Naa.)`, `Nab.)` …
 - the parent's permanent `N` is inherited by every child **in the Task family**.
 
-**Separate namespace anchor.** The Task family's master `N` comes from the
-Plan/Task Subject namespace only. It is independent of any Delegation record
-number or Summary family number — those are separate artifact-type namespaces
-with their own anchors, connected to the Task by explicit path pointers, not by
-a shared number. Do not scan the Delegation or Summary folders to choose a Task
-number, and do not expect the numbers to match.
+**Separate namespace anchor.** The Task family's master `N` comes from the Plan/Task Subject namespace only. It is independent of any Delegation record number or Summary family number — those are separate artifact-type namespaces with their own anchors, connected to the Task by explicit path pointers, not by a shared number. Do not scan the Delegation or Summary folders to choose a Task number, and do not expect the numbers to match.
 
 How to assign a child prefix when parenthood applies:
 
-1. **Infer parenthood** from explicit user direction ("this is a sub-task of …")
-   or clear context. **Ask when parenthood is ambiguous** — do not guess.
-2. **Scan the parent's existing lowercase children** across **both**
-   `Archive\Live\Tasks\[Subject]\` and `Archive\Historical\Tasks\[Subject]\`
-   (files matching `Na.)` … `Nz.)`, `Naa.)` … for the same parent `N`) to see
-   which suffixes are taken.
+1. **Infer parenthood** from explicit user direction ("this is a sub-task of …") or clear context. **Ask when parenthood is ambiguous** — do not guess.
+2. **Scan the parent's existing lowercase children** across **both** `Archive\Live\Tasks\[Subject]\` and `Archive\Historical\Tasks\[Subject]\` (files matching `Na.)` … `Nz.)`, `Naa.)` … for the same parent `N`) to see which suffixes are taken.
 3. **Allocate the next suffix** in alphabetical order, skipping any taken.
-4. **Obey an orchestrator-reserved prefix exactly** when one is supplied (for
-   example, when `delegate-this` reserved `1a.)` for this task). Never invent or
-   renumber a reserved prefix.
+4. **Obey an orchestrator-reserved prefix exactly** when one is supplied (for example, when `delegate-this` reserved `1a.)` for this task). Never invent or renumber a reserved prefix.
 
-The child prefix is **permanent**. It survives `_pending.md` ↔ `_done.md`
-renames and Live ↔ Historical moves; `finalize-task` preserves it through
-finalization and reopening. An independent mini task with no parent uses the
-plain `N.)` form, not a child suffix.
+The child prefix is **permanent**. It survives `_pending.md` ↔ `_done.md` renames and Live ↔ Historical moves; `finalize-task` preserves it through finalization and reopening. An independent mini task with no parent uses the plain `N.)` form, not a child suffix.
 
 ## Task Style Rules
 
@@ -430,42 +392,24 @@ If the user asked for the task only in chat, do not create, update, rename, or f
 
 ## Agent Provenance For Durable Artifacts
 
-This skill applies the workspace's first-party durable-artifact provenance rule
-to durable task artifacts and every later material task revision.
+This skill applies the workspace's first-party durable-artifact provenance rule to durable task artifacts and every later material task revision.
 
 For every in-scope artifact:
 
-- place an `## Agent Provenance` section near the top with `Content owner`,
-  `Original writing agent`, `Created`, and `Artifact role`;
-- use a stable truthful agent-family label such as `Codex Agent`, `Claude Agent`,
-  `Antigravity Agent`, `Hermes Agent`, or `zCode Agent`;
+- place an `## Agent Provenance` section near the top with `Content owner`, `Original writing agent`, `Created`, and `Artifact role`;
+- use a stable truthful agent-family label such as `Codex Agent`, `Claude Agent`, `Antigravity Agent`, `Hermes Agent`, or `zCode Agent`;
 - keep the original writing-agent entry immutable;
-- keep an append-only `## Agent Change Log` near the bottom, recording the date,
-  acting agent, action, and concise scope for every material edit;
-- if a legacy artifact lacks reliable creator evidence, use `Not recorded` rather
-  than guessing, then log the current agent's actual change; and
+- keep an append-only `## Agent Change Log` near the bottom, recording the date, acting agent, action, and concise scope for every material edit;
+- if a legacy artifact lacks reliable creator evidence, use `Not recorded` rather than guessing, then log the current agent's actual change; and
 - treat copying or global synchronization as transport, not authorship.
 
-Keep `Content owner` for now. In Uzo's personal artifacts it normally resolves
-to `Uzo`; do not confuse content ownership with the agent that performed the
-filesystem write. Do not inject provenance into product source, third-party
-files, databases, generated caches, skill definitions, schema-sensitive or
-machine-consumed files, or other operational files unless their schema
-explicitly supports it.
+Keep `Content owner` for now. In Uzo's personal artifacts it normally resolves to `Uzo`; do not confuse content ownership with the agent that performed the filesystem write. Do not inject provenance into product source, third-party files, databases, generated caches, skill definitions, schema-sensitive or machine-consumed files, or other operational files unless their schema explicitly supports it.
 
 ## Durable Artifact Format Handling
 
-This skill owns task content, Prompt Contract, checklists, estimates, Subject,
-permanent number, path, update/reopen behavior, and lifecycle. When co-invoked
-with `html-this` or `pdf-this`, run the full task workflow and save only the
-requested `.html` or `.pdf` durable artifact unless the user requests multiple
-formats. All Markdown-described structure remains semantically mandatory; only
-serialization changes.
+This skill owns task content, Prompt Contract, checklists, estimates, Subject, permanent number, path, update/reopen behavior, and lifecycle. When co-invoked with `html-this` or `pdf-this`, run the full task workflow and save only the requested `.html` or `.pdf` durable artifact unless the user requests multiple formats. All Markdown-described structure remains semantically mandatory; only serialization changes.
 
-Treat same-stem `.md`, `.html`, and `.pdf` variants as one task and one
-numbering entry. On update or reopen, preflight and update/move every sibling
-together. This section overrides `.md`-only examples only for the co-invoked
-run; `_pending`, `_mini_task_pending`, and done lifecycle semantics remain.
+Treat same-stem `.md`, `.html`, and `.pdf` variants as one task and one numbering entry. On update or reopen, preflight and update/move every sibling together. This section overrides `.md`-only examples only for the co-invoked run; `_pending`, `_mini_task_pending`, and done lifecycle semantics remain.
 
 ## Validation
 

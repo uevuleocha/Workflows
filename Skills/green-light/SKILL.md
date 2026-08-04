@@ -137,14 +137,9 @@ If the requested output mode conflicts with the project's canonical contract or 
 
 ## Durable Artifact Format Pass-Through
 
-When `green-light` is co-invoked with `html-this` or `pdf-this` and routes the
-approved task into a durable-artifact producer, preserve that format request in
-the handoff. The producer remains responsible for content and lifecycle; the
-format skill remains responsible for serialization and format verification.
+When `green-light` is co-invoked with `html-this` or `pdf-this` and routes the approved task into a durable-artifact producer, preserve that format request in the handoff. The producer remains responsible for content and lifecycle; the format skill remains responsible for serialization and format verification.
 
-Do not apply the format request to product source, configuration, backups,
-databases, skill definitions, or other operational files. If several format
-skills are invoked, pass through exactly the requested set.
+Do not apply the format request to product source, configuration, backups, databases, skill definitions, or other operational files. If several format skills are invoked, pass through exactly the requested set.
 
 ## Validation
 

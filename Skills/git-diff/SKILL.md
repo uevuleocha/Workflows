@@ -5,51 +5,38 @@ description: Read-only Git status and diff reporting with explicit rename-on/off
 
 # Git Diff
 
-Report the complete state of a Git repository without changing its real index,
-working tree, commits, or remotes.
+Report the complete state of a Git repository without changing its real index, working tree, commits, or remotes.
 
 ## Invocation
 
-Begin for `/git-diff`, `git-diff`, `use git-diff`, `check git diff`, and clear
-equivalents asking for the current repository's overall diff and status.
+Begin for `/git-diff`, `git-diff`, `use git-diff`, `check git diff`, and clear equivalents asking for the current repository's overall diff and status.
 
 ## Safety Contract
 
 - This workflow is read-only by default.
-- Never run `git add`, `git commit`, `git restore`, `git clean`, or a mutating
-  submodule command against the real repository.
-- The temporary-index calculation must use a temporary file outside the real
-  index and remove it on success or failure.
-- If the user later explicitly asks to stage changes, leave this workflow and use
-  the repository's approved staging workflow.
-- A hub can record only a submodule's committed SHA. It cannot capture or push
-  uncommitted nested-repository content.
+- Never run `git add`, `git commit`, `git restore`, `git clean`, or a mutating submodule command against the real repository.
+- The temporary-index calculation must use a temporary file outside the real index and remove it on success or failure.
+- If the user later explicitly asks to stage changes, leave this workflow and use the repository's approved staging workflow.
+- A hub can record only a submodule's committed SHA. It cannot capture or push uncommitted nested-repository content.
 
 ## Execution Workflow
 
 ### 1. Resolve the repository
 
 1. Run `git rev-parse --show-toplevel`; stop if it fails.
-2. Record the repository name, branch, upstream, ahead/behind counts, staged,
-   unstaged, and untracked paths.
+2. Record the repository name, branch, upstream, ahead/behind counts, staged, unstaged, and untracked paths.
 3. Do not assume that the current directory is the repository root.
 
 ### 2. Collect file-level state
 
-- Use NUL-delimited commands for machine parsing:
-  `git status --porcelain=v1 -z`, `git diff --numstat -z`, and
-  `git diff --cached --numstat -z`.
+- Use NUL-delimited commands for machine parsing: `git status --porcelain=v1 -z`, `git diff --numstat -z`, and `git diff --cached --numstat -z`.
 - Classify staged and unstaged columns independently.
-- Preserve paths exactly; do not split on spaces, colons, or Windows drive
-  letters.
+- Preserve paths exactly; do not split on spaces, colons, or Windows drive letters.
 - List untracked paths separately.
 
 ### 3. Parse rename and copy records correctly
 
-For `git status --porcelain=v1 -z`, an `R` or `C` status consumes two path
-fields. After the status field's path, consume the following NUL-delimited field
-as the paired source/old path. Never reinterpret that old path as another status
-entry.
+For `git status --porcelain=v1 -z`, an `R` or `C` status consumes two path fields. After the status field's path, consume the following NUL-delimited field as the paired source/old path. Never reinterpret that old path as another status entry.
 
 When deriving the after-file set:
 
@@ -57,27 +44,18 @@ When deriving the after-file set:
 - add the destination/new path;
 - derive folder additions/deletions from the before and after file sets.
 
-A rename within one directory must not create a bogus folder addition or
-deletion.
+A rename within one directory must not create a bogus folder addition or deletion.
 
 ### 4. Calculate both Grand Total views safely
 
-Use a temporary index for each view so untracked files are included without
-touching the user's staging area. Resolve the real index with
-`git rev-parse --git-path index`, create a unique sibling temporary path, set
-`GIT_INDEX_FILE` only for the child commands, run `git read-tree HEAD`, and stage
-into that temporary index only. Remove it in a guaranteed cleanup step.
+Use a temporary index for each view so untracked files are included without touching the user's staging area. Resolve the real index with `git rev-parse --git-path index`, create a unique sibling temporary path, set `GIT_INDEX_FILE` only for the child commands, run `git read-tree HEAD`, and stage into that temporary index only. Remove it in a guaranteed cleanup step.
 
 Run and label both totals deliberately:
 
-1. `renames OFF (moves = delete + add)` using
-   `git -c diff.renames=false diff --cached --shortstat`.
-2. `renames ON (moves detected)` using
-   `git -c diff.renames=true diff --cached --shortstat`.
+1. `renames OFF (moves = delete + add)` using `git -c diff.renames=false diff --cached --shortstat`.
+2. `renames ON (moves detected)` using `git -c diff.renames=true diff --cached --shortstat`.
 
-Both lines always appear. Follow them with one sentence explaining that a gap
-normally represents moves/renames and is expected; if equal, say there was no
-rename gap.
+Both lines always appear. Follow them with one sentence explaining that a gap normally represents moves/renames and is expected; if equal, say there was no rename gap.
 
 ### 5. Calculate TOTALS
 
@@ -85,46 +63,32 @@ rename gap.
 - Derive `after` from the correctly parsed porcelain records.
 - `Folders` is the added/deleted parent-directory set count.
 - `Files` is the added/deleted file-set count.
-- `Lines` sums staged and unstaged numstat plus line counts for untracked regular
-  files. Report binary entries separately; never coerce `-` to zero silently.
+- `Lines` sums staged and unstaged numstat plus line counts for untracked regular files. Report binary entries separately; never coerce `-` to zero silently.
 - TOTALS uses rename-aware semantics. Do not call a rename's old path a new file.
 
 ### 6. Always inspect submodule pointers
 
-Detect submodules from tracked mode `160000` entries and use `.gitmodules` for
-path/name metadata when present. If either source suggests submodules, reconcile
-the inventory and report inconsistencies.
+Detect submodules from tracked mode `160000` entries and use `.gitmodules` for path/name metadata when present. If either source suggests submodules, reconcile the inventory and report inconsistencies.
 
 For every tracked submodule, collect without mutation:
 
 - pinned SHA: parent `HEAD` gitlink (`git ls-tree HEAD -- <path>`);
 - local HEAD: `git -C <path> rev-parse HEAD` when initialized;
-- marker from `git status --porcelain=v2 -z` submodule state (`S<c><m><u>`) plus
-  pinned/local SHA comparison;
-- state: `in sync`, `pointer behind`, `dirty content`, `both`, `uninitialized`,
-  or `missing/inconsistent metadata`.
+- marker from `git status --porcelain=v2 -z` submodule state (`S<c><m><u>`) plus pinned/local SHA comparison;
+- state: `in sync`, `pointer behind`, `dirty content`, `both`, `uninitialized`, or `missing/inconsistent metadata`.
 
 Marker meanings:
 
-- `M` = local submodule commit differs from the parent's pinned SHA (`S.C..` or
-  direct SHA mismatch evidence);
-- `m` = tracked or untracked working-tree content exists inside the submodule
-  (`S..M.` / `S...U` evidence);
+- `M` = local submodule commit differs from the parent's pinned SHA (`S.C..` or direct SHA mismatch evidence);
+- `m` = tracked or untracked working-tree content exists inside the submodule (`S..M.` / `S...U` evidence);
 - `Mm`/combined evidence = both conditions;
 - `–` = clean and pinned/local SHAs match.
 
-Render the Pointers table on every run in a submodule-bearing repository, even
-when every row is clean. Cross-reference the host workspace's terminology for
-`M` versus `m` and `HEAD` when one exists. From inside a nested repository, do
-not claim to know an ancestor hub's pinned SHA unless the user explicitly names
-and authorizes inspection of that hub.
+Render the Pointers table on every run in a submodule-bearing repository, even when every row is clean. Cross-reference the host workspace's terminology for `M` versus `m` and `HEAD` when one exists. From inside a nested repository, do not claim to know an ancestor hub's pinned SHA unless the user explicitly names and authorizes inspection of that hub.
 
 ## Canonical Report Shape
 
-Every agent must emit sections in this exact order. Omit an empty file section;
-never omit `Submodule Pointers` when the repository has submodules. All Markdown
-tables must be pipe-aligned in raw text and every cell must be at most 80
-characters.
+Every agent must emit sections in this exact order. Omit an empty file section; never omit `Submodule Pointers` when the repository has submodules. All Markdown tables must be pipe-aligned in raw text and every cell must be at most 80 characters.
 
 ```markdown
 Here's your `/git-diff` for **<Repo Name>**. <one-line characterization>
@@ -165,14 +129,10 @@ Nothing staged or committed — this was read-only.
 
 ## Verification
 
-- Confirm the real index checksum and `git status --porcelain=v1 -z` output are
-  unchanged before and after the run.
+- Confirm the real index checksum and `git status --porcelain=v1 -z` output are unchanged before and after the run.
 - Verify both rename modes were explicitly pinned and labelled.
-- On rename fixtures, confirm each `R`/`C` consumes its paired old path and a
-  same-directory rename reports `Folders +0 -0`.
-- On submodule fixtures, verify clean, pointer-drift, dirty-content, combined,
-  and uninitialized states where available.
+- On rename fixtures, confirm each `R`/`C` consumes its paired old path and a same-directory rename reports `Folders +0 -0`.
+- On submodule fixtures, verify clean, pointer-drift, dirty-content, combined, and uninitialized states where available.
 - Confirm the Pointers table appears for clean submodule-bearing repositories.
 
-When updating this skill, run the folder-style skill validator with Python UTF-8
-mode and validate behavior only in disposable repositories.
+When updating this skill, run the folder-style skill validator with Python UTF-8 mode and validate behavior only in disposable repositories.

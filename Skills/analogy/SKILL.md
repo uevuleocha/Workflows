@@ -10,11 +10,7 @@ Re-explain the idea, code behavior, plan, error, workflow, or decision the user 
 
 ## Required Composition With Say More
 
-`say-more` always applies this skill together with `for-dummies`, in both its
-concise and expanded modes. When called by `say-more`, contribute a brief,
-accurate comparison to one cohesive response. Do not restart this skill's
-invocation workflow, ask a duplicate clarification question, or emit a separate
-full answer. `say-more` owns the overall depth and response shape.
+`say-more` always applies this skill together with `for-dummies`, in both its concise and expanded modes. When called by `say-more`, contribute a brief, accurate comparison to one cohesive response. Do not restart this skill's invocation workflow, ask a duplicate clarification question, or emit a separate full answer. `say-more` owns the overall depth and response shape.
 
 ## Invocation
 

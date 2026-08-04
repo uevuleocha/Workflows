@@ -206,31 +206,15 @@ Do not:
 
 ## Agent Provenance For Durable Artifacts
 
-Finalization never replaces the original creator. Preserve the artifact's
-`## Agent Provenance` section exactly, then append a new entry to its
-`## Agent Change Log` naming the truthful acting agent, the finalization date,
-the lifecycle action, and the status/path or content scope changed.
+Finalization never replaces the original creator. Preserve the artifact's `## Agent Provenance` section exactly, then append a new entry to its `## Agent Change Log` naming the truthful acting agent, the finalization date, the lifecycle action, and the status/path or content scope changed.
 
-When same-stem Markdown, HTML, or PDF siblings exist, apply the same provenance
-history to the complete artifact set. If a legacy artifact lacks reliable
-creator evidence, record `Original writing agent: Not recorded` rather than
-guessing, and log the current finalizer's work. Do not add embedded provenance
-to product source, third-party files, databases, generated caches, skill
-definitions, schema-sensitive or machine-consumed files, or other operational
-files unless their schema explicitly supports it.
+When same-stem Markdown, HTML, or PDF siblings exist, apply the same provenance history to the complete artifact set. If a legacy artifact lacks reliable creator evidence, record `Original writing agent: Not recorded` rather than guessing, and log the current finalizer's work. Do not add embedded provenance to product source, third-party files, databases, generated caches, skill definitions, schema-sensitive or machine-consumed files, or other operational files unless their schema explicitly supports it.
 
 ## Durable Artifact Format Handling
 
-This skill still owns every Prompt Contract, Verification Checklist, evidence,
-and execution gate. Before finalizing, discover same-stem `.md`, `.html`, and
-`.pdf` siblings and treat them as one prompt artifact set. Preflight every
-destination, apply executed content/status through the applicable format skill,
-rename the lifecycle suffix on every sibling, and move the complete set
-together without changing the permanent prefix or Topic.
+This skill still owns every Prompt Contract, Verification Checklist, evidence, and execution gate. Before finalizing, discover same-stem `.md`, `.html`, and `.pdf` siblings and treat them as one prompt artifact set. Preflight every destination, apply executed content/status through the applicable format skill, rename the lifecycle suffix on every sibling, and move the complete set together without changing the permanent prefix or Topic.
 
-HTML-only or PDF-only prompts remain in that format; do not manufacture
-Markdown. Stop rather than finalize only part of a sibling set. Extension-only
-search and validation examples become format-neutral for this run.
+HTML-only or PDF-only prompts remain in that format; do not manufacture Markdown. Stop rather than finalize only part of a sibling set. Extension-only search and validation examples become format-neutral for this run.
 
 ## Validation
 

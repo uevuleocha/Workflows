@@ -26,45 +26,32 @@ The record's **content is immutable after dispatch**. Its **state is not** — t
 
 ## Execution Workspace
 
-The delegation family is created inside a single execution workspace, resolved
-before any parent, delegation, mini, or return report is written. State it once
-here; every path in this record is resolved relative to it.
+The delegation family is created inside a single execution workspace, resolved before any parent, delegation, mini, or return report is written. State it once here; every path in this record is resolved relative to it.
 
 ```text
 Execution workspace: <absolute path to the workspace root holding Archive\>
 ```
 
-Create the parent plan/task, the delegation record, every mini artifact, and the
-session-summary / return-report family **all under this workspace** from the
-start.
+Create the parent plan/task, the delegation record, every mini artifact, and the session-summary / return-report family **all under this workspace** from the start.
 
 ---
 
 ## Child Numbering
 
-The families use lowercase child numbering, with **separate linked anchors** per
-artifact-type namespace:
+The families use lowercase child numbering, with **separate linked anchors** per artifact-type namespace:
 
 - each family master / independent mini: `N.)`
-- child mini artifacts and return reports: `Na.)`, `Nb.)` … `Nz.)`, then
-  `Naa.)`, `Nab.)` …
+- child mini artifacts and return reports: `Na.)`, `Nb.)` … `Nz.)`, then `Naa.)`, `Nab.)` …
 
 **Separate anchors (do not share one number across namespaces):**
 
-- **Plan/Task family** — master `N` from the Plan/Task Subject namespace; child
-  plans/tasks inherit it. Canonical: `1.)`, children `1a.)` … `1e.)`.
-- **Delegation record** — own `N` from the Delegation Subject namespace.
-  Canonical: `1.)` (independent of the Plan number).
-- **Summary family** — master `N` from the Summary Subject namespace; return
-  reports inherit it. Canonical: `9.)`, reports `9a.)` … `9e.)`.
+- **Plan/Task family** — master `N` from the Plan/Task Subject namespace; child plans/tasks inherit it. Canonical: `1.)`, children `1a.)` … `1e.)`.
+- **Delegation record** — own `N` from the Delegation Subject namespace. Canonical: `1.)` (independent of the Plan number).
+- **Summary family** — master `N` from the Summary Subject namespace; return reports inherit it. Canonical: `9.)`, reports `9a.)` … `9e.)`.
 
-Each anchor is calculated across its own combined Live + Historical namespace.
-Explicit paths and pointers connect the families; their numeric anchors need not
-match.
+Each anchor is calculated across its own combined Live + Historical namespace. Explicit paths and pointers connect the families; their numeric anchors need not match.
 
-The orchestrator reserves every child prefix before dispatch and writes the
-exact reserved prefix into the assignment overview, the mini-artifact table, the
-return-report table, and each packet. Never leave a child prefix blank or vague.
+The orchestrator reserves every child prefix before dispatch and writes the exact reserved prefix into the assignment overview, the mini-artifact table, the return-report table, and each packet. Never leave a child prefix blank or vague.
 
 ---
 

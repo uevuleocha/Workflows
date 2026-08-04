@@ -58,9 +58,7 @@ Before creating any delegation record or dispatching any Mode A packet, resolve 
 1. **If a parent plan/task clearly exists** in the current context — the user named it, or the session has been working from it — attach it. Do not ask.
 2. **If it is unclear whether one exists**, ask:
 
-   ```text
-   A delegation always needs a parent plan and/or task to hang from.
-   Do you already have one for this objective?
+```text A delegation always needs a parent plan and/or task to hang from. Do you already have one for this objective?
 
    - If yes, point me at it and I will attach it.
    - If no, I will create one with you before dispatching.
@@ -86,45 +84,27 @@ Then establish **bidirectional linkage**:
 
 ## The Execution Workspace
 
-**Resolve the execution workspace before Mode A creates any parent, delegation,
-mini artifact, or return report.** The execution workspace is the root whose
-`Archive\` tree will hold the entire delegation family — the parent plan/task,
-the delegation record, the mini artifacts, and the session-summary /
-return-report family. Pin it once at the start of the run; every artifact path
-in the delegation record is resolved relative to it.
+**Resolve the execution workspace before Mode A creates any parent, delegation, mini artifact, or return report.** The execution workspace is the root whose `Archive\` tree will hold the entire delegation family — the parent plan/task, the delegation record, the mini artifacts, and the session-summary / return-report family. Pin it once at the start of the run; every artifact path in the delegation record is resolved relative to it.
 
-Do not resolve a parent, then a delegation, then a return report each against a
-different workspace. Decide the workspace first, then create the **whole family**
-(parent, delegation, minis, return reports) inside it. This is what keeps a
-dispatched delegation's family together instead of spread across roots.
+Do not resolve a parent, then a delegation, then a return report each against a different workspace. Decide the workspace first, then create the **whole family** (parent, delegation, minis, return reports) inside it. This is what keeps a dispatched delegation's family together instead of spread across roots.
 
-The execution workspace is normally obvious — it is the active workspace root.
-If it is not (for example, the objective spans two roots), stop and ask which
-one owns the delegation family before creating anything.
+The execution workspace is normally obvious — it is the active workspace root. If it is not (for example, the objective spans two roots), stop and ask which one owns the delegation family before creating anything.
 
 ---
 
 ## Artifact Family and Lowercase Child Numbering
 
-A Mode A dispatch produces a **family of artifacts** that must stay coordinated.
-All of them live under the execution workspace's `Archive\` tree, and every file
-that belongs to a family carries a **lowercase child prefix**. The families are
-**linked by explicit pointers, not by a shared number.**
+A Mode A dispatch produces a **family of artifacts** that must stay coordinated. All of them live under the execution workspace's `Archive\` tree, and every file that belongs to a family carries a **lowercase child prefix**. The families are **linked by explicit pointers, not by a shared number.**
 
-The dispatched family has up to three **artifact-type namespaces**, each with its
-own numeric anchor:
+The dispatched family has up to three **artifact-type namespaces**, each with its own numeric anchor:
 
 - **Plan/Task family** — the parent plan and/or task, plus its mini plans/tasks.
 - **Delegation record** — one record, in its own Delegation Subject namespace.
-- **Summary family** — the orchestrator/master summary plus one delegated return
-  report per returning assignment.
+- **Summary family** — the orchestrator/master summary plus one delegated return report per returning assignment.
 
 ### Separate, linked family anchors
 
-**Do not use one shared numeric anchor across different artifact-type
-namespaces.** Each family gets its master number from its **own** Subject
-namespace; children inherit that family's master number. Explicit paths and
-pointers connect the families; their numeric anchors need not match.
+**Do not use one shared numeric anchor across different artifact-type namespaces.** Each family gets its master number from its **own** Subject namespace; children inherit that family's master number. Explicit paths and pointers connect the families; their numeric anchors need not match.
 
 | Family               | Master number source                            | Children inherit          |
 |----------------------|-------------------------------------------------|---------------------------|
@@ -132,23 +112,15 @@ pointers connect the families; their numeric anchors need not match.
 | Delegation record    | Its own Delegation Subject namespace            | n/a (one record)          |
 | Summary              | Its own Summary Subject namespace               | The Summary master `N`    |
 
-Each anchor is calculated as one greater than the highest top-level `N.)` across
-that namespace's **own combined Live and Historical** Subject folder. Scanning
-only one folder (or one artifact-type namespace) for another family's number is
-how collisions happen — each family scans its own namespace only.
+Each anchor is calculated as one greater than the highest top-level `N.)` across that namespace's **own combined Live and Historical** Subject folder. Scanning only one folder (or one artifact-type namespace) for another family's number is how collisions happen — each family scans its own namespace only.
 
 Canonical example:
 
-- Plan family: `1.)` (master, from the Plan Subject namespace); children `1a.)`
-  through `1e.)`.
+- Plan family: `1.)` (master, from the Plan Subject namespace); children `1a.)` through `1e.)`.
 - Delegation record: `1.)` in its separate Delegation Subject namespace.
-- Summary family: `9.)` (master, from the Summary Subject namespace); reports
-  `9a.)` through `9e.)`.
+- Summary family: `9.)` (master, from the Summary Subject namespace); reports `9a.)` through `9e.)`.
 
-The Plan master (`1.`), the Delegation master (`1.`), and the Summary master
-(`9.`) are **coincidentally equal in two cases and different in the third —
-and that is correct.** They are independent anchors. The delegation record,
-the parent plan, and the master summary name each other by path.
+The Plan master (`1.`), the Delegation master (`1.`), and the Summary master (`9.`) are **coincidentally equal in two cases and different in the third — and that is correct.** They are independent anchors. The delegation record, the parent plan, and the master summary name each other by path.
 
 ### Child-numbering grammar
 
@@ -161,70 +133,34 @@ the parent plan, and the master summary name each other by path.
 
 Rules:
 
-- A family's master `N` is **inherited by that family's own children only.** A
-  Plan master `1.)` produces Plan children `1a.)`, `1b.)`, …, then `1aa.)`,
-  `1ab.)`, … after `1z.)`. A Summary master `9.)` produces Summary children
-  `9a.)`, `9b.)`, …. The numbers do not cross families.
-- Child suffixes use lowercase letters only, and allocate strictly in
-  alphabetical order: `a`, `b`, …, `z`, then `aa`, `ab`, … .
-- The suffix is part of the artifact's **permanent identity**. It survives
-  lifecycle renames, Live ↔ Historical moves, finalization, and reopening.
-  `finalize-plan` / `finalize-task` / `finalize-delegation` **must preserve the
-  complete lowercase child prefix** — never strip the suffix, never renumber it.
-- An independent mini artifact with no parent takes the plain `N.)` form, not a
-  child suffix.
-- This grammar is owned by `delegate-this`. `plan-this`, `task-this`, and
-  `session-summary` understand it well enough to **allocate the next child
-  suffix** within their own family and **obey a reserved prefix**; they do not
-  absorb the delegation workflow.
+- A family's master `N` is **inherited by that family's own children only.** A Plan master `1.)` produces Plan children `1a.)`, `1b.)`, …, then `1aa.)`, `1ab.)`, … after `1z.)`. A Summary master `9.)` produces Summary children `9a.)`, `9b.)`, …. The numbers do not cross families.
+- Child suffixes use lowercase letters only, and allocate strictly in alphabetical order: `a`, `b`, …, `z`, then `aa`, `ab`, … .
+- The suffix is part of the artifact's **permanent identity**. It survives lifecycle renames, Live ↔ Historical moves, finalization, and reopening. `finalize-plan` / `finalize-task` / `finalize-delegation` **must preserve the complete lowercase child prefix** — never strip the suffix, never renumber it.
+- An independent mini artifact with no parent takes the plain `N.)` form, not a child suffix.
+- This grammar is owned by `delegate-this`. `plan-this`, `task-this`, and `session-summary` understand it well enough to **allocate the next child suffix** within their own family and **obey a reserved prefix**; they do not absorb the delegation workflow.
 
 ### Central prefix reservation
 
-**The orchestrator reserves every child prefix before dispatch.** This is the
-single source of truth for each family — there is no "create a mini plan later"
-without reserving its prefix now.
+**The orchestrator reserves every child prefix before dispatch.** This is the single source of truth for each family — there is no "create a mini plan later" without reserving its prefix now.
 
 Before writing the delegation record, the orchestrator:
 
-1. resolves the Plan/Task family master `N` (one greater than the highest
-   top-level `N.)` across that Plan/Task Subject's combined Live + Historical
-   namespace), then scans that master's existing lowercase children
-   (`Na.)` … `Nz.)`, `Naa.)` …) across the same combined namespace to reserve
-   the next suffix for each mini plan/task;
-2. resolves the Delegation record's own `N` (one greater than the highest across
-   the Delegation Subject's combined Live + Historical namespace) — independently
-   of the Plan/Task number;
-3. resolves the Summary family master `N` (one greater than the highest across
-   the Summary Subject's combined Live + Historical namespace), then reserves
-   the next Summary child suffix for each return report;
-4. writes each **exact reserved prefix** into the right place — mini-plan
-   prefixes into the **assignment overview**, the **mini-artifact table**, and
-   each **packet**; return-report prefixes into the **session-summary /
-   return-report family table** and each **packet**;
-5. records the explicit path pointers that connect the families (the parent plan
-   names the delegation record; the delegation record names the parent and the
-   master summary).
+1. resolves the Plan/Task family master `N` (one greater than the highest top-level `N.)` across that Plan/Task Subject's combined Live + Historical namespace), then scans that master's existing lowercase children (`Na.)` … `Nz.)`, `Naa.)` …) across the same combined namespace to reserve the next suffix for each mini plan/task;
+2. resolves the Delegation record's own `N` (one greater than the highest across the Delegation Subject's combined Live + Historical namespace) — independently of the Plan/Task number;
+3. resolves the Summary family master `N` (one greater than the highest across the Summary Subject's combined Live + Historical namespace), then reserves the next Summary child suffix for each return report;
+4. writes each **exact reserved prefix** into the right place — mini-plan prefixes into the **assignment overview**, the **mini-artifact table**, and each **packet**; return-report prefixes into the **session-summary / return-report family table** and each **packet**;
+5. records the explicit path pointers that connect the families (the parent plan names the delegation record; the delegation record names the parent and the master summary).
 
-Never write "create a mini plan later" without a reserved prefix. If a mini
-artifact or return report is genuinely contingent, still reserve its prefix and
-mark it `(reserved, created after recon)`.
+Never write "create a mini plan later" without a reserved prefix. If a mini artifact or return report is genuinely contingent, still reserve its prefix and mark it `(reserved, created after recon)`.
 
 ### Session-summary / return-report family
 
-Reserve the session-summary family before dispatch, using the **Summary** master
-`N` from the Summary Subject namespace:
+Reserve the session-summary family before dispatch, using the **Summary** master `N` from the Summary Subject namespace:
 
-- **orchestrator / master summary:** `N.)` — the master summary of the whole
-  delegation (e.g. `9.)`).
-- **delegated return reports:** `Na.)`, `Nb.)`, … — one per returning
-  assignment (e.g. `9a.)`, `9b.)`, …).
+- **orchestrator / master summary:** `N.)` — the master summary of the whole delegation (e.g. `9.)`).
+- **delegated return reports:** `Na.)`, `Nb.)`, … — one per returning assignment (e.g. `9a.)`, `9b.)`, …).
 
-A delegated return report's filename **ends in `Report.md`** (for example,
-`9a.) claude_packet1_wave1_Report.md`). It is created when the assignment
-returns, under the execution workspace's
-`Archive\Historical\Summaries\<Subject>\`. The master summary and every return
-report share the **Summary family's** master `N`, not the Plan or Delegation
-number. See **Delegated Return Reports** below.
+A delegated return report's filename **ends in `Report.md`** (for example, `9a.) claude_packet1_wave1_Report.md`). It is created when the assignment returns, under the execution workspace's `Archive\Historical\Summaries\<Subject>\`. The master summary and every return report share the **Summary family's** master `N`, not the Plan or Delegation number. See **Delegated Return Reports** below.
 
 ---
 
@@ -334,35 +270,22 @@ Each mini artifact should identify its parent, isolated scope, dependencies, own
 
 ## Delegated Return Reports
 
-A return report is **mandatory at packet/wave completion** for every dispatched
-assignment. It is how a returning agent hands back its deliverable, evidence,
-and status so the orchestrator can integrate.
+A return report is **mandatory at packet/wave completion** for every dispatched assignment. It is how a returning agent hands back its deliverable, evidence, and status so the orchestrator can integrate.
 
 A return report is a **session-summary family member**:
 
-- It uses **session-summary structure** (the 🎭 ACTS narrative, metadata
-  header, Definition of Done ACT, final-state block) — `session-summary` owns
-  that shape; `delegate-this` only reserves the prefix and mandates the report.
-- It adds one delegation-specific section: an **append-only `## Feedback`
-  ledger**, placed after the session-summary body.
-- Its filename **ends in `Report.md`** and carries the reserved child prefix
-  (`Na.)`, `Nb.)`, …) under
-  `<execution workspace>\Archive\Historical\Summaries\<Subject>\`.
+- It uses **session-summary structure** (the 🎭 ACTS narrative, metadata header, Definition of Done ACT, final-state block) — `session-summary` owns that shape; `delegate-this` only reserves the prefix and mandates the report.
+- It adds one delegation-specific section: an **append-only `## Feedback` ledger**, placed after the session-summary body.
+- Its filename **ends in `Report.md`** and carries the reserved child prefix (`Na.)`, `Nb.)`, …) under `<execution workspace>\Archive\Historical\Summaries\<Subject>\`.
 
 ### Feedback ledger rules
 
 The `## Feedback` section is append-only:
 
-- **Existing report content is immutable.** Never rewrite a returned
-  deliverable, ACT, or earlier line of the report.
-- **Earlier feedback entries are immutable.** Once written, a feedback line is
-  never edited or deleted — corrections are added as new lines.
-- **Feedback is appendable only while the delegation is active.** The
-  orchestrator (and, when relevant, the returning worker) may append feedback
-  lines while the delegation is `_dispatched`.
-- **The entire report freezes when `finalize-delegation` closes the delegation.**
-  After the record becomes `_completed`, no further feedback may be appended —
-  the report is a closed historical artifact.
+- **Existing report content is immutable.** Never rewrite a returned deliverable, ACT, or earlier line of the report.
+- **Earlier feedback entries are immutable.** Once written, a feedback line is never edited or deleted — corrections are added as new lines.
+- **Feedback is appendable only while the delegation is active.** The orchestrator (and, when relevant, the returning worker) may append feedback lines while the delegation is `_dispatched`.
+- **The entire report freezes when `finalize-delegation` closes the delegation.** After the record becomes `_completed`, no further feedback may be appended — the report is a closed historical artifact.
 
 A feedback line is short and dated, e.g.:
 
@@ -376,89 +299,52 @@ A feedback line is short and dated, e.g.:
 
 ### Thin dependency
 
-`session-summary` understands the **report/feedback shape** (it is the owner of
-the summary body and the `Report.md` family rule), but it does **not** absorb
-the delegation workflow — no packet schema, no routing, no lifecycle moves. The
-report's lifecycle is driven entirely by `delegate-this` (create on return) and
-`finalize-delegation` (freeze on close).
+`session-summary` understands the **report/feedback shape** (it is the owner of the summary body and the `Report.md` family rule), but it does **not** absorb the delegation workflow — no packet schema, no routing, no lifecycle moves. The report's lifecycle is driven entirely by `delegate-this` (create on return) and `finalize-delegation` (freeze on close).
 
 ---
 
 ## Checkpoint Policy (every packet)
 
-**Every packet must carry an explicit Checkpoint Policy.** It tells the
-receiving agent, in advance, exactly where execution stops within that packet.
+**Every packet must carry an explicit Checkpoint Policy.** It tells the receiving agent, in advance, exactly where execution stops within that packet.
 
 A Checkpoint Policy states three things explicitly:
 
-1. **Where execution stops.** Default: **complete the packet continuously**;
-   intermediate milestones are **not** user checkpoints unless explicitly
-   labelled `USER CHECKPOINT`.
-2. **Whether sync is allowed.** For single-repository skill work, the default
-   is **centralized synchronization** (see below): workers do **not** sync; the
-   orchestrator does one final global-sync + parity pass after review.
-3. **What deliverables must be returned first.** The packet's return report and
-   any named deliverables come back before the worker stops or pauses.
+1. **Where execution stops.** Default: **complete the packet continuously**; intermediate milestones are **not** user checkpoints unless explicitly labelled `USER CHECKPOINT`.
+2. **Whether sync is allowed.** For single-repository skill work, the default is **centralized synchronization** (see below): workers do **not** sync; the orchestrator does one final global-sync + parity pass after review.
+3. **What deliverables must be returned first.** The packet's return report and any named deliverables come back before the worker stops or pauses.
 
-Label a midpoint checkpoint explicitly as `USER CHECKPOINT` only when the user
-genuinely must act mid-packet (e.g. an approval gate). Otherwise the worker
-runs the packet to completion and returns once.
+Label a midpoint checkpoint explicitly as `USER CHECKPOINT` only when the user genuinely must act mid-packet (e.g. an approval gate). Otherwise the worker runs the packet to completion and returns once.
 
-The Checkpoint Policy is a required field in the packet template and appears in
-the delegation record alongside each packet.
+The Checkpoint Policy is a required field in the packet template and appears in the delegation record alongside each packet.
 
 ---
 
 ## Centralized Synchronization (multi-agent skill work)
 
-For **multi-agent skill work inside one Workflows repository**, the default
-synchronization model is **centralized**:
+For **multi-agent skill work inside one Workflows repository**, the default synchronization model is **centralized**:
 
-- **Workers edit and validate local masters only.** Each worker edits its owned
-  `Skills/<name>/` files, runs validation locally, and returns its deliverables
-  (diffs, reports, validation output).
-- **Workers never pause merely to ask about sync.** Sync is the orchestrator's
-  concern, not the worker's gate.
-- **The orchestrator performs one final global-sync and parity pass** after all
-  reviews and corrections are in — propagating the reviewed local masters to the
-  global install locations (Codex, Claude, Antigravity, Hermes, zCode) and
-  verifying parity.
-- **Explicit user override wins.** If the user says a worker may sync its own
-  surface, or asks for a different sync model, obey that for the run.
+- **Workers edit and validate local masters only.** Each worker edits its owned `Skills/<name>/` files, runs validation locally, and returns its deliverables (diffs, reports, validation output).
+- **Workers never pause merely to ask about sync.** Sync is the orchestrator's concern, not the worker's gate.
+- **The orchestrator performs one final global-sync and parity pass** after all reviews and corrections are in — propagating the reviewed local masters to the global install locations (Codex, Claude, Antigravity, Hermes, zCode) and verifying parity.
+- **Explicit user override wins.** If the user says a worker may sync its own surface, or asks for a different sync model, obey that for the run.
 
-This default keeps one-editor-per-file clean and avoids races where several
-workers each push to the same global install concurrently. It does not change
-how non-skill delegations sync; it is the default specifically for skill work in
-this repository.
+This default keeps one-editor-per-file clean and avoids races where several workers each push to the same global install concurrently. It does not change how non-skill delegations sync; it is the default specifically for skill work in this repository.
 
 ---
 
 ## Provider-Neutral Hermes Routing
 
-Hermes routing is **provider-neutral**. Do not permanently bind Hermes to a
-specific provider or model, and never downgrade it based on GLM, OpenAI, Codex,
-or zCode.
+Hermes routing is **provider-neutral**. Do not permanently bind Hermes to a specific provider or model, and never downgrade it based on GLM, OpenAI, Codex, or zCode.
 
 Before routing any assignment to Hermes:
 
-1. **Ask which provider/model Hermes currently uses** and **which
-   subscription/quota pool it shares.** Hermes's provider surface changes over
-   time; treat it as dynamic, not fixed.
-2. **Route by capability, trust, and tools** — same routing factors as every
-   other platform. Provider identity is an input to routing, not a label.
-3. **Schedule according to current quota capacity.** If the configured provider
-   is near its quota ceiling, serialize, defer, or reroute rather than overload
-   it.
-4. **Never permanently bind or downgrade Hermes** based on GLM, OpenAI, Codex,
-   or zCode. A run-time pairing is a run-time decision, recorded in the
-   delegation record, not a standing downgrade.
-5. **Pay-as-you-go providers always require explicit approval** — for this run,
-   not inferred from a previous one.
+1. **Ask which provider/model Hermes currently uses** and **which subscription/quota pool it shares.** Hermes's provider surface changes over time; treat it as dynamic, not fixed.
+2. **Route by capability, trust, and tools** — same routing factors as every other platform. Provider identity is an input to routing, not a label.
+3. **Schedule according to current quota capacity.** If the configured provider is near its quota ceiling, serialize, defer, or reroute rather than overload it.
+4. **Never permanently bind or downgrade Hermes** based on GLM, OpenAI, Codex, or zCode. A run-time pairing is a run-time decision, recorded in the delegation record, not a standing downgrade.
+5. **Pay-as-you-go providers always require explicit approval** — for this run, not inferred from a previous one.
 
-The routing factors and cost gate in `references/routing-and-cost-policy.md`
-apply unchanged; this section governs **Hermes specifically** because its
-provider/model surface is dynamic where the other platforms' are relatively
-fixed.
+The routing factors and cost gate in `references/routing-and-cost-policy.md` apply unchanged; this section governs **Hermes specifically** because its provider/model surface is dynamic where the other platforms' are relatively fixed.
 
 ---
 
@@ -668,43 +554,24 @@ Do not:
 
 ## Agent Provenance For Durable Artifacts
 
-This skill applies the workspace's first-party durable-artifact provenance rule
-to delegation records, integration updates, and completion evidence.
+This skill applies the workspace's first-party durable-artifact provenance rule to delegation records, integration updates, and completion evidence.
 
 For every in-scope artifact:
 
-- place an `## Agent Provenance` section near the top with `Content owner`,
-  `Original writing agent`, `Created`, and `Artifact role`;
-- use a stable truthful agent-family label such as `Codex Agent`, `Claude Agent`,
-  `Antigravity Agent`, `Hermes Agent`, or `zCode Agent`;
+- place an `## Agent Provenance` section near the top with `Content owner`, `Original writing agent`, `Created`, and `Artifact role`;
+- use a stable truthful agent-family label such as `Codex Agent`, `Claude Agent`, `Antigravity Agent`, `Hermes Agent`, or `zCode Agent`;
 - keep the original writing-agent entry immutable;
-- keep an append-only `## Agent Change Log` near the bottom, recording the date,
-  acting agent, action, and concise scope for every material edit;
-- if a legacy artifact lacks reliable creator evidence, use `Not recorded` rather
-  than guessing, then log the current agent's actual change; and
+- keep an append-only `## Agent Change Log` near the bottom, recording the date, acting agent, action, and concise scope for every material edit;
+- if a legacy artifact lacks reliable creator evidence, use `Not recorded` rather than guessing, then log the current agent's actual change; and
 - treat copying or global synchronization as transport, not authorship.
 
-Keep `Content owner` for now. In Uzo's personal artifacts it normally resolves
-to `Uzo`; do not confuse content ownership with the agent that performed the
-filesystem write. Do not inject provenance into product source, third-party
-files, databases, generated caches, skill definitions, schema-sensitive or
-machine-consumed files, or other operational files unless their schema
-explicitly supports it.
+Keep `Content owner` for now. In Uzo's personal artifacts it normally resolves to `Uzo`; do not confuse content ownership with the agent that performed the filesystem write. Do not inject provenance into product source, third-party files, databases, generated caches, skill definitions, schema-sensitive or machine-consumed files, or other operational files unless their schema explicitly supports it.
 
 ## Durable Artifact Format Handling
 
-This skill owns delegation routing, numbering, assignment packets, parent/child
-relationships, return-report content, and lifecycle. When co-invoked with
-`html-this` or `pdf-this`, preserve that ownership and serialize the requested
-human-readable delegation records, mini artifacts, handoffs, summaries, and
-return reports only in the requested format. Pass the format request through to
-every called artifact-producing skill.
+This skill owns delegation routing, numbering, assignment packets, parent/child relationships, return-report content, and lifecycle. When co-invoked with `html-this` or `pdf-this`, preserve that ownership and serialize the requested human-readable delegation records, mini artifacts, handoffs, summaries, and return reports only in the requested format. Pass the format request through to every called artifact-producing skill.
 
-Machine-consumed state remains native. Same-stem `.md`, `.html`, and `.pdf`
-variants are one logical artifact and one reserved prefix. On update, return,
-or reopen, preflight and update the complete sibling set. This section overrides
-extension-only examples during a co-invoked run; all family numbering, feedback,
-freeze, and completion rules remain mandatory.
+Machine-consumed state remains native. Same-stem `.md`, `.html`, and `.pdf` variants are one logical artifact and one reserved prefix. On update, return, or reopen, preflight and update the complete sibling set. This section overrides extension-only examples during a co-invoked run; all family numbering, feedback, freeze, and completion rules remain mandatory.
 
 ## Validation
 

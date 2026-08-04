@@ -62,5 +62,4 @@ the first run. Do not assume the original maintainer's paths.
 
 ## Optional artifact formats
 
-Pairs with `html-this` and `pdf-this` so every existing format sibling is
-finalized together without changing the owning lifecycle gate.
+Pairs with `html-this` and `pdf-this` so every existing format sibling is finalized together without changing the owning lifecycle gate.

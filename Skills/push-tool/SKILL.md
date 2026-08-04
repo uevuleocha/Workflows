@@ -144,20 +144,14 @@ For a batch run, write one line per tool, in execution order. If `"Archive/Live/
 4. **Staging & remote pre-flight (C).** Note any unrelated already-staged changes for the report (they are never included in this skill's commits). `git fetch origin`; hard-stop if `origin/main` is ahead or diverged. If pre-existing unpushed local commits exist, list them (hash, message, signing agent) and ask the user for approval before proceeding — the push in step 10 would deliver them too. Record the starting commit hash.
 5. **Pre-copy commit (seal outgoing version, tool-scoped).** If the tool's folder has uncommitted changes, run exactly:
 
-   ```powershell
-   git add -- "Tools/Sources/<Type>/<ToolName>"
-   git commit -m "push-tool: pre-push snapshot <Type>\<ToolName> | Agent: <AgentName>" -- "Tools/Sources/<Type>/<ToolName>"
-   ```
+```powershell git add -- "Tools/Sources/<Type>/<ToolName>" git commit -m "push-tool: pre-push snapshot <Type>\<ToolName> | Agent: <AgentName>" -- "Tools/Sources/<Type>/<ToolName>" ```
 
    The pathspec on `git commit` guarantees pre-staged unrelated files cannot ride along. Skip if that folder is already clean. For a batch, the pathspec lists every named tool's folder. If this snapshot commit is created, capture its short hash — it matters for the no-change case in step 8.
 6. **Overlay copy.** Copy every file from the source folder to the destination folder, overwriting existing files. Do not delete extras in the destination.
 7. **Post-copy file-count check (D).** Count the files written this run.
 8. **Tool commit (seal synced version).** Run exactly:
 
-   ```powershell
-   git add -- "Tools/Sources/<Type>/<ToolName>"
-   git commit -m "push-tool: synced <Type>\<ToolName> | Agent: <AgentName>" -- "Tools/Sources/<Type>/<ToolName>"
-   ```
+```powershell git add -- "Tools/Sources/<Type>/<ToolName>" git commit -m "push-tool: synced <Type>\<ToolName> | Agent: <AgentName>" -- "Tools/Sources/<Type>/<ToolName>" ```
 
    A batch uses one commit whose pathspec lists every named tool's folder; list each tool in the body. Capture the short commit hash. **If the overlay produced no tracked changes** (cAlgo and workspace already identical), never create an empty marker commit — instead apply the three-way no-change rule:
    - **Completely unchanged run** (no snapshot commit at step 5, overlay changed nothing): write no log line, create no commits, skip to step 11 and report "already up to date." The chat report is the record of the run; the workspace is left exactly as found.
@@ -165,10 +159,7 @@ For a batch run, write one line per tool, in execution order. If `"Archive/Live/
    - **Batch with mixed results:** commit and log the changed tools normally; report unchanged tools as in-sync per the rules above. Never abort the batch because some tools were unchanged.
 9. **Log + log commit.** Append one line per tool to `"Archive/Live/Documentation/Personal/Logs/1.) push-log.md"` using the captured hash, then run exactly:
 
-   ```powershell
-   git add -- "Archive/Live/Documentation/Personal/Logs/1.) push-log.md"
-   git commit -m "push-tool: log <Type>\<ToolName> | Agent: <AgentName>" -- "Archive/Live/Documentation/Personal/Logs/1.) push-log.md"
-   ```
+```powershell git add -- "Archive/Live/Documentation/Personal/Logs/1.) push-log.md" git commit -m "push-tool: log <Type>\<ToolName> | Agent: <AgentName>" -- "Archive/Live/Documentation/Personal/Logs/1.) push-log.md" ```
 
    Skipped only on a completely unchanged run (no log line was written, so there is nothing to seal). No path through this workflow may leave `"Archive/Live/Documentation/Personal/Logs/1.) push-log.md"` modified but uncommitted.
 10. **Push.** Push all commits created by this run (snapshot, tool, and log commits as applicable), plus any pre-existing commits the user explicitly approved at pre-flight, to `origin main`. A remote-ahead push is never attempted — that was hard-stopped at step 4.
@@ -221,8 +212,7 @@ Git history on `origin main` (GitHub: `uevuleocha/Uzzy-Ecosystem`, private) is t
 To recover an older version of a tool:
 
 ```text
-git log --oneline -- "Tools/Sources/<Type>/<ToolName>"          # list every sealed version
-git checkout <hash> -- "Tools/Sources/<Type>/<ToolName>"        # restore that version into the workspace
+git log --oneline -- "Tools/Sources/<Type>/<ToolName>"          # list every sealed version git checkout <hash> -- "Tools/Sources/<Type>/<ToolName>"        # restore that version into the workspace
 ```
 
 Versions can also be browsed per-file on GitHub via the file's History view.

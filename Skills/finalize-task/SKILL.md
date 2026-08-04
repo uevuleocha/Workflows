@@ -176,8 +176,7 @@ Use the current local date for lifecycle text.
 
 ## File Rename And Move Rules
 
-Finalization does two things to the file: it flips the lifecycle suffix **and**
-moves the file from the `Live` side of the Archive to the `Historical` side.
+Finalization does two things to the file: it flips the lifecycle suffix **and** moves the file from the `Live` side of the Archive to the `Historical` side.
 
 **1. Flip the suffix.** Rename the pending file:
 
@@ -191,28 +190,18 @@ to:
 {name}_done.md
 ```
 
-**2. Move Live → Historical.** Move the file from its `Live` tasks folder to the
-matching `Historical` tasks folder, preserving the same `[Subject]` subfolder on
-both sides:
+**2. Move Live → Historical.** Move the file from its `Live` tasks folder to the matching `Historical` tasks folder, preserving the same `[Subject]` subfolder on both sides:
 
 ```text
 <project root>\Archive\Live\Tasks\[Subject]\{name}_done.md
         ->  <project root>\Archive\Historical\Tasks\[Subject]\{name}_done.md
 ```
 
-Create the `Archive\Historical\Tasks\[Subject]\` target folder if it does not
-exist. **Preserve the file's `N.) ` prefix exactly — including any lowercase
-child suffix** (`Na.)`, `Nb.)`, …). Finalization never renumbers and never
-strips a child suffix. The prefix is assigned once for the life of the file
-across the combined `Live` + `Historical` namespace, so the same prefix simply
-follows the file into `Historical`. This applies equally on **reopen**: when a
-done child task is reopened back to `_pending.md`, its complete lowercase child
-prefix is preserved unchanged.
+Create the `Archive\Historical\Tasks\[Subject]\` target folder if it does not exist. **Preserve the file's `N.) ` prefix exactly — including any lowercase child suffix** (`Na.)`, `Nb.)`, …). Finalization never renumbers and never strips a child suffix. The prefix is assigned once for the life of the file across the combined `Live` + `Historical` namespace, so the same prefix simply follows the file into `Historical`. This applies equally on **reopen**: when a done child task is reopened back to `_pending.md`, its complete lowercase child prefix is preserved unchanged.
 
 Do not keep a duplicate copy on the `Live` side after a successful move.
 
-If the target `_done.md` file already exists in `Historical`, stop and ask
-before overwriting, deleting, or choosing another name.
+If the target `_done.md` file already exists in `Historical`, stop and ask before overwriting, deleting, or choosing another name.
 
 Do not delete unrelated task files.
 
@@ -242,31 +231,15 @@ Do not paste the entire finalized task into chat unless the user asks.
 
 ## Agent Provenance For Durable Artifacts
 
-Finalization never replaces the original creator. Preserve the artifact's
-`## Agent Provenance` section exactly, then append a new entry to its
-`## Agent Change Log` naming the truthful acting agent, the finalization date,
-the lifecycle action, and the status/path or content scope changed.
+Finalization never replaces the original creator. Preserve the artifact's `## Agent Provenance` section exactly, then append a new entry to its `## Agent Change Log` naming the truthful acting agent, the finalization date, the lifecycle action, and the status/path or content scope changed.
 
-When same-stem Markdown, HTML, or PDF siblings exist, apply the same provenance
-history to the complete artifact set. If a legacy artifact lacks reliable
-creator evidence, record `Original writing agent: Not recorded` rather than
-guessing, and log the current finalizer's work. Do not add embedded provenance
-to product source, third-party files, databases, generated caches, skill
-definitions, schema-sensitive or machine-consumed files, or other operational
-files unless their schema explicitly supports it.
+When same-stem Markdown, HTML, or PDF siblings exist, apply the same provenance history to the complete artifact set. If a legacy artifact lacks reliable creator evidence, record `Original writing agent: Not recorded` rather than guessing, and log the current finalizer's work. Do not add embedded provenance to product source, third-party files, databases, generated caches, skill definitions, schema-sensitive or machine-consumed files, or other operational files unless their schema explicitly supports it.
 
 ## Durable Artifact Format Handling
 
-This skill still owns every Prompt Contract, checklist, evidence, delegation,
-and completion gate. Before finalizing, discover same-stem `.md`, `.html`, and
-`.pdf` siblings and treat them as one task artifact set. Preflight every
-destination, apply completed content/status through the applicable format
-skill, rename the lifecycle suffix on every sibling, and move the complete set
-together without changing the permanent prefix or Topic.
+This skill still owns every Prompt Contract, checklist, evidence, delegation, and completion gate. Before finalizing, discover same-stem `.md`, `.html`, and `.pdf` siblings and treat them as one task artifact set. Preflight every destination, apply completed content/status through the applicable format skill, rename the lifecycle suffix on every sibling, and move the complete set together without changing the permanent prefix or Topic.
 
-HTML-only or PDF-only tasks remain in that format; do not manufacture Markdown.
-Stop rather than finalize only part of a sibling set. Extension-only search and
-validation examples become format-neutral for this run.
+HTML-only or PDF-only tasks remain in that format; do not manufacture Markdown. Stop rather than finalize only part of a sibling set. Extension-only search and validation examples become format-neutral for this run.
 
 ## Validation
 

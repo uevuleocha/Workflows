@@ -82,5 +82,4 @@ folders before creating the first prompt. Do not assume the original maintainer'
 
 ## Optional artifact formats
 
-Pair with `html-this` or `pdf-this` for HTML-only or PDF-only human-readable
-artifacts while this skill retains content and workflow ownership.
+Pair with `html-this` or `pdf-this` for HTML-only or PDF-only human-readable artifacts while this skill retains content and workflow ownership.

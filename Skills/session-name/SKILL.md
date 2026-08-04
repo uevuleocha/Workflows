@@ -1,14 +1,11 @@
 ---
 name: session-name
-description: Suggest exactly four short, descriptive chat-session names grounded in the work this session actually did, at session end or midway through. Use when the user invokes /session-name, use session-name, "name this session", "give me session name options", "suggest a name for this chat", "top four names for this session", or clear equivalents asking for chat-session-name suggestions. Offers an OPT-IN N.) session-identifier prefix (asks first; if wanted, requires the user-supplied identifier — used verbatim, including lowercase child suffixes like 17a — and never guesses it), presents choices 1-4, and confirms the final string. Suggestion-only — it never renames the chat, claims platform-side changes, or creates, moves, or renames any file. Not for naming files, plans, tasks, prompts, or reports, and not a recap (session-summary owns that).
+description: Suggest exactly eight descriptive, naturally varied chat-session names grounded in the current session. Use when the user invokes /session-name, use session-name, asks to name the chat, requests eight session names, or asks for longer names initially or as a later refinement. Options 1-4 lead with Outcome, Artifact/Tool, Method, and Headline Result; options 5-8 adaptively synthesize their strongest material and may carry richer integrated detail. Every label begins with an uppercase display word. Selection and the opt-in N.) prefix are optional and non-blocking. Outside Hermes, 240 characters excluding any prefix is the default maximum; a plain request for longer names may reasonably exceed it without a user-supplied character count. On Hermes, every complete label is at most 100 characters including any prefix. Suggestion-only — it never renames a chat or creates, moves, or renames a file.
 ---
 
 # Session Name
 
-Offer the user the top four suggestions for a short, descriptive **chat-session
-name** — the label shown in the platform's session sidebar/UI — grounded in what
-this session actually did. The user picks one; the skill confirms the exact
-final string. Nothing is renamed and nothing is written to disk.
+Offer exactly eight grounded suggestions for a descriptive, naturally varied **chat-session name** — the label shown in the platform's session sidebar/UI. Delivering the eight suggestions completes this one-shot helper. The user's eventual selection is private and optional; nothing is renamed and nothing is written to disk.
 
 ## Invocation
 
@@ -20,173 +17,144 @@ Treat these as direct invocation and begin the skill:
 - "name this session"
 - "give me session name options"
 - "suggest a name for this chat"
-- "top four names for this session"
+- "top eight names for this session"
 - clear equivalents asking for chat-session-name suggestions
 
-The skill may be invoked at **session end** or **midway through** a session.
+The skill may be invoked at **session end** or **midway through** a session. It may also be co-invoked with other work; its output is never a checkpoint or early-return condition.
 
 ## When NOT to use it
 
-- **Naming a file, plan, task, prompt, or report** → that is the relevant
-  `-this` skill's job (`plan-this`, `task-this`, `prompt-this`, `report-this`).
-  `session-name` is strictly for the chat session's UI label. If the user asks
-  it to name a file or plan, decline and point to the right skill.
-- **A written recap of the session** → that is `session-summary`, the durable
-  document. `session-name` is only the short label. They are commonly run
-  back-to-back at session close (name first, then summary), but they are
-  separate skills.
+- **Naming a file, plan, task, prompt, or report** → use the relevant `-this` skill (`plan-this`, `task-this`, `prompt-this`, or `report-this`). `session-name` labels only the chat session.
+- **A written recap of the session** → use `session-summary`. The two skills may run together, but neither depends on the other and a session-name selection is never compulsory summary input.
 
 ## Workflow
 
-1. **Read the session.** Review what this conversation actually did so far —
-   the work performed, decisions made, problems solved. Use only the real
-   content of *this* session; never a generic guess.
-2. **Confirm the prefix (opt-in).** Before generating any suggestions, ask
-   whether the user wants the `N.)` session-identifier prefix on the names. The
-   prefix is **opt-in**, not assumed.
-   - If the user already made the choice clear at invocation (e.g. "this is
-     session 20" implies yes-with-identifier; "no prefix" implies no), skip the
-     question and honor it.
-3. **Resolve the identifier (only if the prefix is wanted).** The session
-   identifier must come from the user:
-   - If the user supplied it ("run session-name, this is session 20"), use it.
-   - **Use the supplied identifier verbatim, including any lowercase child
-     suffix** in the workspace's `Nx.)` grammar: "this is session 17a" produces
-     a `17a.)` prefix, never `17.)`. Do not strip, normalize, or "correct" a
-     child suffix to the bare number.
-   - If not supplied, **stop and ask** "What is this chat session's identifier
-     (e.g. 20, or 17a for a child session)?" and wait for the answer before
-     presenting any options. Continue next turn. Where the host supports an
-     AskUserQuestion-style runtime prompt, that is an acceptable way to ask.
-   - **Never guess or infer the identifier** — neither the number nor the
-     suffix — not from workspace file numbering, folder indexes, or any other
-     source. Ask-or-tell only.
-4. **Produce exactly four options.** Accurate, richly descriptive, and
-   meaningfully distinct. Build each option from the session's applicable
-   **facets** — Outcome, Artifact/Tool, Method, Headline Result — combining
-   the facets that are applicable and statable and omitting the ones that are
-   not. Each option **leads with a different facet** so the four remain four
-   genuine angles, not four rewordings of one phrase. When the prefix is in
-   use, all four carry the **identical** prefix (including any child suffix);
-   only the descriptive part varies. Present them as a numbered list of
-   choices 1–4.
-5. **Confirm the pick.** After the user selects one, echo the exact final
-   string for them to paste into the platform UI. The skill does **not**
-   rename the session and never claims the platform-side name changed.
+1. **Read the session.** Review what this conversation actually did so far — work performed, decisions made, problems solved, artifacts handled, and outcomes reached. Use only grounded session content; never invent a generic angle.
+2. **Resolve the optional prefix without asking a preliminary question.** The `N.)` session-identifier prefix is opt-in and identifiers are never guessed.
+   - If the user supplies an identifier or clearly says "this is session 20," use that identifier **verbatim** on all eight options. Preserve lowercase child suffixes: `17a` becomes `17a.)`, never `17.)`.
+   - If the user explicitly declines a prefix, omit it.
+   - If the user says nothing about a prefix, treat the opt-in as not exercised and produce eight unprefixed suggestions without asking.
+   - If the user explicitly requests a prefix but supplies no identifier, produce eight unprefixed suggestions, briefly note that the prefix was omitted because no identifier was supplied, and continue. Never stop, ask, wait, infer, or guess.
+3. **Draft options 1-4 as the foundation set.** Each option may combine any applicable facets, but it must lead with its assigned facet and remain meaningfully distinct:
+   1. **Outcome-led** — lead with what the session accomplished.
+   2. **Artifact/Tool-led** — lead with the principal artifact, system, or tool while still beginning with an uppercase display word. If the canonical identifier is lowercase, rewrite the lead naturally rather than placing that identifier first; for example, use `Session-Name Skill Upgraded ...`, not `session-name Upgraded ...`.
+   3. **Method-led** — lead with the approach, workflow, or technique.
+   4. **Headline Result-led** — lead with the strongest newsworthy result.
+4. **Draft options 5-8 as adaptive syntheses.** Write these only after considering options 1-4. For each synthesis, identify complementary strengths, facts, phrases, and emphasis from the foundation set, then rewrite them into one cohesive, natural name that usually communicates a richer integration than any single foundation angle. Reorganize, expand, compress, sharpen, or newly phrase grounded material when useful. Because a synthesis may carry more integrated information, it may naturally be longer than options 1-4, but literal extra length is never mandatory. It must not mechanically concatenate fragments, repeat a foundation option, pad wording, inflate the outcome, or introduce ungrounded claims. Options 5-8 must differ materially from one another.
+5. **Apply the host length and user-preference rules to each complete label.** Include any visible list number and optional session prefix only as specified below. Do not compress every option into a uniform length band; let the session substance, foundation angle, synthesis depth, host, and any explicit request for longer names determine natural variation.
+6. **Emit all eight suggestions and continue.** Delivering the eight valid suggestions is terminal success for `session-name`. Never ask the user to choose, promise later confirmation, wait for a response, or leave any turn, task, workflow, delegation, goal, or co-invoked skill pending because no selection was reported. Continue all co-invoked work in the same turn.
 
-## Naming Style Rules
+## Naming Style And Length Rules
 
-- **Rich, under a 150-character ceiling.** Up to ~150 characters, **excluding**
-  the prefix. 150 is a **ceiling, not a quota**: reach toward it when the
-  session has enough real substance and context to fill it richly; a shorter
-  name is the correct name for a thin, short, or early session. **Never pad**
-  a name just to approach 150 — agent judgment decides how much of the ceiling
-  the session's actual content earns. The ceiling is soft guidance — do not
-  hard-fail or truncate a longer name that is the accurate one.
-- **Facet-built.** Compose each option from the applicable facets — Outcome,
-  Artifact/Tool, Method, Headline Result — including only those that are
-  applicable and statable for this session.
-- **Accurate.** Grounded in what the session genuinely did; do not inflate or
-  misdescribe.
-- **Distinct.** The four options vary in emphasis so the user has a real
-  choice.
-- **Exactly four.** No more, no fewer, in this version.
+- **Exactly eight.** Options 1-4 are the four foundation angles; options 5-8 are four adaptive syntheses. No more and no fewer.
+- **Uppercase display start.** After any optional `N.)` prefix, the first descriptive word of every option must begin with an uppercase letter. This applies especially to Artifact/Tool-led option 2. Preserve the canonical casing of intentionally lowercase technical identifiers such as `session-name`, `npm`, or `zCode` when they appear later in the label; if one would otherwise lead, prepend or rewrite with an uppercase natural descriptor instead of altering the identifier or allowing a lowercase start.
+- **Grounded and distinct.** Every option must accurately reflect the current session and provide a useful alternative emphasis.
+- **Natural rather than stitched.** Options 5-8 must read as newly composed names, not joined clauses copied from options 1-4.
+- **Natural length variation.** Do not force all eight names toward the same length. Foundation options may stay focused; synthesis options may use more space when their richer integration earns it. Semantic richness matters more than character count, so options 5-8 do not have to be longer and no option may be padded merely to create a length difference.
+- **Outside Hermes: 240-character default maximum excluding the optional session prefix.** Stay at or below 240 characters by default. This is a maximum, not a quota: a thin session still deserves shorter names, while a substantial session should not be compressed merely to keep every option inside a Hermes-like range.
+- **Outside Hermes, an explicit request for longer names overrides the default maximum when useful.** The user may ask for longer, richer, more detailed, or expanded names either in the original invocation or after receiving the first eight. The user does not need to specify a character count or replacement maximum, and the agent must not ask for one. Produce eight reasonably expanded, still useful names; they may exceed 240 characters when the added grounded detail earns it, but never become rambling, padded, or unreasonable.
+- **On Hermes: 100-character hard cap for the complete paste-ready option, including any `N.)` prefix, spaces, and punctuation.** Use only known host context; do not probe or investigate Hermes. Measure after applying the prefix. Compress intelligently until every option fits without cutting words or removing the facts that make the options distinct.
+- **List numbering is presentation, not part of the pasted label.** The Hermes cap applies to the label after `1. ` through `8. ` is removed, but includes a supplied session prefix such as `17a.) `.
+
+## Selection And Co-Invocation Semantics
+
+- The user's selection is private, optional, and outside this skill's completion contract.
+- If the user voluntarily reports a selection later, acknowledge it naturally if useful. Do not treat it as a state transition, require confirmation, update a file, or reopen completed work.
+- If the user later asks for longer names, treat that as a fresh optional refinement and immediately emit a new set of eight reasonably longer, more detailed suggestions. Do not ask the user to choose a maximum. The original invocation remains complete and was never pending.
+- When co-invoked with another skill or task, place the eight names at an appropriate point and continue the remaining work in the same turn.
+- A later `session-summary` may mention a voluntarily shared selection when useful, but neither workflow waits for or requires it.
 
 ## Mid-Session Use
 
-When invoked midway through a session, name only the work **completed so
-far**, and briefly note that the name may evolve and the skill can be re-run
-at session close.
+When invoked midway through a session, name only the work **completed so far** and briefly note that the name may evolve if the focus changes. Still emit exactly eight suggestions and complete without asking for a selection.
 
-## Scope and Safety
+## Scope And Safety
 
-- **Read-only.** Produces chat output only. Creates, moves, and renames no
-  files. Does not rename the chat in any platform UI and never claims to.
-- **Platform-neutral.** It may recommend the string as a UI label, but must
-  not claim it can rename chats in Claude Code, Codex, zCode, Hermes,
-  Antigravity, or any other host.
-- **One-shot helper, not a mode.** It emits no Mode footer of its own and does
-  not persist. It still obeys any mandatory response footers required by the
-  host workspace contract (e.g. Glossary/Mode footers).
+- **Suggestion-only and read-only.** Produce chat output only. Do not rename the chat, claim it was renamed, create or rename a file, probe automatic-renaming support, or ask to investigate platform-side renaming.
+- **Platform-neutral.** Recommend paste-ready labels without claiming mutation capability in Claude, Codex, zCode, Hermes, Antigravity, or any other host.
+- **One-shot helper, not a mode.** Emit no Mode footer of its own and do not persist. Obey any footer required by an active host mode.
 
 ## Output Shape
 
+Use a simple numbered list. The representative block below is a **non-Hermes, information-rich session**; it intentionally demonstrates natural length variation and the larger non-Hermes budget. With a supplied identifier, every pasted label carries the identical verbatim prefix:
+
 ```text
-This is session 17a. Top four name options:
+Eight session-name suggestions:
 
-1. 17a.) ChatGPT Codex Connected to Hermes — OAuth Subscription Login Working, No API Key Needed
-2. 17a.) Hermes Default Model Set to GPT-5.6-sol via Codex OAuth Setup and Config Edits
-3. 17a.) OAuth-Based Codex Wiring in Hermes: Auth Flow Debugged, Subscription Verified
-4. 17a.) Headline: Hermes Now Runs on the ChatGPT Subscription — Codex OAuth Replaces API-Key Billing
-
-Pick one and I'll confirm it.
+1. 42.) Finalize-Session Skill Built, Locally Validated, Synchronized Across Five Agent Platforms, and Released with Verified Byte Parity
+2. 42.) Finalize-Session Orchestrator Connects Eight-Option Chat Naming with Durable ACTS Summaries While Preserving Independent Child Skills
+3. 42.) Local-First Skill Implementation, Scenario Validation, Five-Platform Synchronization, and Recursive Parity Verification Complete
+4. 42.) One Invocation Now Produces Eight Non-Blocking Session Names and a Durable Summary Without Renaming or Pausing the Actual Chat
+5. 42.) From Prompt 13 to a Verified Global Skill: Thin Orchestration, Compulsory Identifier Routing, Duplicate-Safe Resume, and Five-Platform Parity
+6. 42.) Finalize-Session Unifies Rich Session Naming and Durable Summary Creation Through Dependency Preflight, Safe Number Routing, and Same-Pass Completion
+7. 42.) A Thin Wrapper Now Coordinates Two Independent Skills, Preserves Hermes-Specific Limits, Prevents Cross-Turn Duplication, and Ships Identically Everywhere
+8. 42.) Combined Session Closure Delivered End to End with Adaptive Name Synthesis, ACTS Artifact Ownership, Local Validation, Global Sync, and Verified Handoff
 ```
 
-Each option leads with a different facet (outcome, artifact/tool, method,
-headline result) and combines the others where statable. Without the prefix,
-the same block simply omits `17a.)` from each option; a plain parent session
-would carry e.g. `17.)` instead.
+The list ends there for `session-name`; do not append a selection request. Without a prefix, omit `42.) ` from every label. If a requested prefix lacked an identifier, add one brief note before or after the list: `Prefix omitted because no session identifier was supplied.` Then continue any co-invoked work.
+
+## Behavior Scenarios
+
+1. **No prefix preference stated:** emit eight unprefixed suggestions immediately; ask nothing.
+2. **Explicit no-prefix:** emit eight unprefixed suggestions immediately.
+3. **Prefix requested without an identifier:** emit eight unprefixed suggestions plus the brief omission note; do not stop.
+4. **Parent identifier supplied:** `37` is used verbatim as `37.)` on all eight labels.
+5. **Child identifier supplied:** `37b` is used verbatim as `37b.)` on all eight labels.
+6. **No selection reported:** the invocation is complete after the eighth suggestion.
+7. **Selection voluntarily reported later:** acknowledge naturally if useful; change no state and require no follow-up.
+8. **Co-invoked work:** emit the eight labels at an appropriate point and continue the other requested work in the same turn.
+9. **Hermes without a prefix:** verify all eight complete labels are at most 100 characters.
+10. **Hermes with a prefix:** apply the verbatim prefix, then verify all eight complete labels are still at most 100 characters.
+11. **Non-Hermes host, normal request:** keep each label at or below the 240-character default maximum excluding the optional prefix, with natural variation rather than artificial uniformity.
+12. **Platform mutation boundary:** suggest labels only; never rename, claim a rename, probe capabilities, or ask to investigate renaming.
+13. **Lowercase artifact identifier:** when option 2 would naturally lead with `session-name`, `npm`, `zCode`, or another lowercase identifier, begin with an uppercase descriptor such as `Session-Name Skill`, `Package Workflow with npm`, or `Global zCode Integration`; never emit a lowercase first descriptive word.
+14. **Longer names requested initially outside Hermes:** provide eight reasonably expanded names, allow useful labels above 240 characters, and ask no character-count question.
+15. **Longer names requested after the first eight outside Hermes:** immediately provide a fresh set of eight materially longer or more detailed names within good reason; the earlier invocation remains complete.
+16. **Synthesis length and richness:** options 5-8 normally integrate more information and may be longer than options 1-4, but no mechanical length ordering or padding is required.
 
 ## Examples
 
-### 1. Known session identifier (child suffix used verbatim)
+### Known child identifier
 
-> **User:** run session-name, this is session 17a
-> **Agent:** *(prefix implied yes, identifier supplied — generates
-> immediately)* presents four `17a.)`-prefixed options as choices 1–4. The
-> `a` suffix is kept verbatim — never normalized to `17.)`.
+> **User:** Run session-name; this is session 17a.
+> **Agent:** Immediately emits eight `17a.)`-prefixed options. Options 1-4 lead with Outcome, Artifact/Tool, Method, and Headline Result; options 5-8 adaptively synthesize their strongest grounded material. The `a` suffix is preserved verbatim. No selection is requested.
 
-### 2. Prefix wanted, identifier missing — stop and ask
+### Prefix requested without an identifier
 
-> **User:** /session-name — yes, use the number prefix
-> **Agent:** "What is this chat session's identifier (e.g. 20, or 17a for a
-> child session)?" *(stops; no options yet; continues next turn once the user
-> answers — an AskUserQuestion-style prompt is fine where the host supports
-> it)*
+> **User:** Run session-name and use the number prefix.
+> **Agent:** Emits eight unprefixed options plus `Prefix omitted because no session identifier was supplied.` It then continues any co-invoked work without asking or waiting.
 
-### 3. User declines the prefix
+### Co-invocation
 
-> **User:** name this session, no numbering
-> **Agent:** presents four unprefixed options, e.g.
-> `1. Hermes OAuth Setup for ChatGPT Codex`, as choices 1–4.
+> **User:** Name this session and write the requested wrap-up.
+> **Agent:** Emits eight suggestions and then continues the explicitly requested wrap-up workflow in the same turn. The naming output is not a checkpoint.
 
-### 4. Mid-session invocation
+### Voluntary later selection
 
-> **User:** give me session name options *(session still ongoing)*
-> **Agent:** asks about the prefix if unclear, then names only the work done
-> so far and adds: "This names the session so far — re-run me at session close
-> if the focus shifts."
+> **User:** I used option 6.
+> **Agent:** May respond, `Nice choice — option 6 captures the transition clearly.` No confirmation workflow, state change, or file update follows.
 
-### 5. Final user selection
+### Hermes
 
-> **User:** option 2
-> **Agent:** "Confirmed. Final name: `20.) Hermes on ChatGPT: OpenAI Codex
-> OAuth Setup` — paste it into the session label in your platform's UI. I
-> haven't renamed anything myself."
+> **Context:** Current host is Hermes and the user supplied `37b`.
+> **Agent:** Produces eight labels beginning `37b.) ` and verifies each complete label is at most 100 characters after the prefix is applied. It compresses wording naturally rather than truncating words.
 
-### 6. Refusal — naming a plan/file instead
+### Longer non-Hermes refinement without a supplied maximum
 
-> **User:** use session-name to name my new plan file
-> **Agent:** "session-name only labels the chat session itself. For naming a
-> plan file, use `plan-this` (or the matching `-this` skill for the artifact
-> type)."
+> **User:** These are good, but give me longer session names.
+> **Agent:** Immediately emits a fresh set of eight reasonably longer, more detailed suggestions without asking for a character limit. It may exceed the ordinary 240-character default where grounded detail benefits, preserves natural variation, and does not treat the earlier set as incomplete.
 
-### 7. Separation from session-summary
+### Refusal: naming a plan file
 
-> **User:** name this session and write the wrap-up
-> **Agent:** runs session-name for the label only, then: "For the durable
-> recap, that's `session-summary` — want me to run it next?"
+> **User:** Use session-name to name my new plan file.
+> **Agent:** Explains that `session-name` only suggests chat labels and routes plan-file naming to `plan-this`.
 
 ## Related Skills
 
-- `session-summary` — the durable written recap; companion at session close.
-- `plan-this`, `task-this`, `prompt-this`, `report-this` and their finalizers —
-  the durable-artifact family. `session-name` is **not** in that family: it
-  creates no artifact and needs no finalizer.
+- `finalize-session` — the convenience caller that runs `session-name` and `session-summary` in one pass, supplying the chat-session identifier as this skill's verbatim `N.)` prefix. It orchestrates only; every rule in this file still governs. Standalone invocation is unaffected.
+- `session-summary` — the independent durable recap; it may follow `session-name`, but neither workflow depends on a reported selection.
+- `plan-this`, `task-this`, `prompt-this`, `report-this`, and their finalizers — the durable-artifact family. `session-name` creates no artifact and needs no finalizer.
 
-## Future Hook
+## Validation
 
-A hard character cap and an automatic platform-derived session identifier are
-deliberately **not** implemented in this version. Identifier source is
-ask-or-tell only; the 150-character soft ceiling is the documented hook for a
-future hard cap once usage settles.
+When creating or updating this skill, validate the folder with `quick_validate.py` in Python UTF-8 mode. Exercise every Behavior Scenario; confirm exactly eight outputs with the required foundation/synthesis ordering; verify every first descriptive word starts uppercase even when option 2 represents a lowercase technical identifier; confirm normal non-Hermes names stay within the 240-character default maximum; confirm a plain request for longer names needs no user-supplied maximum and may reasonably exceed 240; confirm the set varies naturally in length and synthesis richness without padding; record final Hermes label lengths after prefixes are applied; confirm no blocking or rename language remains; and verify all coupled metadata agrees with this file.

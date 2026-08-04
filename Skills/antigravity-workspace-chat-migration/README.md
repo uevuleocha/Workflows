@@ -1,23 +1,14 @@
 # Antigravity Workspace Chat Migration — Adoption Guide
 
-Migrates Antigravity (Gemini) Desktop chat conversations between workspaces/projects (per-conversation
-SQLite blob Project UUID, the Project Registry, the derived agyhub index, and the Electron
-`state.vscdb`), with backups, one-session testing, manifests, and verification.
+Migrates Antigravity (Gemini) Desktop chat conversations between workspaces/projects (per-conversation SQLite blob Project UUID, the Project Registry, the derived agyhub index, and the Electron `state.vscdb`), with backups, one-session testing, manifests, and verification.
 
 ## Dependency
 
-`antigravity-workspace-chat-migration` depends on the `session-summary` skill. Both the Front-Door
-and Execution workflows close by producing an explicit handoff/report summary through
-`session-summary` — not hand-written prose (see the `## Session Summary Integration` section in
-`SKILL.md`). It runs with an availability guard and falls back to a plain markdown summary if
-`session-summary` is not loaded.
+`antigravity-workspace-chat-migration` depends on the `session-summary` skill. Both the Front-Door and Execution workflows close by producing an explicit handoff/report summary through `session-summary` — not hand-written prose (see the `## Session Summary Integration` section in `SKILL.md`). It runs with an availability guard and falls back to a plain markdown summary if `session-summary` is not loaded.
 
-**If you adopted `antigravity-workspace-chat-migration` from Uzo (U-Z-O), also adopt
-`session-summary`.** This skill also ships its own bundled `scripts/` — keep those with it when you
-copy the skill.
+**If you adopted `antigravity-workspace-chat-migration` from Uzo (U-Z-O), also adopt `session-summary`.** This skill also ships its own bundled `scripts/` — keep those with it when you copy the skill.
 
-For the general mechanism, see the workspace's `Documentation/` folder,
-`3.) Skill-to-Skill Calls — Pattern and Registry.md`.
+For the general mechanism, see the workspace's `Documentation/` folder, `3.) Skill-to-Skill Calls — Pattern and Registry.md`.
 
 ## Adoption Prompt
 
@@ -30,5 +21,4 @@ creating missing folders.
 
 ## Optional artifact formats
 
-Pair with `html-this` or `pdf-this` for HTML-only or PDF-only manifests,
-handoffs, and reports while this skill retains migration ownership.
+Pair with `html-this` or `pdf-this` for HTML-only or PDF-only manifests, handoffs, and reports while this skill retains migration ownership.

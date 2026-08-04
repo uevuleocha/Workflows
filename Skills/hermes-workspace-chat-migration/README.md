@@ -20,5 +20,4 @@ Read this README and SKILL.md. This skill depends on `session-summary` and ships
 
 ## Optional artifact formats
 
-Pair with `html-this` or `pdf-this` for HTML-only or PDF-only manifests,
-handoffs, and reports while this skill retains migration ownership.
+Pair with `html-this` or `pdf-this` for HTML-only or PDF-only manifests, handoffs, and reports while this skill retains migration ownership.

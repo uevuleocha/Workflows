@@ -18,6 +18,12 @@ A Prompt Contract authored under this skill is a **planning artifact**. It scope
 
 When invoked by `plan-this` or `task-this`, the calling skill embeds the contract into that plan/task artifact under a `## Prompt Contract` section. `prompt-contracts` itself still writes no standalone contract file — on its own it delivers the contract in chat.
 
+### Embedded Caller Mode
+
+An owning durable-artifact skill may define a stricter caller policy. `north-star` uses embedded caller mode: derive, validate, and embed the complete contract without asking for separate Prompt Contract approval. The user's sufficiently detailed North Star invocation supplies the authority to begin the first Full or Batch pursuit. The contract is not repeated in chat by default; show it only when the user explicitly opts in during creation or asks to see it later. Material scope changes update the embedded contract, while evidence-only progress does not rewrite it.
+
+This exception belongs to the calling workflow. It does not change the direct invocation behavior below and does not silently alter `plan-this`, `task-this`, `prompt-this`, or other callers.
+
 ## Invocation
 
 Treat these as direct invocation and begin the prompt-contracts workflow:
@@ -98,14 +104,18 @@ FAILURE (any of these = not done):
 
 This is the positive completion checklist. It defines what must be true before the agent can stop looping and deliver.
 
+In plain language, a **good result** is one where every Definition of Done item is met and no Failure condition occurred. This is a terminology bridge only; `DEFINITION OF DONE` remains the canonical header and logic.
+
 - Include required evidence: "unit tests pass", "validator reports Skill is valid", "manual review confirms no stale contract-shape wording"
-- Include scope completion: "local master skill updated", "metadata updated", "global sync deferred"
+- Include scope completion: "local master skill updated", "metadata updated", "sync authorization and status recorded"
 - Keep it concrete enough to verify: "all configured roles covered" not "quality is good"
 - Do not duplicate FAILURE; DoD says what must be true, FAILURE says what must not happen
 
 #### Writing good FAILURE clauses
 
 This is the most important section. Think about how the task could "technically work" but actually be wrong:
+
+In plain language, a **bad result** exists when at least one Failure condition occurred. **Things to avoid** are the concrete Failure conditions listed here. These phrases do not add new contract sections or change the rule that any active Failure means not done.
 
 - Missing edge case: "no test for empty input"
 - Performance miss: "latency exceeds 1ms on synthetic load"
@@ -286,6 +296,7 @@ Do:
 
 - parse user-provided contracts into the 5 canonical sections
 - draft contracts from plain task descriptions and present for approval
+- honor an owning skill's explicit embedded-caller policy, including North Star's approval-free authoring and opt-in-only chat display
 - validate completeness, consistency, testability, and scope
 - run the DEFINITION OF DONE and FAILURE-condition self-verification before delivering
 - report contract status (ALL PASS or explicit failures) at the end
@@ -304,4 +315,6 @@ After creating or updating this skill itself:
 - confirm the skill folder contains `SKILL.md` and, where the host expects it, `agents\openai.yaml`
 - confirm the 5-section contract template (GOAL / CONSTRAINTS / FORMAT / DEFINITION OF DONE / FAILURE) appears intact
 - confirm the Execution, Self-Verification, and Boundaries sections exist
+- confirm the good-result and bad-result language maps only to DEFINITION OF DONE and FAILURE, without adding headers
+- confirm North Star embedded caller mode is approval-free and chat display remains opt-in
 - validate folder-style skills with the `quick_validate.py` script that ships with your skill-creator install, running Python in UTF-8 mode (`-X utf8`).

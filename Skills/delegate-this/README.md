@@ -11,57 +11,29 @@ It has two modes:
 
 ## Artifact Families and Child Numbering
 
-A Mode A dispatch creates linked **families of artifacts** that all live under
-one **execution workspace** (resolved before anything is created). Each family
-has its **own numeric anchor** from its own Subject namespace — the anchors need
-not match; explicit paths connect the families:
+A Mode A dispatch creates linked **families of artifacts** that all live under one **execution workspace** (resolved before anything is created). Each family has its **own numeric anchor** from its own Subject namespace — the anchors need not match; explicit paths connect the families:
 
-- **Plan/Task family** — parent plan and/or task (`N.)`, e.g. `1.)`) plus mini
-  artifacts (`1a.)`, `1b.)` … `1e.)`), inheriting the Plan/Task master `N`.
-- **Delegation record** — its own `N.` from the Delegation Subject namespace
-  (e.g. `1.)`, independent of the Plan number).
-- **Summary family** — orchestrator/master summary (`N.)`, e.g. `9.`) plus one
-  delegated **return report** per assignment (`9a.)`, `9b.)` … `9e.`), inheriting
-  the Summary master `N`. Return-report filenames end in `Report.md`.
+- **Plan/Task family** — parent plan and/or task (`N.)`, e.g. `1.)`) plus mini artifacts (`1a.)`, `1b.)` … `1e.)`), inheriting the Plan/Task master `N`.
+- **Delegation record** — its own `N.` from the Delegation Subject namespace (e.g. `1.)`, independent of the Plan number).
+- **Summary family** — orchestrator/master summary (`N.)`, e.g. `9.`) plus one delegated **return report** per assignment (`9a.)`, `9b.)` … `9e.`), inheriting the Summary master `N`. Return-report filenames end in `Report.md`.
 
-Each anchor is calculated across its own combined Live + Historical namespace.
-The orchestrator **reserves every child prefix before dispatch** and writes each
-exact reserved prefix into the assignment overview, the mini-artifact table, the
-return-report table, and each packet. "Create a mini plan later" without a
-reserved prefix is not allowed. `plan-this`, `task-this`, and `session-summary`
-understand this grammar enough to allocate the next suffix within their own
-family and obey a reserved prefix — they do not absorb the delegation workflow.
+Each anchor is calculated across its own combined Live + Historical namespace. The orchestrator **reserves every child prefix before dispatch** and writes each exact reserved prefix into the assignment overview, the mini-artifact table, the return-report table, and each packet. "Create a mini plan later" without a reserved prefix is not allowed. `plan-this`, `task-this`, and `session-summary` understand this grammar enough to allocate the next suffix within their own family and obey a reserved prefix — they do not absorb the delegation workflow.
 
 ## Mandatory Return Reports
 
-Every returning assignment writes a **return report** (ending in `Report.md`)
-using session-summary structure plus an **append-only `## Feedback` ledger**.
-Report content and earlier feedback entries are immutable; feedback is
-appendable only while the delegation is active; the whole report (and its
-ledger) freezes when `finalize-delegation` closes the delegation.
+Every returning assignment writes a **return report** (ending in `Report.md`) using session-summary structure plus an **append-only `## Feedback` ledger**. Report content and earlier feedback entries are immutable; feedback is appendable only while the delegation is active; the whole report (and its ledger) freezes when `finalize-delegation` closes the delegation.
 
 ## Per-Packet Checkpoint Policy
 
-Every packet carries an explicit **Checkpoint Policy**: where execution stops
-(default: complete the packet continuously; only `USER CHECKPOINT` midpoints
-pause), whether sync is allowed (default for skill work: centralized sync), and
-what deliverables must be returned first.
+Every packet carries an explicit **Checkpoint Policy**: where execution stops (default: complete the packet continuously; only `USER CHECKPOINT` midpoints pause), whether sync is allowed (default for skill work: centralized sync), and what deliverables must be returned first.
 
 ## Centralized Synchronization (Skill Work)
 
-For multi-agent skill work in one Workflows repository, the default is
-**centralized synchronization**: workers edit and validate local masters and
-return deliverables; the orchestrator runs one final global-sync + parity pass
-after review. Workers never pause merely to ask about sync. Explicit user
-override wins.
+For multi-agent skill work in one Workflows repository, the default is **centralized synchronization**: workers edit and validate local masters and return deliverables; the orchestrator runs one final global-sync + parity pass after review. Workers never pause merely to ask about sync. Explicit user override wins.
 
 ## Provider-Neutral Hermes Routing
 
-Hermes is routed by **capability, trust, and tools**, not a fixed provider
-label. `delegate-this` asks which provider/model Hermes currently uses and which
-quota pool it shares, routes by capability/trust/tools, schedules by quota, and
-never permanently binds or downgrades Hermes based on GLM, OpenAI, Codex, or
-zCode. Pay-as-you-go providers always require explicit approval.
+Hermes is routed by **capability, trust, and tools**, not a fixed provider label. `delegate-this` asks which provider/model Hermes currently uses and which quota pool it shares, routes by capability/trust/tools, schedules by quota, and never permanently binds or downgrades Hermes based on GLM, OpenAI, Codex, or zCode. Pay-as-you-go providers always require explicit approval.
 
 ## Calls Other Skills
 
@@ -73,11 +45,7 @@ zCode. Pay-as-you-go providers always require explicit approval.
 | `task-this`        | To author a parent or mini **task**         | Pause, warn, author inline only if the user says so |
 | `finalize-delegation` | To close the record when work is integrated | Stop. Leave `_dispatched`; install and run it       |
 
-**There is no manual lifecycle fallback.** If `finalize-delegation` is unavailable, the
-record stays `_dispatched` exactly where it is. Install or load the skill — from the
-local master, or by re-running `global-sync` — and then run it. Never move, rename, or
-otherwise close a delegation record by hand: doing so skips the return-and-integration
-verification and the parent-pointer repair, which is precisely how records get orphaned.
+**There is no manual lifecycle fallback.** If `finalize-delegation` is unavailable, the record stays `_dispatched` exactly where it is. Install or load the skill — from the local master, or by re-running `global-sync` — and then run it. Never move, rename, or otherwise close a delegation record by hand: doing so skips the return-and-integration verification and the parent-pointer repair, which is precisely how records get orphaned.
 
 `delegate-this` calls those skills. **They never call it.** `plan-this` and `task-this` carry only a thin `Delegation` pointer field that defaults to `N/A` — no routing logic, no packet schema, no delegation workflow. That one-way boundary is deliberate: adopt `delegate-this` without them and it degrades gracefully; adopt them without it and they never notice.
 
@@ -132,5 +100,4 @@ the first Mode A run. Do not assume the original maintainer's platform set or pa
 
 ## Optional artifact formats
 
-Pair with `html-this` or `pdf-this` for HTML-only or PDF-only human-readable
-artifacts while this skill retains content and workflow ownership.
+Pair with `html-this` or `pdf-this` for HTML-only or PDF-only human-readable artifacts while this skill retains content and workflow ownership.

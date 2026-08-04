@@ -10,5 +10,4 @@ The setup task should help the user install dependencies, provide an API key thr
 
 ## Optional artifact formats
 
-Pair with `html-this` or `pdf-this` for HTML-only or PDF-only human-readable
-artifacts while this skill retains content and workflow ownership.
+Pair with `html-this` or `pdf-this` for HTML-only or PDF-only human-readable artifacts while this skill retains content and workflow ownership.

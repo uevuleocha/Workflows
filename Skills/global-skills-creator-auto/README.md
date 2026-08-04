@@ -2,6 +2,8 @@
 
 This skill autonomously creates or syncs reusable agent skills from a local master skills folder to one or more global agent skill installs.
 
+Every newly created skill carries the portable Markdown table-alignment contract and a validation check so pipe alignment remains enforced after global installation.
+
 If you cloned this skill from someone else, do not assume the original maintainer's paths apply to your machine. Ask your agent to read this README and `SKILL.md`, then help you configure your own path stack before running autonomous create-and-sync work.
 
 ## Local Master Rule

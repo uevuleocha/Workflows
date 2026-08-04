@@ -193,28 +193,18 @@ If the requested output mode conflicts with the project's canonical contract or 
 
 ## Agent Provenance For Durable Artifacts
 
-This skill applies the workspace's first-party durable-artifact provenance rule
-to durable Debug captures, evidence records, and subsequent diagnostic updates.
+This skill applies the workspace's first-party durable-artifact provenance rule to durable Debug captures, evidence records, and subsequent diagnostic updates.
 
 For every in-scope artifact:
 
-- place an `## Agent Provenance` section near the top with `Content owner`,
-  `Original writing agent`, `Created`, and `Artifact role`;
-- use a stable truthful agent-family label such as `Codex Agent`, `Claude Agent`,
-  `Antigravity Agent`, `Hermes Agent`, or `zCode Agent`;
+- place an `## Agent Provenance` section near the top with `Content owner`, `Original writing agent`, `Created`, and `Artifact role`;
+- use a stable truthful agent-family label such as `Codex Agent`, `Claude Agent`, `Antigravity Agent`, `Hermes Agent`, or `zCode Agent`;
 - keep the original writing-agent entry immutable;
-- keep an append-only `## Agent Change Log` near the bottom, recording the date,
-  acting agent, action, and concise scope for every material edit;
-- if a legacy artifact lacks reliable creator evidence, use `Not recorded` rather
-  than guessing, then log the current agent's actual change; and
+- keep an append-only `## Agent Change Log` near the bottom, recording the date, acting agent, action, and concise scope for every material edit;
+- if a legacy artifact lacks reliable creator evidence, use `Not recorded` rather than guessing, then log the current agent's actual change; and
 - treat copying or global synchronization as transport, not authorship.
 
-Keep `Content owner` for now. In Uzo's personal artifacts it normally resolves
-to `Uzo`; do not confuse content ownership with the agent that performed the
-filesystem write. Do not inject provenance into product source, third-party
-files, databases, generated caches, skill definitions, schema-sensitive or
-machine-consumed files, or other operational files unless their schema
-explicitly supports it.
+Keep `Content owner` for now. In Uzo's personal artifacts it normally resolves to `Uzo`; do not confuse content ownership with the agent that performed the filesystem write. Do not inject provenance into product source, third-party files, databases, generated caches, skill definitions, schema-sensitive or machine-consumed files, or other operational files unless their schema explicitly supports it.
 
 ## Validation
 

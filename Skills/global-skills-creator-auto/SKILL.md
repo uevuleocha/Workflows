@@ -202,6 +202,12 @@ Ecosystem consistency reminder: every folder-style skill must include `agents/op
 
 ## Validation Rules
 
+### Required Portable Markdown Table Alignment
+
+Every newly created skill must carry a `## Markdown Table Alignment` section in its own `SKILL.md` with the complete rule below, plus a validation item that checks the rule remains present:
+
+- **All Markdown tables must be visually pipe-aligned.** Cap every cell at 80 characters, including any overflow marker. If a cell's full content would exceed 80 characters, truncate it at the nearest word boundary within the cap, append a pointer such as `→ see note [row-id]` (using that row's own identifier — its `#`, `Phase`, name, or whichever column already identifies the row), and place the full original text as a plain note directly below the table, keyed by that same identifier. Pad columns so the table is aligned in a monospaced raw-text or Markdown view. Rendered visual alignment is authoritative; raw `|` indices are diagnostic only because Unicode display width (for example emoji, arrows, or wide glyphs) can differ from raw character counts. Do not flag or rework a table solely because raw pipe indices differ when the rendered table is visually aligned. Visibly uneven columns, malformed separators, or cells above 80 characters still fail. This applies to every table an agent writes, not only Estimated Effort tables. **Prefer ASCII-only characters (`->`, `--`, `...`) inside table cells**; Unicode glyphs (arrows, em/en dashes, ellipsis) render wider than one column in most viewers and silently break pipe alignment even when raw character counts match. When a table exceeds approximately 120 characters in total width, narrow the columns (truncate cells to essentials and move detail to notes) so the table renders on a single line without word-wrapping.
+
 Always validate folder-style skills with the `quick_validate.py` script that ships with your skill-creator install, running Python in UTF-8 mode (`-X utf8`).
 
 Run this validator for:
@@ -212,6 +218,8 @@ Run this validator for:
 - Antigravity global folder
 - Hermes global folder (under `Personal/`)
 - zCode global folder
+
+Before sync, also inspect the new local-master `SKILL.md` and confirm its Markdown Table Alignment section and corresponding validation item are present. Missing portable alignment governance is a validation failure even when `quick_validate.py` passes.
 
 When `global-sync` performs the sync, it runs this validation for every target; this list governs the inline fallback.
 

@@ -54,26 +54,15 @@ Two factors override preference outright:
 
 ## Provider-Neutral Hermes Routing
 
-Hermes is routed by **capability, trust, and tools** — not by a fixed provider
-label. Before routing any assignment to Hermes:
+Hermes is routed by **capability, trust, and tools** — not by a fixed provider label. Before routing any assignment to Hermes:
 
-1. **Ask which provider/model Hermes currently uses** and **which
-   subscription/quota pool it shares.** Do not assume the previous run's
-   provider; the surface is dynamic.
-2. **Route by capability, trust, and tools** — the same routing factors as every
-   other platform. Provider identity is an input to routing, not a label.
-3. **Schedule according to current quota capacity.** If the configured provider
-   is near its quota ceiling, serialize, defer, or reroute rather than overload
-   it.
-4. **Never permanently bind or downgrade Hermes** based on GLM, OpenAI, Codex,
-   or zCode. A run-time pairing is a run-time decision, recorded in the
-   delegation record, not a standing downgrade.
-5. **Pay-as-you-go providers always require explicit approval** — for this run,
-   not inferred from a previous one.
+1. **Ask which provider/model Hermes currently uses** and **which subscription/quota pool it shares.** Do not assume the previous run's provider; the surface is dynamic.
+2. **Route by capability, trust, and tools** — the same routing factors as every other platform. Provider identity is an input to routing, not a label.
+3. **Schedule according to current quota capacity.** If the configured provider is near its quota ceiling, serialize, defer, or reroute rather than overload it.
+4. **Never permanently bind or downgrade Hermes** based on GLM, OpenAI, Codex, or zCode. A run-time pairing is a run-time decision, recorded in the delegation record, not a standing downgrade.
+5. **Pay-as-you-go providers always require explicit approval** — for this run, not inferred from a previous one.
 
-Record the resolved provider/model and quota pool in the delegation record (for
-example in the Assignment Overview's Hermes rows) so the run-time pairing is
-visible and reversible.
+Record the resolved provider/model and quota pool in the delegation record (for example in the Assignment Overview's Hermes rows) so the run-time pairing is visible and reversible.
 
 ---
 

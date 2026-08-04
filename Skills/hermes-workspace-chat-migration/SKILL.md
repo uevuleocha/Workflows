@@ -111,36 +111,17 @@ When a migration is staged (e.g. one-session test first, then the rest), prefer 
 
 ## Agent Provenance For Durable Artifacts
 
-The migration manifest is a first-party durable artifact and must carry
-schema-safe agent provenance. Native JSON manifests use a top-level
-`agent_provenance` object containing `content_owner`,
-`original_writing_agent`, `created`, `artifact_role`, and an append-only
-`change_log`. Each change-log item records the date, truthful acting agent,
-action, and concise scope. Preserve the original writer permanently.
+The migration manifest is a first-party durable artifact and must carry schema-safe agent provenance. Native JSON manifests use a top-level `agent_provenance` object containing `content_owner`, `original_writing_agent`, `created`, `artifact_role`, and an append-only `change_log`. Each change-log item records the date, truthful acting agent, action, and concise scope. Preserve the original writer permanently.
 
-The helper for this skill accepts additional top-level manifest metadata, but
-never add provenance to application databases, transcripts, caches, registries,
-backups, or other migrated operational state. If another manifest consumer has
-a strict schema that rejects the metadata, keep the native execution manifest
-unchanged and place provenance in an approved human-readable companion instead.
+The helper for this skill accepts additional top-level manifest metadata, but never add provenance to application databases, transcripts, caches, registries, backups, or other migrated operational state. If another manifest consumer has a strict schema that rejects the metadata, keep the native execution manifest unchanged and place provenance in an approved human-readable companion instead.
 
-`session-summary` separately owns provenance for migration handoff and execution
-summaries. An HTML or PDF rendition must visibly preserve the native manifest's
-original creator and identify the agent that performed the conversion.
+`session-summary` separately owns provenance for migration handoff and execution summaries. An HTML or PDF rendition must visibly preserve the native manifest's original creator and identify the agent that performed the conversion.
 
 ## Durable Artifact Format Handling
 
-This skill owns migration discovery, safety gates, manifest schema, execution,
-backups, verification, and handoff/report scope. When co-invoked with
-`html-this` or `pdf-this`, pass the requested format to `session-summary` and
-create only the requested human-readable handoff/report format.
+This skill owns migration discovery, safety gates, manifest schema, execution, backups, verification, and handoff/report scope. When co-invoked with `html-this` or `pdf-this`, pass the requested format to `session-summary` and create only the requested human-readable handoff/report format.
 
-The execution manifest remains native JSON by default. If the user explicitly
-requests an HTML-only or PDF-only manifest, embed the exact JSON through the
-format skill. Before execution, recover it to an approved temporary `.json`,
-validate the original manifest schema, and give only that temporary file to the
-migration helper. Backups, databases, and app state always remain in their
-required native formats. Treat same-stem format variants as one manifest.
+The execution manifest remains native JSON by default. If the user explicitly requests an HTML-only or PDF-only manifest, embed the exact JSON through the format skill. Before execution, recover it to an approved temporary `.json`, validate the original manifest schema, and give only that temporary file to the migration helper. Backups, databases, and app state always remain in their required native formats. Treat same-stem format variants as one manifest.
 
 ## Session Summary Integration
 

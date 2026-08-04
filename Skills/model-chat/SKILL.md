@@ -164,41 +164,24 @@ Do not:
 
 ## Agent Provenance For Durable Artifacts
 
-This skill applies the workspace's first-party durable-artifact provenance rule
-to durable debate reports and any human-readable run artifacts.
+This skill applies the workspace's first-party durable-artifact provenance rule to durable debate reports and any human-readable run artifacts.
 
 For every in-scope artifact:
 
-- place an `## Agent Provenance` section near the top with `Content owner`,
-  `Original writing agent`, `Created`, and `Artifact role`;
-- use a stable truthful agent-family label such as `Codex Agent`, `Claude Agent`,
-  `Antigravity Agent`, `Hermes Agent`, or `zCode Agent`;
+- place an `## Agent Provenance` section near the top with `Content owner`, `Original writing agent`, `Created`, and `Artifact role`;
+- use a stable truthful agent-family label such as `Codex Agent`, `Claude Agent`, `Antigravity Agent`, `Hermes Agent`, or `zCode Agent`;
 - keep the original writing-agent entry immutable;
-- keep an append-only `## Agent Change Log` near the bottom, recording the date,
-  acting agent, action, and concise scope for every material edit;
-- if a legacy artifact lacks reliable creator evidence, use `Not recorded` rather
-  than guessing, then log the current agent's actual change; and
+- keep an append-only `## Agent Change Log` near the bottom, recording the date, acting agent, action, and concise scope for every material edit;
+- if a legacy artifact lacks reliable creator evidence, use `Not recorded` rather than guessing, then log the current agent's actual change; and
 - treat copying or global synchronization as transport, not authorship.
 
-Keep `Content owner` for now. In Uzo's personal artifacts it normally resolves
-to `Uzo`; do not confuse content ownership with the agent that performed the
-filesystem write. Do not inject provenance into product source, third-party
-files, databases, generated caches, skill definitions, schema-sensitive or
-machine-consumed files, or other operational files unless their schema
-explicitly supports it.
+Keep `Content owner` for now. In Uzo's personal artifacts it normally resolves to `Uzo`; do not confuse content ownership with the agent that performed the filesystem write. Do not inject provenance into product source, third-party files, databases, generated caches, skill definitions, schema-sensitive or machine-consumed files, or other operational files unless their schema explicitly supports it.
 
 ## Durable Artifact Format Handling
 
-This skill owns debate execution, structured conversation state, synthesis
-content, run-folder naming, and completion state. When co-invoked with
-`html-this` or `pdf-this`, serialize the human-readable synthesis only as
-`synthesis.html` or `synthesis.pdf` as requested. Keep `conversation.json` and
-`latest.json` native because they are machine-readable run state. A native
-synthesis intermediate may exist only in an approved temporary location.
+This skill owns debate execution, structured conversation state, synthesis content, run-folder naming, and completion state. When co-invoked with `html-this` or `pdf-this`, serialize the human-readable synthesis only as `synthesis.html` or `synthesis.pdf` as requested. Keep `conversation.json` and `latest.json` native because they are machine-readable run state. A native synthesis intermediate may exist only in an approved temporary location.
 
-If synthesis format siblings exist, treat them as one logical artifact and
-update them consistently. This section overrides `synthesis.md` examples only
-for the co-invoked run.
+If synthesis format siblings exist, treat them as one logical artifact and update them consistently. This section overrides `synthesis.md` examples only for the co-invoked run.
 
 ## Validation
 

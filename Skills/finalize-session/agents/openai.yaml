@@ -1,0 +1,7 @@
+interface:
+  display_name: "Finalize Session"
+  short_description: "Run session-name and session-summary in one pass"
+  default_prompt: "Use $finalize-session to name and summarize this chat; my chat-session identifier is <N>."
+
+policy:
+  allow_implicit_invocation: true

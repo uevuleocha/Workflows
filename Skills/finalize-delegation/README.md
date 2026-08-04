@@ -29,12 +29,7 @@ finalize-delegation  →  Archive\Historical\Delegations\<Subject>\N.) <Topic>_c
 
 ## Return-Report Freeze
 
-Closing the delegation **freezes the entire session-summary / return-report
-family**. Every return report (files ending in `Report.md` at the reserved
-child prefixes) and its append-only `## Feedback` ledger becomes a closed
-historical artifact — no further feedback may be appended after the delegation
-is `_completed`. The orchestrator/master summary is likewise frozen. This skill
-does not rewrite the reports; it only enforces the freeze.
+Closing the delegation **freezes the entire session-summary / return-report family**. Every return report (files ending in `Report.md` at the reserved child prefixes) and its append-only `## Feedback` ledger becomes a closed historical artifact — no further feedback may be appended after the delegation is `_completed`. The orchestrator/master summary is likewise frozen. This skill does not rewrite the reports; it only enforces the freeze.
 
 ## Two Gates That Will Stop You
 
@@ -55,5 +50,4 @@ before the first run. Do not assume the original maintainer's paths.
 
 ## Optional artifact formats
 
-Pairs with `html-this` and `pdf-this` so every existing format sibling is
-finalized together without changing the owning lifecycle gate.
+Pairs with `html-this` and `pdf-this` so every existing format sibling is finalized together without changing the owning lifecycle gate.

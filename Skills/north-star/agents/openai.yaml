@@ -1,7 +1,7 @@
 interface:
   display_name: "North Star"
-  short_description: "Pursue a durable objective turn by turn"
-  default_prompt: "Use $north-star to create, resume, or reopen an IN PROGRESS North Star, open one helper-timed pursuit for each agent turn that advances it, close that pursuit before every final response so user waiting time is never counted, report the latest pursuit and grand total exactly once, and invoke finalize-north-star when every verification item is proven."
+  short_description: "Pursue a contracted objective in Full or Batch Mode"
+  default_prompt: "Use $north-star to embed a five-part Prompt Contract without an approval gate or default chat display, pursue it in Full or Batch Mode with automatic iteration transition, create the mandatory provenance table after lifecycle and attributed change log immediately before terminal Base64 state, report the selected-star footer on every applicable response, and invoke finalize-north-star when every contract gate is proven."
 
 policy:
   allow_implicit_invocation: false

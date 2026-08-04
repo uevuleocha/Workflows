@@ -16,10 +16,14 @@ SCRIPT = Path(__file__).resolve().parent / "north_star_state.py"
 ROOT = Path(tempfile.mkdtemp(prefix="ns_test_"))
 WORKSPACE = ROOT / "workspace"
 PASS, FAIL, TOTAL = 0, 0, 0
+ACTOR_COMMANDS = {"reopen","pursuit-stop","pursuit-remove","provisional-commit","checkpoint","refine","pause","resume","recover","finalize","end"}
 
-def run(*args, expect_ok=True):
+def run(*args, expect_ok=True, inject_actor=True):
     global PASS, FAIL, TOTAL; TOTAL += 1
-    cmd = [sys.executable, "-X", "utf8", str(SCRIPT), *args]
+    command_args=list(args)
+    if inject_actor and command_args and command_args[0] in ACTOR_COMMANDS and "--acting-agent" not in command_args:
+        command_args += ["--acting-agent","Codex Agent"]
+    cmd = [sys.executable, "-X", "utf8", str(SCRIPT), *command_args]
     try:
         proc = subprocess.run(cmd, capture_output=True, text=True, cwd=str(WORKSPACE), timeout=30)
     except subprocess.TimeoutExpired:
@@ -40,7 +44,7 @@ def status_json(artifact):
     return json.loads(proc.stdout)
 
 def create_ns(subject, topic, objective="Test objective"):
-    return run("create","--workspace-root",str(WORKSPACE),"--subject",subject,"--topic",topic,"--objective",objective,"--pursuit","Test","--run-style","continuous","--verification","Check 1","--verification","Check 2")
+    return run("create","--workspace-root",str(WORKSPACE),"--subject",subject,"--topic",topic,"--writing-agent","Codex Agent","--goal",objective,"--pursuit","Test","--mode","full","--constraint","Stay in scope","--format","Produce the requested result","--definition-of-done","Check 1","--definition-of-done","Check 2","--failure","Unsupported completion")
 
 def setup():
     WORKSPACE.mkdir(parents=True)
@@ -72,11 +76,11 @@ def prov_start(art): return run("provisional-start","--artifact",str(art))
 def prov_discard(art): return run("provisional-discard","--artifact",str(art))
 def prov_commit(art, summary, phase=None, expect_ok=True):
     args = ["provisional-commit","--artifact",str(art),"--summary",summary]
-    if phase: args += ["--phase",phase]
+    if phase: args += ["--batch",phase]
     return run(*args, expect_ok=expect_ok)
 def pursuit_start(art, summary, phase=None):
     args = ["pursuit-start","--artifact",str(art),"--summary",summary]
-    if phase: args += ["--phase",phase]
+    if phase: args += ["--batch",phase]
     return run(*args)
 def pursuit_stop(art, summary):
     return run("pursuit-stop","--artifact",str(art),"--summary",summary)
@@ -85,13 +89,31 @@ def do_resume(art): return run("resume","--artifact",str(art))
 def do_recover(art, note="test"): return run("recover","--artifact",str(art),"--note",note)
 def do_end(art, note="test"): return run("end","--artifact",str(art),"--note",note)
 def do_finalize(art, evidence="test", note="test"):
-    return run("finalize","--artifact",str(art),"--evidence",evidence,"--note",note)
+    return run("finalize","--artifact",str(art),"--evidence",evidence,"--note",note,"--verify-complete","1","--verify-complete","2","--constraints-verified","--format-verified","--failure-reviewed")
 def do_reopen(art, phase="Reopened", next_action="Continue"):
-    return run("reopen","--artifact",str(art),"--phase",phase,"--next-action",next_action)
+    return run("reopen","--artifact",str(art),"--batch",phase,"--next-action",next_action)
 def do_checkpoint(art, idx):
     return run("checkpoint","--artifact",str(art),"--verify-complete",str(idx),"--note","checked")
 def do_remove(art, number, reason="wrong"):
     return run("pursuit-remove","--artifact",str(art),"--number",str(number),"--reason",reason)
+def assert_terminal_state_block(art):
+    text=art.read_text(encoding="utf-8")
+    lines=[line for line in text.splitlines() if line.strip()]
+    assert lines[-1]=="<!-- north-star:run-end -->", "run-end must be the final nonblank line"
+    assert lines[-2].startswith("<!-- north-star:state-b64 "), "Base64 state must immediately precede run-end"
+    lifecycle=text.index("North Star lifecycle:")
+    provenance=text.index("## Agent Provenance")
+    north=text.index("## North Star")
+    change_log=text.index("## Agent Change Log")
+    state=text.index("<!-- north-star:state-b64 ")
+    assert lifecycle < provenance < north < change_log < state
+    lifecycle_line_end=text.index("\n",lifecycle)
+    assert not text[lifecycle_line_end:provenance].strip(), "Agent Provenance must immediately follow lifecycle"
+    assert text.count("## Agent Provenance")==1 and text.count("## Agent Change Log")==1
+    assert "| Field" in text and "| Value" in text
+    for field in ("Content owner","Original writing agent","Created","Artifact role"):
+        assert f"| {field}" in text
+    assert not any(line.startswith("#") for line in text[change_log:state].splitlines()[1:]), "Agent Change Log must be the final human-readable section"
 
 # ══════════════════════════════════════════════════════════════════════
 # TEST CASES
@@ -422,7 +444,7 @@ def test26():
     assert s["provisional"] is None
     assert s["active_pursuit"] is None
     # Production output: the exact paused footer text
-    proc = run("format-receipt", "--artifact", str(art), "--type", "paused-footer")
+    proc = run("format-receipt", "--artifact", str(art), "--type", "mode-footer")
     assert proc is not None
     stdout = proc.stdout.strip()
     assert "Mode = " in stdout, "paused footer must start with 'Mode = '"
@@ -481,27 +503,130 @@ def test29():
     assert "file:///" not in stdout, "must not contain file:// URI"
     assert "\\" not in stdout.split("](<")[1].split(">)")[0] if "](<" in stdout else True, "destination must not contain backslashes"
 
-@test("30. format-receipt paused-footer refuses when timing is open")
+@test("30. format-receipt mode-footer refuses when timing is open")
 def test30():
     art = artifact_path("PFGuard", "Paused Footer Guard")
     pursuit_start(art, "Work"); pursuit_stop(art, "Work done")
     do_pause(art)
     # Normal paused footer still works
-    proc = run("format-receipt", "--artifact", str(art), "--type", "paused-footer", "--subject", "PFGuard")
+    proc = run("format-receipt", "--artifact", str(art), "--type", "mode-footer", "--subject", "PFGuard")
     assert proc is not None
     assert "PAUSED" in proc.stdout
-    # Now test: paused-footer refuses with open authoritative pursuit
+    # Now test: mode-footer refuses with open authoritative pursuit
     art2 = artifact_path("PFGuard2", "Paused Footer Guard 2")
     pursuit_start(art2, "Open work")
-    proc2 = run("format-receipt", "--artifact", str(art2), "--type", "paused-footer", "--subject", "PFGuard2", expect_ok=False)
+    proc2 = run("format-receipt", "--artifact", str(art2), "--type", "mode-footer", "--subject", "PFGuard2", expect_ok=False)
     assert proc2 is not None and proc2.returncode != 0
     pursuit_stop(art2, "Done")
-    # And: paused-footer refuses with open provisional
+    # And: mode-footer refuses with open provisional
     art3 = artifact_path("PFGuard3", "Paused Footer Guard 3")
     prov_start(art3)
-    proc3 = run("format-receipt", "--artifact", str(art3), "--type", "paused-footer", "--subject", "PFGuard3", expect_ok=False)
+    proc3 = run("format-receipt", "--artifact", str(art3), "--type", "mode-footer", "--subject", "PFGuard3", expect_ok=False)
     assert proc3 is not None and proc3.returncode != 0
     prov_discard(art3)
+
+@test("31. Full Mode creation embeds the five-part contract and terminal state")
+def test31():
+    art=artifact_path("FullCreate","Full Contract Creation"); s=status_json(art)
+    assert s["initial_mode"]=="full" and s["current_mode"]=="full"
+    assert set(s["prompt_contract"])=={"goal","constraints","format","definition_of_done","failure"}
+    text=art.read_text(encoding="utf-8")
+    for heading in ("##### GOAL","##### CONSTRAINTS","##### FORMAT","##### DEFINITION OF DONE","##### FAILURE"): assert heading in text
+    assert text.index("North Star lifecycle:") < text.index("## Agent Provenance") < text.index("## North Star")
+    assert text.index("## Agent Change Log") < text.index("<!-- north-star:state-b64 ")
+    assert_terminal_state_block(art)
+
+@test("32. Full and Batch active footers and opt-in Prompt Contract output")
+def test32():
+    full=artifact_path("FullFooter","Full Footer")
+    proc=run("format-receipt","--artifact",str(full),"--type","mode-footer"); assert proc and "North Star (FULL)" in proc.stdout
+    contract_out=run("format-receipt","--artifact",str(full),"--type","prompt-contract"); assert contract_out
+    for label in ("GOAL:","CONSTRAINTS:","FORMAT:","DEFINITION OF DONE:","FAILURE:"): assert label in contract_out.stdout
+    batch=artifact_path("BatchFooter","Batch Footer")
+    proc2=run("format-receipt","--artifact",str(batch),"--type","mode-footer"); assert proc2 and "North Star (BATCH)" in proc2.stdout
+
+@test("33. Known iteration after pursuit 1 transitions immediately to Batch")
+def test33():
+    art=artifact_path("KnownIteration","Known Iteration")
+    pursuit_start(art,"First pass"); pursuit_stop(art,"First pass done")
+    run("checkpoint","--artifact",str(art),"--another-iteration","A corrective iteration is required.","--note","Iteration known")
+    s=status_json(art); assert s["initial_mode"]=="full" and s["current_mode"]=="batch"
+    assert len(s["mode_transitions"])==1 and s["mode_transitions"][0]["reason"]=="A corrective iteration is required."
+    assert_terminal_state_block(art)
+
+@test("34. Pursuit 2 cannot begin while current mode remains Full")
+def test34():
+    art=artifact_path("AutoIteration","Automatic Iteration")
+    pursuit_start(art,"First pass"); pursuit_stop(art,"First done")
+    assert status_json(art)["current_mode"]=="full"
+    pursuit_start(art,"Second pass")
+    s=status_json(art); assert s["current_mode"]=="batch" and len(s["mode_transitions"])==1
+    assert s["active_pursuit"]["number"]==2
+    pursuit_stop(art,"Second done"); assert_terminal_state_block(art)
+
+@test("35. Material refinement updates the contract; evidence-only checkpoint does not")
+def test35():
+    art=artifact_path("Refinement","Contract Refinement")
+    pursuit_start(art,"Initial work"); pursuit_stop(art,"Initial done")
+    before=status_json(art)["prompt_contract"]
+    do_checkpoint(art,1); after_checkpoint=status_json(art)["prompt_contract"]
+    assert before==after_checkpoint
+    run("refine","--artifact",str(art),"--goal","Refined goal","--constraint","New scope","--format","New format","--definition-of-done","New DoD","--failure","New failure","--note","User expanded scope")
+    s=status_json(art); assert s["prompt_contract"]["goal"]=="Refined goal"
+    assert s["definition_of_done_complete"]==[] and s["current_mode"]=="batch"
+    assert_terminal_state_block(art)
+
+@test("36. Finalization is gated by DoD evidence, Failure review, Format, and Constraints")
+def test36():
+    art=artifact_path("ContractGate","Contract Finalization Gate")
+    pursuit_start(art,"Complete work"); pursuit_stop(art,"Work complete")
+    proc=run("finalize","--artifact",str(art),"--verify-complete","1","--constraints-verified","--format-verified","--failure-reviewed",expect_ok=False)
+    assert proc and "unchecked Definition of Done" in proc.stderr
+    run("checkpoint","--artifact",str(art),"--failure-active","1")
+    proc2=run("finalize","--artifact",str(art),"--verify-complete","1","--verify-complete","2","--constraints-verified","--format-verified","--failure-reviewed",expect_ok=False)
+    assert proc2 and "active Failure" in proc2.stderr
+    run("checkpoint","--artifact",str(art),"--clear-failures")
+    proc3=run("finalize","--artifact",str(art),"--verify-complete","1","--verify-complete","2",expect_ok=False)
+    assert proc3 and "constraints" in proc3.stderr
+    do_finalize(art,"Direct completion evidence")
+    final=list((WORKSPACE/"Archive"/"Historical"/"North Stars"/"ContractGate").glob("*_finalized.md"))[0]
+    s=status_json(final); assert s["contract_review"] and s["status"]=="finalized"
+    footer=run("format-receipt","--artifact",str(final),"--type","mode-footer"); assert footer and "FINALIZED THIS TURN" in footer.stdout
+    assert_terminal_state_block(final)
+
+@test("37. Terminal state placement survives lifecycle mutations")
+def test37():
+    art=artifact_path("TerminalPlacement","Terminal Placement")
+    assert_terminal_state_block(art); prov_start(art); prov_discard(art); assert_terminal_state_block(art)
+    pursuit_start(art,"Work"); pursuit_stop(art,"Done"); assert_terminal_state_block(art)
+    do_pause(art); assert_terminal_state_block(art); do_resume(art); assert_terminal_state_block(art)
+    run("refine","--artifact",str(art),"--pursuit","Refined approach","--note","Approach only"); assert_terminal_state_block(art)
+    do_checkpoint(art,1); do_checkpoint(art,2); do_finalize(art)
+    final=list((WORKSPACE/"Archive"/"Historical"/"North Stars"/"TerminalPlacement").glob("*_finalized.md"))[0]; assert_terminal_state_block(final)
+    do_reopen(final); live=artifact_path("TerminalPlacement","Terminal Placement"); assert_terminal_state_block(live)
+
+@test("38. Batch Mode creation remains Batch without a synthetic transition")
+def test38():
+    art=artifact_path("BatchFooter","Batch Footer"); s=status_json(art)
+    assert s["initial_mode"]=="batch" and s["current_mode"]=="batch" and s["mode_transitions"]==[]
+    pursuit_start(art,"Batch one"); pursuit_stop(art,"Batch one done")
+    pursuit_start(art,"Batch two"); pursuit_stop(art,"Batch two done")
+    assert status_json(art)["mode_transitions"]==[]
+    assert_terminal_state_block(art)
+
+@test("39. Provenance and change-log structure are mandatory and actor-owned")
+def test39():
+    art=artifact_path("FullCreate","Full Contract Creation")
+    before=art.read_bytes()
+    refused=run("checkpoint","--artifact",str(art),"--note","No actor supplied",expect_ok=False,inject_actor=False)
+    assert refused and "--acting-agent" in refused.stderr
+    assert art.read_bytes()==before
+    do_checkpoint(art,1)
+    text=art.read_text(encoding="utf-8")
+    assert text.count("## Agent Provenance")==1 and text.count("## Agent Change Log")==1
+    assert "Codex Agent — Created the North Star artifact." in text
+    assert "Codex Agent — Checkpointed North Star progress and verification state." in text
+    assert_terminal_state_block(art)
 
 # ══════════════════════════════════════════════════════════════════════
 # MAIN
@@ -529,20 +654,26 @@ def main():
         ("FmtGuard2","Format Guard Prov"), ("FinRcpt","Finalizer Receipt Test"),
         ("PFGuard","Paused Footer Guard"), ("PFGuard2","Paused Footer Guard 2"),
         ("PFGuard3","Paused Footer Guard 3"),
+        ("FullCreate","Full Contract Creation"), ("FullFooter","Full Footer"),
+        ("KnownIteration","Known Iteration"), ("AutoIteration","Automatic Iteration"),
+        ("Refinement","Contract Refinement"), ("ContractGate","Contract Finalization Gate"),
+        ("TerminalPlacement","Terminal Placement"),
     ]
     for subj, top in subjects_topics:
         create_ns(subj, top)
+    run("create","--workspace-root",str(WORKSPACE),"--subject","BatchFooter","--topic","Batch Footer","--writing-agent","Codex Agent","--goal","Batch objective","--pursuit","Test","--mode","batch","--constraint","Stay in scope","--format","Produce result","--definition-of-done","Check 1","--definition-of-done","Check 2","--failure","Unsupported completion")
 
-    # Run all 26 tests
+    # Run all named tests
     test1(); test2(); test3(); test4(); test5(); test6(); test7(); test8()
     test9(); test10(); test11(); test12(); test13(); test14(); test15()
     test16(); test17(); test18(); test19(); test20()
     test21(); test22(); test23(); test24(); test25(); test26()
-    test27(); test28(); test29(); test30()
+    test27(); test28(); test29(); test30(); test31(); test32(); test33()
+    test34(); test35(); test36(); test37(); test38(); test39()
 
     print(f"\n{'='*60}")
     print(f"Results: {PASS}/{TOTAL} subprocess checks passed, {FAIL} failed")
-    print(f"Named test cases: 30")
+    print(f"Named test cases: 39")
     teardown()
     return 0 if FAIL == 0 else 1
 

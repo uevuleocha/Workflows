@@ -16,11 +16,13 @@ This skill operates under the project's canonical contract (`CLAUDE.md`, `AGENTS
 This is the core design principle: **every child workspace gets its own local working copy of the universal standards document.** The clone is the skill's statefulness mechanism. It lets the agent know — across sessions, across agents — exactly where to start without guessing.
 
 - **Clone path:** `Archive/Live/Documentation/Personal/AI OS & Knowledge Bases/` relative to the target workspace root. This path is fixed across all workspaces.
-- **Clone filename:** the next available `N.)` number in that Subject folder. The hub's copy is `3.)`; a child workspace's copy might be `1.)`, `5.)`, or whatever number is next in that workspace's folder. The number is workspace-local.
+- **Master filename:** the Hub's authoritative standard uses `N.) Universal Workspace Standards + Setup & Parity Checklist_Master.md`. The current Hub master is `3.) Universal Workspace Standards + Setup & Parity Checklist_Master.md`.
+- **Clone filename:** every child workspace uses `N.) Universal Workspace Standards + Setup & Parity Checklist_{Workspace Name} Clone.md`. Assign the next available workspace-local `N.)` number in that Subject folder, replace `{Workspace Name}` with the canonical workspace name while preserving its established spelling and casing, and never leave the placeholder braces in the filename. For example, Workflows uses `1.) Universal Workspace Standards + Setup & Parity Checklist_Workflows Clone.md`.
 - **Clone presence is the first baseline signal:**
   - No clone found → no prior `workspace-setup` baseline exists; the local anchor must be created as part of this run. Clone absence alone does not prove the workspace is new — it only means `workspace-setup` has never established a baseline here. Determine workspace age/state from all available evidence (contract files, Git repo, README, folder structure). An established workspace without a clone is still `Existing workspace` — the missing clone is an anchor/parity gap, not proof of freshness.
   - Clone found → a prior baseline exists; compare it against the current hub version to detect drift and stage only the items that have changed.
 - **Clone content:** a faithful copy of the universal standards document from the hub, plus clearly separated workspace-specific annotations where appropriate. The universal standards content must remain synchronized with the hub; workspace-specific notes live in their own clearly delimited section so future syncs can update the shared content without touching local vocabulary.
+- **Checklist state:** task markers and indented `Workspace status` notes in a child clone are workspace-local state. They must survive Hub synchronization and must never be copied back into the Hub master.
 - **Sync is transport, not authorship.** Updating the clone is not new authorship — it is synchronization of the hub's standards into the workspace's local reference. Preserve provenance from the source; do not overwrite workspace-specific provenance or local annotations.
 
 ## Invocation
@@ -69,7 +71,7 @@ Before proposing any changes, inspect the target workspace against the complete 
 | A   | Assessment and Scope                  | Resolve root, classify, record identity         |
 | B   | Required Root Structure               | CLAUDE.md, AGENTS.md, README.md, Archive, tmp   |
 | C   | CLAUDE.md Universal Standards         | All 17 sections incl. glossary, North Star      |
-| D   | AGENTS.md Wrapper Parity              | Four platform sections, .agents paths           |
+| D   | AGENTS.md Wrapper Parity              | Four sections, split Codex/.agents paths         |
 | E   | Platform Coordination Settings        | JSON validation, template parity, no secrets    |
 | F   | README, Documentation, Artifact Rules | Map marker, provenance, N.) numbering           |
 | G   | Conditional Git and Secret Safety     | .gitignore, .env, secret exclusion              |
@@ -80,10 +82,10 @@ Before proposing any changes, inspect the target workspace against the complete 
 The authoritative checklist lives in the universal standards document. When the local clone exists, use it as the reference. When it does not, read the hub copy at:
 
 ```
-C:\Users\Admin\Uzzys Universe\Archive\Live\Documentation\Personal\AI OS & Knowledge Bases\3.) Universal Workspace Standards and Setup & Parity Checklist.md
+C:\Users\Admin\Uzzys Universe\Archive\Live\Documentation\Personal\AI OS & Knowledge Bases\3.) Universal Workspace Standards + Setup & Parity Checklist_Master.md
 ```
 
-If the hub copy has moved, locate the current numbered artifact in the same Subject folder, confirm with the user when ambiguous, and repair references rather than creating a second standard.
+If the Hub master has moved, locate the current numbered `_Master.md` artifact in the same Subject folder, confirm with the user when ambiguous, and repair references rather than creating a second standard.
 
 ## Classification
 
@@ -99,6 +101,33 @@ After inspection, issue both labels:
 - `Already aligned` — every applicable checklist item has current evidence
 
 Treat an existing compliant item as **evidence, not something to delete**. Report it as **Already compliant** so the user can see what was inspected and why no action is needed. Mark an item complete only when current evidence supports it.
+
+## Durable Checklist State
+
+The child clone is the durable execution ledger for its workspace. During every authorized setup or parity run, persist the result in that same clone rather than reporting completion only in chat.
+
+- `[x]` means the item is currently resolved by direct evidence: implemented and verified, already compliant and verified, or conditionally not applicable with an explicit reason.
+- `[ ]` means the item is pending, failed, blocked, ambiguous, or lacks current evidence. Never tick by assumption, prior chat claims, elapsed time, or mere file existence when the requirement is broader.
+- For a conditional item that does not apply, use `[x]` and add an indented plain-text note directly below it in the form `Workspace status: N/A - <specific reason>.` Never use N/A to hide applicable unfinished work.
+- Stable implementation items remain checked while their implementation still exists, but later evidence of drift resets the affected item to `[ ]`.
+- Recurring verification items record the latest successful observation, not permanent completion. Re-run them on every applicable parity pass, refresh the verification date, and reset an affected item to `[ ]` when current evidence is missing or fails.
+- Keep the authoritative requirement wording verbatim. Only the task marker and clearly prefixed workspace-status note are local state.
+
+### Workspace Parity Status
+
+Every child clone must contain a clearly separated `## Workspace Parity Status` section immediately before `## Workspace-Local Synchronization Annotation`. Maintain this visually pipe-aligned two-column table:
+
+| Field                 | Value                                      |
+|-----------------------|--------------------------------------------|
+| Workspace             | Canonical workspace name                   |
+| Verdict               | Full setup / Updates required / Aligned    |
+| Hub master            | Current numbered `_Master.md` artifact     |
+| Master synchronized   | YYYY-MM-DD by truthful agent               |
+| Checklist verified    | YYYY-MM-DD by truthful agent               |
+| Recurring checks      | Current / Pending re-verification          |
+| Evidence              | Short summary; details in Agent Change Log |
+
+Update the table only from current evidence. `Already aligned` requires every applicable item to be `[x]`, every non-applicable conditional item to carry its reason, recurring checks to be current for this run, and no unresolved blocker.
 
 ## The Briefing — Using set-the-stage
 
@@ -136,9 +165,11 @@ When conflicts arise, follow this priority:
 3. The current hub `CLAUDE.md` and `AGENTS.md` as structural and behavioral reference implementations.
 4. Existing target-workspace rules that do not conflict with higher-priority instructions or universal safety requirements.
 
-## Exact-Parity Exceptions
+## Mandatory Verbatim Copying
 
-Two items require verbatim copying from the hub into every child workspace:
+Whenever the universal standards document, hub `CLAUDE.md` or `AGENTS.md`, or another authoritative setup source supplies actual instruction text for insertion or copying, treat it as compulsory exact-parity material. Copy it verbatim: never compress, compact, paraphrase, shorten, reorder, change punctuation, or omit any part. Adapt only clearly marked placeholders or text the source expressly permits agents to adapt. If supplied text conflicts with the target context, stop and surface the conflict instead of silently rewriting it.
+
+The following named blocks are standing exact-parity requirements:
 
 1. **North Star paragraph** — the timing-fallback paragraph from the standards document must appear verbatim in every workspace `CLAUDE.md`. On every parity run, compare and verify exact textual match.
 
@@ -148,7 +179,7 @@ The current canonical shared glossary list is:
 
 > **Uzi → Uzzy**, **Cloud → Claude**, **Scale → Skill**, **In house → directly in chat (intentional user shorthand, not a dictation correction)**.
 
-Preserve genuinely workspace-specific glossary entries in a clearly separated local list. Never overwrite them or confuse them with the canonical hub entries. Everywhere else, prefer context-aware adaptation unless the standard explicitly requires exact copying.
+Preserve genuinely workspace-specific glossary entries in a clearly separated local list. Never overwrite them or confuse them with the canonical hub entries. Context-aware adaptation applies only where the authoritative source has not supplied actual insertion text or has expressly allowed adaptation.
 
 ## Local Clone Synchronization
 
@@ -158,17 +189,20 @@ The local clone must stay synchronized with the hub standards document.
 
 1. Create the `Archive/Live/Documentation/Personal/AI OS & Knowledge Bases/` folder if it does not exist.
 2. Assign the next `N.)` number based on what already exists in that Subject folder.
-3. Copy the hub standards document faithfully.
-4. Add a workspace-local provenance note identifying this as a synchronized local copy, not new authorship.
+3. Resolve the canonical workspace name from the workspace identity and create `N.) Universal Workspace Standards + Setup & Parity Checklist_{Workspace Name} Clone.md`, replacing the placeholder with that exact name.
+4. Copy the Hub master faithfully.
+5. Add a workspace-local provenance note identifying this as a synchronized local copy, not new authorship.
 
 ### When the clone exists
 
 1. Read the current local clone.
 2. Read the current hub standards document.
-3. Diff the universal standards content to identify added, changed, or removed items.
+3. Diff the universal standards content to identify added, changed, or removed items. For comparison only, normalize local `[x]` markers to `[ ]` and exclude `Workspace status` notes plus the complete workspace-local status and annotation sections.
 4. Stage the synchronization changes for user review.
-5. Apply changes to the same file in place — do not create a duplicate, do not renumber, do not overwrite workspace-specific annotations or append-only provenance history.
-6. Preserve clearly separated workspace-specific sections intact.
+5. Apply changes to the same file in place — do not create a duplicate, do not renumber, do not overwrite workspace-specific annotations, checklist state, parity status, or append-only provenance history.
+6. Preserve a marker only when the requirement text is unchanged and current evidence still supports it. Leave every new or materially changed requirement `[ ]` until it is verified during the current run.
+7. Re-evaluate conditional N/A notes and recurring checks; never carry either forward mechanically.
+8. Preserve clearly separated workspace-specific sections intact.
 
 ### Clone preservation rules
 
@@ -176,6 +210,7 @@ The local clone must stay synchronized with the hub standards document.
 - Never renumber an existing copy.
 - Never overwrite local provenance.
 - Never silently discard workspace-specific rules or annotations.
+- Never erase or blindly preserve local task markers, N/A reasons, or parity status; re-evaluate them from current evidence.
 - Treat synchronization as transport, not new authorship.
 
 ## Conditional Rules
@@ -191,12 +226,14 @@ Never let conditional rules leak into unrelated workspaces.
 
 ## Platform Settings
 
-Every workspace must have a root-level `.agents/` directory with four platform homes:
+Every workspace must use the split platform-coordination layout:
 
 - `.agents/.antigravity/settings.local.json`
-- `.agents/.codex/settings.local.json`
 - `.agents/.hermes/settings.local.json`
 - `.agents/.zcode/settings.local.json`
+- `.codex/settings.local.json` at the workspace root beside Codex's harness-managed `config.toml`
+
+Codex owns the root `.codex/` directory. Never move, replace, or edit its `config.toml` merely to establish parity; migrate only the workspace coordination JSON into the same root directory and point the Codex wrapper there. The shared `.agents/` directory contains exactly the Antigravity, Hermes, and Z Code homes.
 
 Settings are template-equivalent by platform across all workspaces, not byte-for-byte identical. Adapt workspace identity and workspace-relative paths. Preserve justified deviations explained in `notes`. Never store secrets in coordination settings.
 
@@ -207,7 +244,11 @@ Any of these means the run is not done:
 - The skill treats the standards document as only a contract/file-structure guide.
 - It blindly clones the hub contract into child workspaces or promotes hub-only rules universally.
 - It fails to synchronize the canonical hub glossary list exactly.
+- It compresses, compacts, paraphrases, shortens, reorders, repunctuates, omits, or silently rewrites actual instruction text supplied by an authoritative setup source.
 - It creates duplicate standards copies, renumbers an existing copy, overwrites local provenance, or silently discards workspace-specific rules.
+- It reports completion without persisting evidence-backed task markers and current parity status in the child clone.
+- It leaves an unsupported item checked, treats a recurring verification as permanent, or marks an applicable unfinished item N/A.
+- It leaves Codex coordination duplicated under both `.codex/` and `.agents/.codex/`, changes harness-managed `config.toml`, or restores the retired four-home `.agents/` model.
 - It mutates a workspace before providing the required briefing and obtaining applicable authority.
 - It makes `set-the-stage` own setup execution or duplicates the complete checklist into that skill.
 - `SKILL.md` or `README.md` says or implies that every workspace without a local standards clone is necessarily a fresh workspace.
@@ -224,9 +265,16 @@ After creating or updating this skill:
 - confirm an established but drifting workspace is classified as existing/updates required and reports already-compliant items separately;
 - confirm a fully compliant workspace is classified as existing/already aligned without manufacturing work;
 - confirm an absent local standards copy receives the correct next local number and path;
+- confirm every newly created child clone is named `N.) Universal Workspace Standards + Setup & Parity Checklist_{Workspace Name} Clone.md` with the canonical workspace name substituted exactly and no placeholder braces remaining;
+- confirm the Hub source resolves to the numbered `Universal Workspace Standards + Setup & Parity Checklist_Master.md` artifact rather than a child clone;
 - confirm an existing local standards copy is updated in place without duplication, renumbering, provenance loss, or blind overwrite;
-- confirm hub `CLAUDE.md` and `AGENTS.md` guidance is adapted to child context while explicit verbatim exceptions remain exact;
+- confirm child-clone task markers persist evidence-backed state, conditional N/A items carry specific reasons, and unsupported items remain unchecked;
+- confirm stable implementation and recurring verification are distinguished, recurring checks refresh on every applicable run, and drift resets affected markers;
+- confirm the required Workspace Parity Status table is present, current, visually pipe-aligned, and consistent with the final verdict;
+- confirm Hub synchronization normalizes markers for comparison, excludes workspace-local notes and sections, preserves supported unchanged state, and leaves new or materially changed requirements pending until verified;
+- confirm every supplied block of actual instruction text is copied verbatim, with changes limited to marked placeholders or expressly adaptable text, while unsupplied structural guidance is adapted to child context;
 - confirm canonical hub glossary examples synchronize exactly, including newly added hub entries, while separately identified workspace-specific entries remain intact;
 - confirm conditional Git, wiki, hub, and nested-workspace requirements activate only when applicable;
+- confirm Codex coordination resolves only through root `.codex/settings.local.json`, `config.toml` is preserved byte-for-byte, and `.agents/` contains exactly Antigravity, Hermes, and Z Code coordination homes;
 - confirm `set-the-stage` produces the briefing before mutations and remains read-only itself;
 - confirm one-shot and phased paths preserve safety and user approval boundaries.

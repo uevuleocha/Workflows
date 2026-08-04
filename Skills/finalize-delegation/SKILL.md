@@ -70,19 +70,14 @@ Evaluate all named parents, then apply these rules:
 
 - **Any named parent is still open** (`_active.md` / `_pending.md`) → **do not finalize silently.** A delegation is normally closed after its parents, because a parent is what proves the returned work was integrated. **Each open parent requires its own explicit override** — one override does not cover another. Ask, listing every open parent:
 
-  ```text
-  This delegation has open parents:
+```text This delegation has open parents:
 
     1. <path>   (status: <ACTIVE / PENDING>)
     2. <path>   (status: <ACTIVE / PENDING>)
 
-  A delegation is normally finalized after its parents, since a parent proves the
-  returned work was integrated. For EACH open parent above, tell me how to proceed:
+A delegation is normally finalized after its parents, since a parent proves the returned work was integrated. For EACH open parent above, tell me how to proceed:
 
-  a. Finalize that parent first (I will direct you to `finalize-plan` / `finalize-task`).
-  b. Override — finalize this delegation anyway; that parent stays open for unrelated work.
-  c. Stop.
-  ```
+a. Finalize that parent first (I will direct you to `finalize-plan` / `finalize-task`). b. Override — finalize this delegation anyway; that parent stays open for unrelated work. c. Stop. ```
 
   Only option (b) permits finalizing ahead of a parent, it must be an explicit user choice, and it must be granted **per parent**. Record every override in the completed record's notes, naming the parent it applies to.
 
@@ -140,10 +135,7 @@ Do **not** rewrite `## Assignment Packets`, `## Shared Context`, or `## Global C
 
 ## Return-Report Freeze
 
-Closing the delegation **freezes the entire session-summary / return-report
-family**. Every return report (the files ending in `Report.md` at the reserved
-child prefixes `Na.)`, `Nb.)`, …) and its append-only `## Feedback` ledger
-becomes a closed historical artifact:
+Closing the delegation **freezes the entire session-summary / return-report family**. Every return report (the files ending in `Report.md` at the reserved child prefixes `Na.)`, `Nb.)`, …) and its append-only `## Feedback` ledger becomes a closed historical artifact:
 
 - No further `## Feedback` lines may be appended to any return report after the
   delegation is `_completed`.
@@ -151,17 +143,14 @@ becomes a closed historical artifact:
   finalization does not change them, it just locks the ledger from new appends.
 - The orchestrator/master summary (`N.)`) is likewise frozen.
 
-This skill does **not** rewrite or renumber the return reports or their
-prefixes. The reserved child prefixes are permanent and are preserved verbatim.
-`session-summary` owns the report shape; this skill only enforces the freeze.
+This skill does **not** rewrite or renumber the return reports or their prefixes. The reserved child prefixes are permanent and are preserved verbatim. `session-summary` owns the report shape; this skill only enforces the freeze.
 
 ## File Rename And Move Rules
 
 The record moves across the Archive's lifecycle boundary. Rename **and** move in one operation:
 
 ```text
-From:  <Workspace>\Archive\Live\Delegations\<Subject>\N.) <Topic>_dispatched.md
-To:    <Workspace>\Archive\Historical\Delegations\<Subject>\N.) <Topic>_completed.md
+From:  <Workspace>\Archive\Live\Delegations\<Subject>\N.) <Topic>_dispatched.md To:    <Workspace>\Archive\Historical\Delegations\<Subject>\N.) <Topic>_completed.md
 ```
 
 Rules:
@@ -254,31 +243,15 @@ Do not:
 
 ## Agent Provenance For Durable Artifacts
 
-Finalization never replaces the original creator. Preserve the artifact's
-`## Agent Provenance` section exactly, then append a new entry to its
-`## Agent Change Log` naming the truthful acting agent, the finalization date,
-the lifecycle action, and the status/path or content scope changed.
+Finalization never replaces the original creator. Preserve the artifact's `## Agent Provenance` section exactly, then append a new entry to its `## Agent Change Log` naming the truthful acting agent, the finalization date, the lifecycle action, and the status/path or content scope changed.
 
-When same-stem Markdown, HTML, or PDF siblings exist, apply the same provenance
-history to the complete artifact set. If a legacy artifact lacks reliable
-creator evidence, record `Original writing agent: Not recorded` rather than
-guessing, and log the current finalizer's work. Do not add embedded provenance
-to product source, third-party files, databases, generated caches, skill
-definitions, schema-sensitive or machine-consumed files, or other operational
-files unless their schema explicitly supports it.
+When same-stem Markdown, HTML, or PDF siblings exist, apply the same provenance history to the complete artifact set. If a legacy artifact lacks reliable creator evidence, record `Original writing agent: Not recorded` rather than guessing, and log the current finalizer's work. Do not add embedded provenance to product source, third-party files, databases, generated caches, skill definitions, schema-sensitive or machine-consumed files, or other operational files unless their schema explicitly supports it.
 
 ## Durable Artifact Format Handling
 
-This skill still owns every return, integration, parent, feedback-freeze, and
-completion gate. Before finalizing, discover same-stem `.md`, `.html`, and
-`.pdf` siblings for the delegation and its format-managed family members.
-Preflight every destination, apply completed status through the applicable
-format skill, rename every sibling's lifecycle suffix, and move the complete
-delegation set together without changing permanent prefixes.
+This skill still owns every return, integration, parent, feedback-freeze, and completion gate. Before finalizing, discover same-stem `.md`, `.html`, and `.pdf` siblings for the delegation and its format-managed family members. Preflight every destination, apply completed status through the applicable format skill, rename every sibling's lifecycle suffix, and move the complete delegation set together without changing permanent prefixes.
 
-HTML-only or PDF-only artifacts remain in that format; do not manufacture
-Markdown. Stop rather than finalize only part of a sibling set. Extension-only
-search and `Report.md` examples become format-neutral for this run.
+HTML-only or PDF-only artifacts remain in that format; do not manufacture Markdown. Stop rather than finalize only part of a sibling set. Extension-only search and `Report.md` examples become format-neutral for this run.
 
 ## Validation
 
