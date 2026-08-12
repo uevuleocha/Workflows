@@ -95,15 +95,23 @@ def remap_path_str(value: str, old: str, new: str) -> str:
     rewritten — which is the safe behavior: stamping such a breadcrumb is the
     same fabrication class as the doubling this fix removes.
     """
-    lv, lo, ln = value.lower(), old.lower(), new.lower()
+    prefix = ""
+    v = value
+    if v.startswith("\\\\?\\"):
+        prefix = "\\\\?\\"
+        v = v[4:]
+    clean_old = old[4:] if old.startswith("\\\\?\\") else old
+    clean_new = new[4:] if new.startswith("\\\\?\\") else new
+
+    lv, lo, ln = v.lower(), clean_old.lower(), clean_new.lower()
     if lv == lo:
-        return new
+        return prefix + clean_new
     if lv == ln or lv.startswith(ln + "\\"):
         return value
     if lv.startswith(lo + "\\"):
-        if _is_nested(old, new):
+        if _is_nested(clean_old, clean_new):
             return value
-        return new + value[len(old):]
+        return prefix + clean_new + v[len(clean_old):]
     return value
 
 
@@ -197,7 +205,11 @@ def candidate_state_dbs(manifest: dict[str, Any]) -> list[Path]:
             raw.append(str(value))
     values = manifest.get("candidate_state_dbs")
     if isinstance(values, list):
-        raw.extend(str(v) for v in values if v)
+        for v in values:
+            if isinstance(v, dict) and "path" in v:
+                raw.append(str(v["path"]))
+            elif v:
+                raw.append(str(v))
     values = manifest.get("state_files", {}).get("candidate_state_dbs") if isinstance(manifest.get("state_files"), dict) else None
     if isinstance(values, list):
         raw.extend(str(v) for v in values if v)
