@@ -17,13 +17,14 @@ It is the third member of a family:
 | Skill              | When it is called                          | If unavailable                                      |
 |--------------------|--------------------------------------------|-----------------------------------------------------|
 | `prompt-contracts` | On **every** create and update             | Pause, warn, author inline only if the user says so |
+| `markdown-table-aligner` | Before Markdown handoff or serialization | Pause; manual fallback needs user approval          |
 | `finalize-prompt`  | Never called — the user runs it separately | Tell the user; the prompt stays `PENDING`           |
 
 `prompt-this` calls `prompt-contracts`. It does **not** call `finalize-prompt` — that skill is the user's to run, and it is the only thing that may close a prompt.
 
 `prompt-this` has **no dependency on `delegate-this`.** Prompt files carry a `**Delegation:** N/A` pointer field and nothing more. No routing, no packets, no platforms, no subagents.
 
-If you adopt `prompt-this`, adopt `prompt-contracts` and `finalize-prompt` too.
+If you adopt `prompt-this`, adopt `prompt-contracts`, `markdown-table-aligner`, and `finalize-prompt` too.
 
 ## What Makes a Prompt File Recognizable
 

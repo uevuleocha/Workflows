@@ -2,7 +2,7 @@
 
 This skill creates or syncs reusable agent skills from a local master skills folder to one or more global agent skill installs.
 
-Every newly created skill carries the portable Markdown table-alignment contract and a validation check so pipe alignment remains enforced after global installation.
+Every skill that writes Markdown tables — new or existing, into a durable artifact or into its own chat output — carries the portable Markdown table-alignment contract and a validation check so pipe alignment remains enforced after global installation. Skills that write no tables are exempt. Skills that create first-party durable artifacts also carry the durable-artifact provenance contract — a five-row agent provenance table (`Content owner`, `Original writing agent`, `Original writing LLM`, `Created`, `Artifact role`) immediately after each artifact's opening block, and an append-only five-column agent change log (`Date and Time | Agent | Model | Action | Scope`) as the last section. Skills whose artifacts carry a DEFINITION OF DONE additionally carry a Feedback Section for cross-agent messages, plus the three canonical artifact-integrity rules: Checklist Tick Discipline, No Invented Sync Constraints, and Non-Blocking Wiki And Git Items.
 
 If you cloned this skill from someone else, do not assume the original maintainer's paths apply to your machine. Ask your agent to read this README and `SKILL.md`, then help you configure your own path stack.
 
@@ -35,3 +35,6 @@ These are candidates, not guarantees. The agent should verify each path exists b
 ## Depends On `global-sync`
 
 Once the design is agreed and the local master is created, this guided skill syncs it globally by delegating to the `global-sync` skill (Mode A), so the same copy-and-validate workflow is used everywhere. **If you adopt this skill, adopt `global-sync` too.** If `global-sync` is unavailable at sync time, this skill pauses and tells you it is required; it only falls back to inline copy logic if you explicitly continue without it.
+## Deterministic table dependency
+
+Adopt `markdown-table-aligner` with this skill. It supplies the deterministic final padding pass for file-based Markdown tables; the portable rule remains the content and fallback contract.

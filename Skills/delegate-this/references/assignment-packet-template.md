@@ -115,7 +115,7 @@ Stop immediately and return to the user if:
 On completion, write a return report at the reserved **Summary family** child
 prefix and path above (filename ending in `Report.md`), under
 `<workspace>\Archive\Historical\Summaries\<Subject>\`. It uses session-summary
-structure plus an append-only `## Feedback` ledger. The Summary prefix (e.g.
+structure plus an append-only `## Delegation Ledger`. The Summary prefix (e.g.
 `9a.)`) is independent of the Plan/Task mini-artifact prefix (e.g. `1a.`) — use
 the exact reserved Summary prefix, never invent or renumber it.
 
@@ -134,6 +134,6 @@ Never omit this field. If the route needs no defence, write exactly:
 - **Cost / trust rationale** — mandatory. `N/A — routing self-evident` is the only permitted shorthand, and it is still a filled field, not an omission.
 - **Mini artifact / Reserved prefix / Return report** — the orchestrator reserves two separate lowercase child prefixes: a **Plan/Task family** prefix (e.g. `1a.)`) for the mini artifact and a **Summary family** prefix (e.g. `9a.)`) for the return report. The prefixes come from different namespaces and need not match. The agent either receives a path that already exists or is instructed to create the artifact at its reserved prefix after investigation. Never leave a prefix blank or write "create later" without a reservation.
 - **Checkpoint Policy** — mandatory. State where execution stops, whether sync is allowed, and what must be returned first. The default for skill work is continuous completion with centralized sync (the worker does not sync).
-- **Return report** — mandatory at packet/wave completion. It lives at the reserved **Summary family** prefix under the execution workspace's `Archive\Historical\Summaries\<Subject>\`, ends in `Report.md`, uses session-summary structure plus an append-only `## Feedback` ledger.
+- **Return report** — mandatory at packet/wave completion. It lives at the reserved **Summary family** prefix under the execution workspace's `Archive\Historical\Summaries\<Subject>\`, ends in `Report.md`, uses session-summary structure plus an append-only `## Delegation Ledger`.
 - **Owned surfaces** — this is the one-editor-per-file guarantee. If two packets would list the same path, the routing is wrong. Split the file's work or serialize the waves.
 - **Stop-and-return conditions** — always include the four generic tripwires above. They are what prevent a well-meaning agent from silently exceeding its packet.

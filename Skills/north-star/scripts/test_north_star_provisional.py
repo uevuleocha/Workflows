@@ -16,7 +16,7 @@ SCRIPT = Path(__file__).resolve().parent / "north_star_state.py"
 ROOT = Path(tempfile.mkdtemp(prefix="ns_test_"))
 WORKSPACE = ROOT / "workspace"
 PASS, FAIL, TOTAL = 0, 0, 0
-ACTOR_COMMANDS = {"reopen","pursuit-stop","pursuit-remove","provisional-commit","checkpoint","refine","pause","resume","recover","finalize","end"}
+ACTOR_COMMANDS = {"reopen","pursuit-stop","pursuit-remove","provisional-commit","checkpoint","refine","pause","resume","recover","finalize","end","feedback-add"}
 
 def run(*args, expect_ok=True, inject_actor=True):
     global PASS, FAIL, TOTAL; TOTAL += 1
@@ -624,9 +624,50 @@ def test39():
     do_checkpoint(art,1)
     text=art.read_text(encoding="utf-8")
     assert text.count("## Agent Provenance")==1 and text.count("## Agent Change Log")==1
-    assert "Codex Agent — Created the North Star artifact." in text
-    assert "Codex Agent — Checkpointed North Star progress and verification state." in text
+    assert text.count("## Feedback Section")==1
+    # Change log is a five-column table, not a bullet list.
+    assert "| Date and Time" in text and "| Model " in text and "| Scope" in text
+    assert "Created the North Star artifact" in text
+    assert "Checkpointed North Star progress and verification state" in text
+    for field in ("Content owner","Original writing agent","Original writing LLM","Created","Artifact role"):
+        assert f"| {field}" in text, field
+    # Mandatory section order: provenance -> content -> feedback -> change log -> state.
+    assert text.index("## Agent Provenance")<text.index("## North Star")<text.index("## Feedback Section")<text.index("## Agent Change Log")
+    # Feedback is helper-owned, numbered, and appended by any acting agent.
+    run("feedback-add","--artifact",str(art),"--descriptor","Independent verification",
+        "--body","Verified the five-row provenance table.")
+    text=art.read_text(encoding="utf-8")
+    assert "### Feedback 1 — " in text and "Independent verification" in text
+    assert text.index("## Feedback Section")<text.index("## Agent Change Log")
     assert_terminal_state_block(art)
+
+@test("40. Exact model attribution accepts full identities and rejects family labels")
+def test40():
+    accepted = run(
+        "create", "--workspace-root", str(WORKSPACE), "--subject", "ExactModel",
+        "--topic", "Exact Model", "--writing-agent", "Codex Agent",
+        "--writing-llm", "GPT-5.6 Sol", "--goal", "Exact model test",
+        "--pursuit", "Test", "--mode", "batch", "--constraint", "Stay in scope",
+        "--format", "Produce result", "--definition-of-done", "Check 1",
+        "--failure", "Ambiguous model",
+    )
+    assert accepted is not None
+    art = artifact_path("ExactModel", "Exact Model")
+    assert status_json(art)["provenance"]["original_writing_llm"] == "GPT-5.6 Sol"
+    for model in ("GPT-5", "GPT-5.6", "Claude", "Codex Agent"):
+        rejected = run(
+            "create", "--workspace-root", str(WORKSPACE), "--subject", f"Bad{model[:2]}",
+            "--topic", f"Bad {model}", "--writing-agent", "Codex Agent",
+            "--writing-llm", model, "--goal", "Reject model", "--pursuit", "Test",
+            "--mode", "batch", "--constraint", "Stay in scope", "--format", "Result",
+            "--definition-of-done", "Check", "--failure", "Ambiguous model",
+            expect_ok=False,
+        )
+        assert rejected and "full exact model name" in rejected.stderr
+    # Omitted identity remains the honest fallback; no exact identity is guessed.
+    fallback = create_ns("UnknownModel", "Unknown Model")
+    assert fallback is not None
+    assert status_json(artifact_path("UnknownModel", "Unknown Model"))["provenance"]["original_writing_llm"] == "Not recorded"
 
 # ══════════════════════════════════════════════════════════════════════
 # MAIN
@@ -669,11 +710,11 @@ def main():
     test16(); test17(); test18(); test19(); test20()
     test21(); test22(); test23(); test24(); test25(); test26()
     test27(); test28(); test29(); test30(); test31(); test32(); test33()
-    test34(); test35(); test36(); test37(); test38(); test39()
+    test34(); test35(); test36(); test37(); test38(); test39(); test40()
 
     print(f"\n{'='*60}")
     print(f"Results: {PASS}/{TOTAL} subprocess checks passed, {FAIL} failed")
-    print(f"Named test cases: 39")
+    print(f"Named test cases: 40")
     teardown()
     return 0 if FAIL == 0 else 1
 

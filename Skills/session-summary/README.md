@@ -34,3 +34,6 @@ For the general mechanism, see the workspace's `Documentation/` folder, `3.) Ski
 ## Optional artifact formats
 
 Pair with `html-this` or `pdf-this` for HTML-only or PDF-only human-readable artifacts while this skill retains content and workflow ownership.
+## Deterministic table dependency
+
+Adopt `markdown-table-aligner` with this skill. It supplies the deterministic final padding pass for file-based Markdown tables; the portable rule remains the content and fallback contract.

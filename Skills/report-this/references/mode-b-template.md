@@ -42,3 +42,15 @@
 [Citations, links, and provenance.]
 
 [Append the exact dismissible footer.]
+
+## Feedback Section
+
+<Always present, empty by default. Any agent appends a numbered subsection:
+`### Feedback N - YYYY-MM-DD - Agent - short descriptor`. Append-only; a
+correction is a new entry, never an edit to an earlier one. Never prune this
+section for being empty.>
+## Agent Change Log
+
+| Date and Time       | Agent        | Model         | Action  | Scope   |
+|---------------------|--------------|---------------|---------|---------|
+| YYYY-MM-DD-HH:mm:ss | <agent>      | <model>       | Created | <scope> |

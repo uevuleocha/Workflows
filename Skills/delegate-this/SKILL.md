@@ -106,11 +106,11 @@ The dispatched family has up to three **artifact-type namespaces**, each with it
 
 **Do not use one shared numeric anchor across different artifact-type namespaces.** Each family gets its master number from its **own** Subject namespace; children inherit that family's master number. Explicit paths and pointers connect the families; their numeric anchors need not match.
 
-| Family               | Master number source                            | Children inherit          |
-|----------------------|-------------------------------------------------|---------------------------|
-| Plan/Task            | Its own Plan/Task Subject namespace             | The Plan/Task master `N`  |
-| Delegation record    | Its own Delegation Subject namespace            | n/a (one record)          |
-| Summary              | Its own Summary Subject namespace               | The Summary master `N`    |
+| Family            | Master number source                 | Children inherit         |
+| ----------------- | ------------------------------------ | ------------------------ |
+| Plan/Task         | Its own Plan/Task Subject namespace  | The Plan/Task master `N` |
+| Delegation record | Its own Delegation Subject namespace | n/a (one record)         |
+| Summary           | Its own Summary Subject namespace    | The Summary master `N`   |
 
 Each anchor is calculated as one greater than the highest top-level `N.)` across that namespace's **own combined Live and Historical** Subject folder. Scanning only one folder (or one artifact-type namespace) for another family's number is how collisions happen — each family scans its own namespace only.
 
@@ -124,12 +124,12 @@ The Plan master (`1.`), the Delegation master (`1.`), and the Summary master (`9
 
 ### Child-numbering grammar
 
-| Kind of artifact                                | Prefix shape     | Example   |
-|-------------------------------------------------|------------------|-----------|
-| Master / independent artifact in a namespace    | `N.)`            | `1.)`     |
-| Independent mini artifact with **no** parent    | `N.)`            | `1.)`     |
-| Child mini artifact / child return report       | `Na.)`, `Nb.)`   | `1a.)`    |
-| Second-level child (children of a child)        | `Naa.)`, `Nab.)` | `1aa.)`   |
+| Kind of artifact                             | Prefix shape     | Example |
+| -------------------------------------------- | ---------------- | ------- |
+| Master / independent artifact in a namespace | `N.)`            | `1.)`   |
+| Independent mini artifact with **no** parent | `N.)`            | `1.)`   |
+| Child mini artifact / child return report    | `Na.)`, `Nb.)`   | `1a.)`  |
+| Second-level child (children of a child)     | `Naa.)`, `Nab.)` | `1aa.)` |
 
 Rules:
 
@@ -275,12 +275,12 @@ A return report is **mandatory at packet/wave completion** for every dispatched 
 A return report is a **session-summary family member**:
 
 - It uses **session-summary structure** (the 🎭 ACTS narrative, metadata header, Definition of Done ACT, final-state block) — `session-summary` owns that shape; `delegate-this` only reserves the prefix and mandates the report.
-- It adds one delegation-specific section: an **append-only `## Feedback` ledger**, placed after the session-summary body.
+- It adds one delegation-specific section: an **append-only `## Delegation Ledger`**, placed after the session-summary body.
 - Its filename **ends in `Report.md`** and carries the reserved child prefix (`Na.)`, `Nb.)`, …) under `<execution workspace>\Archive\Historical\Summaries\<Subject>\`.
 
-### Feedback ledger rules
+### Delegation Ledger rules
 
-The `## Feedback` section is append-only:
+The `## Delegation Ledger` section is append-only:
 
 - **Existing report content is immutable.** Never rewrite a returned deliverable, ACT, or earlier line of the report.
 - **Earlier feedback entries are immutable.** Once written, a feedback line is never edited or deleted — corrections are added as new lines.
@@ -290,7 +290,7 @@ The `## Feedback` section is append-only:
 A feedback line is short and dated, e.g.:
 
 ```markdown
-## Feedback
+## Delegation Ledger
 
 - [2026-07-11] Orchestrator: deliverable matched DoD; one nit — rename helper
   to match the parent's vocabulary.
@@ -558,10 +558,12 @@ This skill applies the workspace's first-party durable-artifact provenance rule 
 
 For every in-scope artifact:
 
-- place an `## Agent Provenance` section near the top with `Content owner`, `Original writing agent`, `Created`, and `Artifact role`;
+- place an `## Agent Provenance` section immediately after the artifact's opening block -- its title, status, and lifecycle lines -- carrying `Content owner`, `Original writing agent`, `Original writing LLM`, `Created`, and `Artifact role`, in that order;
+- record `Original writing LLM` as the model that produced the artifact, kept distinct from the agent family that performed the write; use `Not recorded` when the model is genuinely unknown, and never infer it from the agent label or backfill it later;
 - use a stable truthful agent-family label such as `Codex Agent`, `Claude Agent`, `Antigravity Agent`, `Hermes Agent`, or `zCode Agent`;
 - keep the original writing-agent entry immutable;
-- keep an append-only `## Agent Change Log` near the bottom, recording the date, acting agent, action, and concise scope for every material edit;
+- keep an append-only `## Agent Change Log` as the last section, or immediately above any section the artifact already reserves for the last position, rendered as a five-column `Date and Time | Agent | Model | Action | Scope` table with one row per material edit;
+- stamp every change-log row `YYYY-MM-DD-HH:mm:ss` on a 24-hour clock, read from the machine clock and never estimated; leave historical date-only rows exactly as written rather than backfilling them, because a log carrying both shapes is correct and the boundary between them is itself information;
 - if a legacy artifact lacks reliable creator evidence, use `Not recorded` rather than guessing, then log the current agent's actual change; and
 - treat copying or global synchronization as transport, not authorship.
 
@@ -573,7 +575,60 @@ This skill owns delegation routing, numbering, assignment packets, parent/child 
 
 Machine-consumed state remains native. Same-stem `.md`, `.html`, and `.pdf` variants are one logical artifact and one reserved prefix. On update, return, or reopen, preflight and update the complete sibling set. This section overrides extension-only examples during a co-invoked run; all family numbering, feedback, freeze, and completion rules remain mandatory.
 
+## Checklist Tick Discipline
+
+**Checklist Tick Discipline.** The executing agent ticks every DEFINITION OF DONE and Verification Checklist box its own evidence supports, in the same pass, and states the evidence for each. Leave a box unticked only when the claim is false, unevidenced, or ambiguous — and say which and why. An unticked box means "not done," never "done but awaiting someone else's confirmation." Independent verification re-checks the ticks; it does not supply them. A tick asserts what this pass did and evidenced; it does not assert that the result is proven correct in later production use.
+
+This rule is **emitted into** every artifact this skill produces, adjacent to the DEFINITION OF DONE or Verification Checklist it governs — not buried in a trailing notes section. The executing agent must read it inside the artifact it was handed, without consulting any workspace contract.
+
+## No Invented Sync Constraints
+
+**No Invented Sync Constraints.** Do not write "local master only," "no global sync in this pass," or any equivalent prohibition into a DEFINITION OF DONE item, Verification Checklist item, CONSTRAINT, FAILURE condition, or instruction unless the user asked for it. Sync authority belongs to the user and is granted at execution time, not predicted at authoring time. When the user later authorizes same-pass sync, an invented constraint turns a correct action into a permanently false checklist item that must be waived. If sequencing genuinely matters, express it as a default the user can override — "stop at the verified local master unless the user authorizes same-pass sync" — never as a completion criterion or failure condition.
+
+This rule binds the authoring agent; it is **never** emitted as artifact text. Its presence is verified by the absence of invented sync constraints in produced artifacts, not by a section in them. It does not authorize syncing and does not change what counts as authorization.
+
+## Non-Blocking Wiki And Git Items
+
+**Non-Blocking Wiki And Git Items.** Do not write a wiki sync, a `stage-commit-push` run, a GitHub push, or a submodule pointer bump into a DEFINITION OF DONE item, Verification Checklist item, CONSTRAINT, or FAILURE condition as a completion criterion. Those operations belong **after** the artifact is finalized: finalization renames and moves the artifact, so syncing first dirties the repository again and leaves the wiki holding a synthesised copy of a path that no longer exists. If such an operation is genuinely worth recording, record it as an explicitly non-blocking follow-up — "after finalization, run `stage-commit-push`" — never as a box whose blank state blocks closure. A finalizer must never refuse or defer closure because a sync, push, or pointer bump has not happened.
+
+**The carve-out.** This does not apply to an artifact **whose subject is** the wiki or Git work. A plan to build `wiki-sync` legitimately carries wiki items in its DEFINITION OF DONE, because there the wiki work *is* the deliverable rather than a publication step for it. The rule targets publication steps, not subject matter. Never strip a legitimate item from an artifact that is correct as written.
+
+Like rule 2, this binds the authoring agent and is never emitted as artifact text.
+
+## Deterministic Markdown Table Aligner Integration
+
+When this skill creates or materially edits a file containing Markdown tables, it must invoke the `markdown-table-aligner` skill after semantic content is complete and before final handoff or Markdown-to-HTML/PDF serialization.
+
+Use the aligner's read-only `check` first. Treat exit `0` as authoritative deterministic monospaced Unicode alignment. For safe padding-only findings, run `format` to a distinct nonexistent staged path, review the diff, adopt it, and rerun `check`. Resolve overflow, malformed, or ambiguous findings manually; stop on operational failure. Confirm the dependency is available before the final write, and never silently replace it with raw character counting. The portable rule below remains compulsory.
+
+## Markdown Table Alignment
+
+Every Markdown table this skill writes - inside a durable manifest or into chat - must obey the workspace pipe-alignment rule, carried here so the rule stays portable after global installation:
+
+- **All Markdown tables must be visually pipe-aligned.** Cap every cell at 80 characters, including any overflow marker. If a cell's full content would exceed 80 characters, truncate it at the nearest word boundary within the cap, append a pointer such as `-> see note [row-id]` (using that row's own identifier - its `#`, `Phase`, name, or whichever column already identifies the row), and place the full original text as a plain note directly below the table, keyed by that same identifier. Pad columns so the table is aligned in a monospaced raw-text or Markdown view. Rendered visual alignment is authoritative; raw `|` indices are diagnostic only because Unicode display width (for example emoji, arrows, or wide glyphs) can differ from raw character counts. Do not flag or rework a table solely because raw pipe indices differ when the rendered table is visually aligned. Visibly uneven columns, malformed separators, or cells above 80 characters still fail. This applies to every table an agent writes, not only Estimated Effort tables. **Prefer ASCII-only characters (`->`, `--`, `...`) inside table cells**; Unicode glyphs (arrows, em/en dashes, ellipsis) render wider than one column in most viewers and silently break pipe alignment even when raw character counts match. When a table exceeds approximately 120 characters in total width, narrow the columns (truncate cells to essentials and move detail to notes) so the table renders on a single line without word-wrapping.
+
+**Validation check:** before handoff, review every table produced this run and confirm visual pipe alignment, the 80-character cell cap with overflow pointers, ASCII-only glyphs inside cells, and single-line rendering for wide tables. Misaligned tables are corrected before delivery.
+
+## Exact Model Attribution
+
+Whenever this skill writes a new model identity, appends a current-run model value, or defines a workflow that does either:
+
+- Record the full model identity actually used when it is safely available from current runtime or session metadata. Use a specific identity such as `GPT-5.6 Sol`, `GPT-5.6 Terra`, or `Claude Opus 5`; a family-only label such as `GPT-5`, `Claude`, or `Codex Agent` is not an acceptable substitute.
+- Resolve identity in this order: current runtime or session metadata; a platform-provided current-model field; only then, when unavoidable, a field-minimized configuration lookup that returns the model field alone. Apply `tread-lightly` to any potentially sensitive configuration and never display, copy, search, diff, or log the whole configuration.
+- Keep the agent family and model identity separate. Never infer an exact model from an agent label, provider name, stale configuration, or model family.
+- Use `Not recorded` only when the exact identity genuinely cannot be established safely. Do not replace an available exact identity with `Not recorded` merely to avoid checking current runtime metadata.
+- Preserve append-only history. Never rewrite a historical provenance or change-log value solely to improve an old model label; add a truthful current correction entry when correction is required.
+
+**Validation check:** For every model value newly written in the current run, accept a full exact identity and the honest `Not recorded` fallback, but reject known ambiguous family-only labels or agent-family substitutions. Confirm model discovery exposed only the required model field and that no historical row was rewritten.
+
 ## Validation
+
+- confirm the `## Markdown Table Alignment` section and its validation check are present, and that every table this skill wrote is visually pipe-aligned with cells at 80 characters or fewer and ASCII-only glyphs inside cells;
+
+- confirm the `## Checklist Tick Discipline` section is present and its rule text is unmodified;
+- confirm the `## No Invented Sync Constraints` section is present, and that a produced artifact contains **no** invented sync constraint in its DEFINITION OF DONE, Verification Checklist, CONSTRAINTS, or FAILURE sections;
+- confirm a newly produced artifact actually carries the Checklist Tick Discipline rule verbatim, since the section can survive in this skill while the template silently loses it;
+- confirm the `## Non-Blocking Wiki And Git Items` section is present with its carve-out, and that a produced artifact contains **no** wiki-sync, push, `stage-commit-push`, or pointer-bump completion criterion;
 
 After a delegation run, confirm and report:
 

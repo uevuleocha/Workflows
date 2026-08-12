@@ -66,18 +66,18 @@ When invoked in any non-hub workspace, use the standards document as the univers
 
 Before proposing any changes, inspect the target workspace against the complete applicable checklist. The checklist categories are:
 
-| Cat | Category                              | Scope                                           |
-|-----|---------------------------------------|-------------------------------------------------|
-| A   | Assessment and Scope                  | Resolve root, classify, record identity         |
-| B   | Required Root Structure               | CLAUDE.md, AGENTS.md, README.md, Archive, tmp   |
-| C   | CLAUDE.md Universal Standards         | All 17 sections incl. glossary, North Star      |
-| D   | AGENTS.md Wrapper Parity              | Four sections, split Codex/.agents paths         |
-| E   | Platform Coordination Settings        | JSON validation, template parity, no secrets    |
-| F   | README, Documentation, Artifact Rules | Map marker, provenance, N.) numbering           |
-| G   | Conditional Git and Secret Safety     | .gitignore, .env, secret exclusion              |
-| H   | Conditional Wiki Requirements         | wiki-schema.md, schema pointers                 |
-| I   | Conditional Hub/Nested-Workspace      | Markers, README tracking, submodule pointers    |
-| J   | Verification and User Handoff         | Re-scan, syntax checks, user presentation       |
+| Cat | Category                              | Scope                                         |
+| --- | ------------------------------------- | --------------------------------------------- |
+| A   | Assessment and Scope                  | Resolve root, classify, record identity       |
+| B   | Required Root Structure               | CLAUDE.md, AGENTS.md, README.md, Archive, tmp |
+| C   | CLAUDE.md Universal Standards         | All 17 sections incl. glossary, North Star    |
+| D   | AGENTS.md Wrapper Parity              | Four sections, split Codex/.agents paths      |
+| E   | Platform Coordination Settings        | JSON validation, template parity, no secrets  |
+| F   | README, Documentation, Artifact Rules | Map marker, provenance, N.) numbering         |
+| G   | Conditional Git and Secret Safety     | .gitignore, .env, secret exclusion            |
+| H   | Conditional Wiki Requirements         | wiki-schema.md, schema pointers               |
+| I   | Conditional Hub/Nested-Workspace      | Markers, README tracking, submodule pointers  |
+| J   | Verification and User Handoff         | Re-scan, syntax checks, user presentation     |
 
 The authoritative checklist lives in the universal standards document. When the local clone exists, use it as the reference. When it does not, read the hub copy at:
 
@@ -117,15 +117,15 @@ The child clone is the durable execution ledger for its workspace. During every 
 
 Every child clone must contain a clearly separated `## Workspace Parity Status` section immediately before `## Workspace-Local Synchronization Annotation`. Maintain this visually pipe-aligned two-column table:
 
-| Field                 | Value                                      |
-|-----------------------|--------------------------------------------|
-| Workspace             | Canonical workspace name                   |
-| Verdict               | Full setup / Updates required / Aligned    |
-| Hub master            | Current numbered `_Master.md` artifact     |
-| Master synchronized   | YYYY-MM-DD by truthful agent               |
-| Checklist verified    | YYYY-MM-DD by truthful agent               |
-| Recurring checks      | Current / Pending re-verification          |
-| Evidence              | Short summary; details in Agent Change Log |
+| Field               | Value                                      |
+| ------------------- | ------------------------------------------ |
+| Workspace           | Canonical workspace name                   |
+| Verdict             | Full setup / Updates required / Aligned    |
+| Hub master          | Current numbered `_Master.md` artifact     |
+| Master synchronized | YYYY-MM-DD by truthful agent               |
+| Checklist verified  | YYYY-MM-DD by truthful agent               |
+| Recurring checks    | Current / Pending re-verification          |
+| Evidence            | Short summary; details in Agent Change Log |
 
 Update the table only from current evidence. `Already aligned` requires every applicable item to be `[x]`, every non-applicable conditional item to carry its reason, recurring checks to be current for this run, and no unresolved blocker.
 
@@ -255,7 +255,24 @@ Any of these means the run is not done:
 - Required files, routing branches, validations, or evidence are missing.
 - It claims completion without evidence or claims global availability from a local-master-only change.
 
+## Deterministic Markdown Table Aligner Integration
+
+When this skill creates or materially edits a file containing Markdown tables, it must invoke the `markdown-table-aligner` skill after semantic content is complete and before final handoff or Markdown-to-HTML/PDF serialization. Its parity checks must also confirm that applicable future artifact skills retain both this integration and the portable rule.
+
+Use the aligner's read-only `check` first. Treat exit `0` as authoritative deterministic monospaced Unicode alignment. For safe padding-only findings, run `format` to a distinct nonexistent staged path, review the diff, adopt it, and rerun `check`. Resolve overflow, malformed, or ambiguous findings manually; stop on operational failure. Confirm the dependency is available before the final write, and never silently replace it with raw character counting. The portable rule below remains compulsory.
+
+## Markdown Table Alignment
+
+Every Markdown table this skill writes - inside a durable manifest or into chat - must obey the workspace pipe-alignment rule, carried here so the rule stays portable after global installation:
+
+- **All Markdown tables must be visually pipe-aligned.** Cap every cell at 80 characters, including any overflow marker. If a cell's full content would exceed 80 characters, truncate it at the nearest word boundary within the cap, append a pointer such as `-> see note [row-id]` (using that row's own identifier - its `#`, `Phase`, name, or whichever column already identifies the row), and place the full original text as a plain note directly below the table, keyed by that same identifier. Pad columns so the table is aligned in a monospaced raw-text or Markdown view. Rendered visual alignment is authoritative; raw `|` indices are diagnostic only because Unicode display width (for example emoji, arrows, or wide glyphs) can differ from raw character counts. Do not flag or rework a table solely because raw pipe indices differ when the rendered table is visually aligned. Visibly uneven columns, malformed separators, or cells above 80 characters still fail. This applies to every table an agent writes, not only Estimated Effort tables. **Prefer ASCII-only characters (`->`, `--`, `...`) inside table cells**; Unicode glyphs (arrows, em/en dashes, ellipsis) render wider than one column in most viewers and silently break pipe alignment even when raw character counts match. When a table exceeds approximately 120 characters in total width, narrow the columns (truncate cells to essentials and move detail to notes) so the table renders on a single line without word-wrapping.
+
+**Validation check:** before handoff, review every table produced this run and confirm visual pipe alignment, the 80-character cell cap with overflow pointers, ASCII-only glyphs inside cells, and single-line rendering for wide tables. Misaligned tables are corrected before delivery.
+
 ## Validation
+
+- confirm the `## Markdown Table Alignment` section and its validation check are present, and that every table this skill wrote is visually pipe-aligned with cells at 80 characters or fewer and ASCII-only glyphs inside cells;
+- confirm every applicable file-based Markdown-table skill carries `## Deterministic Markdown Table Aligner Integration`, declares the dependency, and places the call at its real ownership boundary, while delegated and pure-format cases are recorded as exemptions;
 
 After creating or updating this skill:
 

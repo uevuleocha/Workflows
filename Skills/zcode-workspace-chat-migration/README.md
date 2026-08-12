@@ -14,7 +14,7 @@ The bundled helper script runs the primary, secondary, and cleanup/parity steps:
 
 ## Dependency
 
-`zcode-workspace-chat-migration` depends on the `session-summary` skill. Both the Front-Door and Execution workflows close by producing an explicit handoff/report summary through `session-summary` - not hand-written prose (see the `## Session Summary Integration` section in `SKILL.md`). It runs with an availability guard and falls back to a plain markdown summary if `session-summary` is not loaded.
+`zcode-workspace-chat-migration` depends on the `session-summary` skill. Both the Front-Door and Execution workflows close by producing an explicit handoff/feedback summary through `session-summary` - not hand-written prose (see the `## Session Summary Integration` section in `SKILL.md`). It runs with an availability guard and falls back to a plain markdown summary if `session-summary` is not loaded.
 
 **If you adopted `zcode-workspace-chat-migration` from Uzo (U-Z-O), also adopt `session-summary`.** This skill also ships its own bundled `scripts/` - keep those with it when you copy the skill.
 
@@ -32,4 +32,4 @@ missing folders.
 
 ## Optional artifact formats
 
-Pair with `html-this` or `pdf-this` for HTML-only or PDF-only manifests, handoffs, and reports while this skill retains migration ownership.
+Pair with `html-this` or `pdf-this` for HTML-only or PDF-only manifests, handoffs, and feedback summaries while this skill retains migration ownership.

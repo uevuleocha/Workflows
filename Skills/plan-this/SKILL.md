@@ -20,11 +20,11 @@ On every create and every update:
 1. **Invoke `prompt-contracts`** to author the contract for this plan's work, in its canonical structure: GOAL, CONSTRAINTS, FORMAT, DEFINITION OF DONE, FAILURE. Pre-fill it from the plan's task, scope boundaries, and reference files so the user does not restate anything.
    - Standard and Deep plans: full 5-part contract.
    - Compact and mini plans: a minimal contract (GOAL + DEFINITION OF DONE + FAILURE) is acceptable unless the user asks for the full form.
-2. **Show the full contract in chat (in-house)** so the user can read and adjust it. This is an explicit exception to the "do not paste the plan into chat" rule: always paste the Prompt Contract block, even though you do not paste the rest of the plan.
+2. **In-chat display is off by default.** Do not paste the Prompt Contract into chat unless the user opts in during creation or later asks to see it. Suppressing chat display never permits an omitted or weakened embedded contract -- the artifact still carries the complete contract verbatim, every time. When the user does opt in, paste the full Prompt Contract block as an explicit exception to the "do not paste the plan into chat" rule, without pasting the rest of the plan.
 3. **Embed the exact same contract verbatim** into the plan file under a `## Prompt Contract` section, placed after `## Context` and before `## Phased Implementation Plan`. (For in-chat-only plans there is no file to embed into; the contract simply appears inline with the rest of the plan.)
 4. The contract's DEFINITION OF DONE and FAILURE clauses are the plan's authoritative completion criteria; `finalize-plan` verifies against them.
 
-On any later update, re-derive or revise the contract to match the new scope, refresh the `## Prompt Contract` section in the file, and re-show the updated contract in chat.
+On any later update, re-derive or revise the contract to match the new scope and refresh the `## Prompt Contract` section in the file. Re-show the updated contract in chat only if the user has opted in or asks to see it.
 
 **Availability guard.** Before authoring the contract, confirm the `prompt-contracts` skill is present in the agent's loaded skills.
 
@@ -253,11 +253,26 @@ Status: ACTIVE / PENDING - created [YYYY-MM-DD].
 
 Plan lifecycle: ACTIVE on [YYYY-MM-DD]. [One sentence explaining what this plan covers.]
 
+## Agent Provenance
+
+| Field                  | Value                  |
+|------------------------|------------------------|
+| Content owner          | Uzo                    |
+| Original writing agent | <agent family>         |
+| Original writing LLM   | <model>                |
+| Created                | <YYYY-MM-DD>           |
+| Artifact role          | <what this artifact is>|
+
+
 ## Context
 
 **Delegation:** N/A
 
 ## Prompt Contract
+
+## Checklist Tick Discipline
+
+**Checklist Tick Discipline.** The executing agent ticks every DEFINITION OF DONE and Verification Checklist box its own evidence supports, in the same pass, and states the evidence for each. Leave a box unticked only when the claim is false, unevidenced, or ambiguous — and say which and why. An unticked box means "not done," never "done but awaiting someone else's confirmation." Independent verification re-checks the ticks; it does not supply them. A tick asserts what this pass did and evidenced; it does not assert that the result is proven correct in later production use.
 
 ## Locked Decisions
 
@@ -294,6 +309,17 @@ The `🟣` column header is required for every durable plan. It means "colored e
 Use the richer table style from existing polished finalized plans as the preferred example: include phase letters, session-count estimates, colored markers, explanatory complexity text, and a total estimate line below the table. Do not use a simpler two-column `Phase | Effort` style for Compact, Standard, Deep, or mini plans.
 
 ## Open Items Explicitly Out Of Scope
+
+## Feedback Section
+
+<Always present, empty by default. Any agent appends `### Feedback N - YYYY-MM-DD - Agent - short descriptor`. Append-only; a correction is a new entry, never an edit. Never prune this section for being empty.>
+
+## Agent Change Log
+
+| Date and Time       | Agent     | Model   | Action  | Scope   |
+|---------------------|-----------|---------|---------|---------|
+| YYYY-MM-DD-HH:mm:ss | <agent>   | <model> | Created | <scope> |
+
 ```
 
 ### Delegation Field
@@ -427,10 +453,12 @@ This skill applies the workspace's first-party durable-artifact provenance rule 
 
 For every in-scope artifact:
 
-- place an `## Agent Provenance` section near the top with `Content owner`, `Original writing agent`, `Created`, and `Artifact role`;
+- place an `## Agent Provenance` section immediately after the artifact's opening block -- its title, status, and lifecycle lines -- carrying `Content owner`, `Original writing agent`, `Original writing LLM`, `Created`, and `Artifact role`, in that order;
+- record `Original writing LLM` as the model that produced the artifact, kept distinct from the agent family that performed the write; use `Not recorded` when the model is genuinely unknown, and never infer it from the agent label or backfill it later;
 - use a stable truthful agent-family label such as `Codex Agent`, `Claude Agent`, `Antigravity Agent`, `Hermes Agent`, or `zCode Agent`;
 - keep the original writing-agent entry immutable;
-- keep an append-only `## Agent Change Log` near the bottom, recording the date, acting agent, action, and concise scope for every material edit;
+- keep an append-only `## Agent Change Log` as the last section, or immediately above any section the artifact already reserves for the last position, rendered as a five-column `Date and Time | Agent | Model | Action | Scope` table with one row per material edit;
+- stamp every change-log row `YYYY-MM-DD-HH:mm:ss` on a 24-hour clock, read from the machine clock and never estimated; leave historical date-only rows exactly as written rather than backfilling them, because a log carrying both shapes is correct and the boundary between them is itself information;
 - if a legacy artifact lacks reliable creator evidence, use `Not recorded` rather than guessing, then log the current agent's actual change; and
 - treat copying or global synchronization as transport, not authorship.
 
@@ -442,14 +470,107 @@ This skill owns plan content, Prompt Contract, checklists, estimates, Subject, p
 
 Treat same-stem `.md`, `.html`, and `.pdf` variants as one plan and one numbering entry. On update or reopen, preflight and update/move every sibling together. This section overrides `.md`-only extension examples and validation wording only during a co-invoked format run; `_active`, `_mini_active`, and finalized lifecycle semantics remain unchanged.
 
+## Checklist Tick Discipline
+
+**Checklist Tick Discipline.** The executing agent ticks every DEFINITION OF DONE and Verification Checklist box its own evidence supports, in the same pass, and states the evidence for each. Leave a box unticked only when the claim is false, unevidenced, or ambiguous — and say which and why. An unticked box means "not done," never "done but awaiting someone else's confirmation." Independent verification re-checks the ticks; it does not supply them. A tick asserts what this pass did and evidenced; it does not assert that the result is proven correct in later production use.
+
+This rule is **emitted into** every artifact this skill produces, adjacent to the DEFINITION OF DONE or Verification Checklist it governs — not buried in a trailing notes section. The executing agent must read it inside the artifact it was handed, without consulting any workspace contract.
+
+## No Invented Sync Constraints
+
+**No Invented Sync Constraints.** Do not write "local master only," "no global sync in this pass," or any equivalent prohibition into a DEFINITION OF DONE item, Verification Checklist item, CONSTRAINT, FAILURE condition, or instruction unless the user asked for it. Sync authority belongs to the user and is granted at execution time, not predicted at authoring time. When the user later authorizes same-pass sync, an invented constraint turns a correct action into a permanently false checklist item that must be waived. If sequencing genuinely matters, express it as a default the user can override — "stop at the verified local master unless the user authorizes same-pass sync" — never as a completion criterion or failure condition.
+
+This rule binds the authoring agent; it is **never** emitted as artifact text. Its presence is verified by the absence of invented sync constraints in produced artifacts, not by a section in them. It does not authorize syncing and does not change what counts as authorization.
+
+## Non-Blocking Wiki And Git Items
+
+**Non-Blocking Wiki And Git Items.** Do not write a wiki sync, a `stage-commit-push` run, a GitHub push, or a submodule pointer bump into a DEFINITION OF DONE item, Verification Checklist item, CONSTRAINT, or FAILURE condition as a completion criterion. Those operations belong **after** the artifact is finalized: finalization renames and moves the artifact, so syncing first dirties the repository again and leaves the wiki holding a synthesised copy of a path that no longer exists. If such an operation is genuinely worth recording, record it as an explicitly non-blocking follow-up — "after finalization, run `stage-commit-push`" — never as a box whose blank state blocks closure. A finalizer must never refuse or defer closure because a sync, push, or pointer bump has not happened.
+
+**The carve-out.** This does not apply to an artifact **whose subject is** the wiki or Git work. A plan to build `wiki-sync` legitimately carries wiki items in its DEFINITION OF DONE, because there the wiki work *is* the deliverable rather than a publication step for it. The rule targets publication steps, not subject matter. Never strip a legitimate item from an artifact that is correct as written.
+
+Like rule 2, this binds the authoring agent and is never emitted as artifact text.
+
+## Feedback Section
+
+Every artifact this skill creates carries a `## Feedback Section`, **present and empty by default**, placed immediately above the `## Agent Change Log`.
+
+The section exists so agents can talk to each other through the artifact instead of through a chat session neither of them shares. An orchestrator writes what it needs verified; a verifier writes what it found; the implementer writes back what it changed. Each reads what the others left, across platforms and across sessions.
+
+Entries are append-only and numbered:
+
+```markdown
+## Feedback Section
+
+### Feedback 1 - 2026-08-03 - Hermes Agent - Initial implementation
+
+[what was done]
+
+### Feedback 2 - 2026-08-03 - Bolu (Codex sub-agent) - Independent verification
+
+[what was found, and what remains]
+```
+
+Rules:
+
+- The parent heading is `## Feedback Section` and is always present, even with no entries.
+- Each entry is `### Feedback N - date - agent - short descriptor`, numbered from 1 and never renumbered.
+- Earlier entries are immutable. A correction is a **new** entry, never an edit to an old one.
+- Entries may nest `####` sub-detail (an evidence ledger, a scenario table) inside a single entry.
+- An empty Feedback Section is correct and must never be pruned for being empty.
+
+## Deterministic Markdown Table Aligner Integration
+
+When this skill creates or materially edits a file containing Markdown tables, it must invoke the `markdown-table-aligner` skill after semantic content is complete and before final handoff or Markdown-to-HTML/PDF serialization.
+
+**Availability guard.** Confirm `markdown-table-aligner` is loaded before writing the final artifact. If it is unavailable, pause and tell the user that deterministic alignment cannot run; continue with the portable manual rule only if the user explicitly approves that fallback.
+
+For an in-scope Markdown file or staged Markdown source:
+
+1. Run the aligner's read-only `check`.
+2. Treat exit `0` as authoritative deterministic monospaced Unicode alignment. Do not reject or rework the table solely because a particular editor, emoji fallback font, or proportional renderer shows a residual pixel-level offset.
+3. If exit `1` contains only safe padding findings, run `format` to a distinct nonexistent staged path, review the diff, adopt the staged result, and rerun `check`.
+4. If exit `1` contains overflow, malformed, or ambiguous findings, make the editorial repair manually and rerun the helper; the script never chooses truncation text or overflow notes.
+5. Exit `2` is an operational failure. Stop rather than falling back silently or treating raw character count as authoritative.
+6. Preserve the complete portable Markdown Table Alignment rule below. The helper supplements it and never replaces it.
+
+For HTML or PDF requested from Markdown, run the helper against the exact Markdown source packet before serialization. Chat-only tables continue to use the portable manual rule until block/stdin input is separately implemented.
+
+## Markdown Table Alignment
+
+Every Markdown table this skill writes - inside a durable manifest or into chat - must obey the workspace pipe-alignment rule, carried here so the rule stays portable after global installation:
+
+- **All Markdown tables must be visually pipe-aligned.** Cap every cell at 80 characters, including any overflow marker. If a cell's full content would exceed 80 characters, truncate it at the nearest word boundary within the cap, append a pointer such as `-> see note [row-id]` (using that row's own identifier - its `#`, `Phase`, name, or whichever column already identifies the row), and place the full original text as a plain note directly below the table, keyed by that same identifier. Pad columns so the table is aligned in a monospaced raw-text or Markdown view. Rendered visual alignment is authoritative; raw `|` indices are diagnostic only because Unicode display width (for example emoji, arrows, or wide glyphs) can differ from raw character counts. Do not flag or rework a table solely because raw pipe indices differ when the rendered table is visually aligned. Visibly uneven columns, malformed separators, or cells above 80 characters still fail. This applies to every table an agent writes, not only Estimated Effort tables. **Prefer ASCII-only characters (`->`, `--`, `...`) inside table cells**; Unicode glyphs (arrows, em/en dashes, ellipsis) render wider than one column in most viewers and silently break pipe alignment even when raw character counts match. When a table exceeds approximately 120 characters in total width, narrow the columns (truncate cells to essentials and move detail to notes) so the table renders on a single line without word-wrapping.
+
+**Validation check:** before handoff, review every table produced this run and confirm visual pipe alignment, the 80-character cell cap with overflow pointers, ASCII-only glyphs inside cells, and single-line rendering for wide tables. Misaligned tables are corrected before delivery.
+
+## Exact Model Attribution
+
+Whenever this skill writes a new model identity, appends a current-run model value, or defines a workflow that does either:
+
+- Record the full model identity actually used when it is safely available from current runtime or session metadata. Use a specific identity such as `GPT-5.6 Sol`, `GPT-5.6 Terra`, or `Claude Opus 5`; a family-only label such as `GPT-5`, `Claude`, or `Codex Agent` is not an acceptable substitute.
+- Resolve identity in this order: current runtime or session metadata; a platform-provided current-model field; only then, when unavoidable, a field-minimized configuration lookup that returns the model field alone. Apply `tread-lightly` to any potentially sensitive configuration and never display, copy, search, diff, or log the whole configuration.
+- Keep the agent family and model identity separate. Never infer an exact model from an agent label, provider name, stale configuration, or model family.
+- Use `Not recorded` only when the exact identity genuinely cannot be established safely. Do not replace an available exact identity with `Not recorded` merely to avoid checking current runtime metadata.
+- Preserve append-only history. Never rewrite a historical provenance or change-log value solely to improve an old model label; add a truthful current correction entry when correction is required.
+
+**Validation check:** For every model value newly written in the current run, accept a full exact identity and the honest `Not recorded` fallback, but reject known ambiguous family-only labels or agent-family substitutions. Confirm model discovery exposed only the required model field and that no historical row was rewritten.
+
 ## Validation
+
+- confirm the `## Markdown Table Alignment` section and its validation check are present, and that every table this skill wrote is visually pipe-aligned with cells at 80 characters or fewer and ASCII-only glyphs inside cells;
+
+- confirm the `## Checklist Tick Discipline` section is present and its rule text is unmodified;
+- confirm the `## No Invented Sync Constraints` section is present, and that a produced artifact contains **no** invented sync constraint in its DEFINITION OF DONE, Verification Checklist, CONSTRAINTS, or FAILURE sections;
+- confirm a newly produced artifact actually carries the Checklist Tick Discipline rule verbatim, since the section can survive in this skill while the template silently loses it;
+- confirm the `## Non-Blocking Wiki And Git Items` section is present with its carve-out, and that a produced artifact contains **no** wiki-sync, push, `stage-commit-push`, or pointer-bump completion criterion;
+- confirm a newly produced artifact carries a `## Feedback Section` immediately above its `## Agent Change Log`, present even when empty, using the numbered `### Feedback N` grammar;
 
 After creating or updating a plan:
 
 - confirm the file exists
 - confirm the filename starts with the correct `N.) ` numeric prefix when a durable plan file was created
 - confirm the filename ends in `_active.md`, or `_mini_active.md` when the user explicitly requested a mini plan
-- confirm a `## Prompt Contract` section exists (GOAL / CONSTRAINTS / FORMAT / DEFINITION OF DONE / FAILURE, or the minimal GOAL + DEFINITION OF DONE + FAILURE form for Compact and mini plans), that it was shown in chat, and that it was authored through the `prompt-contracts` skill unless that skill was unavailable
+- confirm a `## Prompt Contract` section exists (GOAL / CONSTRAINTS / FORMAT / DEFINITION OF DONE / FAILURE, or the minimal GOAL + DEFINITION OF DONE + FAILURE form for Compact and mini plans), that it is embedded verbatim in the artifact, and that it was authored through the `prompt-contracts` skill unless that skill was unavailable; confirm it was pasted into chat only if the user opted in
 - confirm every plan at every depth and output mode contains Markdown task and verification checklists
 - for Standard and Deep plans, confirm every implementation phase has a Goal, Tasks checklist, Verification checklist, and status
 - for Compact and mini plans, confirm both the action Checklist and Verification section contain checkboxes

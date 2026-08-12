@@ -104,15 +104,19 @@ python -X utf8 "<skill-dir>/scripts/pdf_this.py" FORM.pdf --to form --values val
 
 Use `--output`, `--title`, `--artifact-kind`, `--status`, `--page-size`, and `--force` when authorized. The helper refuses collisions by default.
 
-Every normal `--to pdf` creation requires canonical Agent Provenance. Markdown or HTML may carry exactly one native canonical table directly. Text, CSV, or JSON without that table must provide a UTF-8 ordered JSON object through `--provenance-json`; its first four entries must be `Content owner`, `Original writing agent`, `Created`, and `Artifact role`. Reject multiple native provenance sections or tables and reject `--provenance-json` when native canonical provenance is already present, so the complete artifact contains exactly one canonical provenance table. Use `--provenance-exempt-reason` only for an identified operational, schema-sensitive, third-party, or otherwise excluded input. The reason is an explicit source-preservation exception, not a general bypass.
+Every normal `--to pdf` creation requires canonical Agent Provenance. Markdown or HTML may carry exactly one native canonical table directly. Text, CSV, or JSON without that table must provide a UTF-8 ordered JSON object through `--provenance-json`; its first five entries must be `Content owner`, `Original writing agent`, `Original writing LLM`, `Created`, and `Artifact role`. Reject multiple native provenance sections or tables and reject `--provenance-json` when native canonical provenance is already present, so the complete artifact contains exactly one canonical provenance table. Use `--provenance-exempt-reason` only for an identified operational, schema-sensitive, third-party, or otherwise excluded input. The reason is an explicit source-preservation exception, not a general bypass.
 
 Prefer the host document runtime. Semantic generation and forms require `reportlab` and `pypdf`; richer extraction may use `pdfplumber`; visual checks require Poppler; faithful HTML conversion requires a supported browser. Do not install dependencies silently.
 
 ## Agent Provenance For Durable Artifacts
 
-For a new standalone PDF artifact, visibly render the standard `Agent Provenance` fields near the top and an append-only `Agent Change Log` near the bottom. Preserve both in the embedded native source.
+For a new standalone PDF artifact, visibly render the standard `Agent Provenance` fields immediately after the artifact's opening block — its title, status, and lifecycle lines — and an append-only `Agent Change Log` as the last section, or immediately above any section the artifact already reserves for the last position. Preserve both in the embedded native source.
 
-The visible provenance block must be a compact professional two-column `Field | Value` table containing exactly one non-empty canonical row, in this order, for `Content owner`, `Original writing agent`, `Created`, and `Artifact role`. Semantic generation uses stable 34/66 percent column widths, readable typography, wrapped long values, a repeated header row, and safe page splitting without clipping. Reject missing provenance, duplicate or empty canonical rows, aliases such as `Original writer`, and incorrect canonical row order. Separately labelled conversion or rendition history may follow the four canonical rows without replacing original authorship. Faithful HTML-to-PDF conversion preserves the source HTML provenance table through browser printing instead of rebuilding it.
+The visible provenance block must be a compact professional two-column `Field | Value` table containing exactly one non-empty canonical row, in this order, for `Content owner`, `Original writing agent`, `Original writing LLM`, `Created`, and `Artifact role`. Semantic generation uses stable 34/66 percent column widths, readable typography, wrapped long values, a repeated header row, and safe page splitting without clipping. Reject missing provenance, duplicate or empty canonical rows, aliases such as `Original writer` or `Original writing model`, and incorrect canonical row order. Separately labelled conversion or rendition history may follow the five canonical rows without replacing original authorship.
+
+`Original writing LLM` names the model that produced the artifact, distinct from the agent family that performed the write. When the model is genuinely unknown, write `Not recorded` rather than inferring it from the agent label, and never backfill it into an existing artifact.
+
+The `Agent Change Log` carries five columns in this order: `Date and Time`, `Agent`, `Model`, `Action`, `Scope`. Timestamps use `YYYY-MM-DD-HH:mm:ss` on a 24-hour clock, read from the system clock and never estimated. Historical date-only rows are left exactly as written and never backfilled. Faithful HTML-to-PDF conversion preserves the source HTML provenance table through browser printing instead of rebuilding it.
 
 For conversion of an existing artifact:
 
@@ -124,6 +128,18 @@ For conversion of an existing artifact:
 
 When an artifact producer and this format skill are co-invoked in one turn by one agent, record that executing agent once as the original writer; skill co-invocation does not manufacture a second author. Never inject provenance into operational or schema-sensitive files merely because they are durable.
 
+## Exact Model Attribution
+
+Whenever this skill writes a new model identity, appends a current-run model value, or defines a workflow that does either:
+
+- Record the full model identity actually used when it is safely available from current runtime or session metadata. Use a specific identity such as `GPT-5.6 Sol`, `GPT-5.6 Terra`, or `Claude Opus 5`; a family-only label such as `GPT-5`, `Claude`, or `Codex Agent` is not an acceptable substitute.
+- Resolve identity in this order: current runtime or session metadata; a platform-provided current-model field; only then, when unavoidable, a field-minimized configuration lookup that returns the model field alone. Apply `tread-lightly` to any potentially sensitive configuration and never display, copy, search, diff, or log the whole configuration.
+- Keep the agent family and model identity separate. Never infer an exact model from an agent label, provider name, stale configuration, or model family.
+- Use `Not recorded` only when the exact identity genuinely cannot be established safely. Do not replace an available exact identity with `Not recorded` merely to avoid checking current runtime metadata.
+- Preserve append-only history. Never rewrite a historical provenance or change-log value solely to improve an old model label; add a truthful current correction entry when correction is required.
+
+**Validation check:** For every model value newly written in the current run, accept a full exact identity and the honest `Not recorded` fallback, but reject known ambiguous family-only labels or agent-family substitutions. Confirm model discovery exposed only the required model field and that no historical row was rewritten.
+
 ## PDF Verification
 
 Do not deliver until every applicable check passes:
@@ -131,7 +147,8 @@ Do not deliver until every applicable check passes:
 1. Confirm the file exists, is non-empty, reopens, and has the expected page count and page size.
 2. Confirm readable metadata and selectable/searchable text when expected.
 3. Confirm the exact embedded source exists and round-trips when this skill created the artifact from a semantic source.
-4. Confirm semantic Agent Provenance contains the four canonical facts in the professional two-column table, with wrapped values and no clipping or damaging split; confirm browser export preserves the HTML table unchanged.
+4. Confirm semantic Agent Provenance contains the five canonical facts in order, including `Original writing LLM`, in the professional two-column table, with wrapped values and no clipping or damaging split; confirm browser export preserves the HTML table unchanged.
+4b. Confirm any `Agent Change Log` present in the source carries the five columns `Date and Time`, `Agent`, `Model`, `Action`, `Scope`, and that no historical date-only row was rewritten.
 5. Render every page for short PDFs and representative pages for long PDFs; inspect clipping, overlap, blank charts, missing tables or sources, broken glyphs, margins, headers, footers, numbering, and transitions. For semantic Markdown, confirm a leading H1 that matches the document title does not duplicate the first-page title, while a different H1 remains visible.
 6. For report exports, reject app-only controls and leaked runtime details such as share/edit/refresh/publish controls, drag handles, manifest/package paths, validator state, widget labels, or local temporary paths.
 7. For forms, perform the logical field-tree and widget checks required by Mode H; visual rendering alone is insufficient.

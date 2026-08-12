@@ -62,12 +62,41 @@ HTML_PACKET_ID = "html-this-source"
 CANONICAL_PROVENANCE_FIELDS = (
     "Content owner",
     "Original writing agent",
+    "Original writing LLM",
     "Created",
     "Artifact role",
 )
+AMBIGUOUS_MODEL_IDENTITIES = {
+    "chatgpt",
+    "claude",
+    "codex",
+    "gemini",
+    "gpt",
+}
+GPT_FAMILY_ONLY_RE = re.compile(r"^gpt[- ]?5(?:\.\d+)?$", re.I)
 
 
-def validate_provenance_rows(headers: list[str], rows: list[list[str]]) -> None:
+def validate_exact_model_identity(value: str) -> None:
+    """Reject known family-only or agent-family substitutions on new writes."""
+    model = value.strip()
+    folded = model.casefold()
+    if folded == "not recorded":
+        return
+    if (
+        not model
+        or folded in AMBIGUOUS_MODEL_IDENTITIES
+        or GPT_FAMILY_ONLY_RE.fullmatch(model)
+        or folded.endswith(" agent")
+    ):
+        raise ValueError(
+            "Model identity must be a full exact model name or the honest "
+            "Not recorded fallback; family-only and agent-family labels are invalid"
+        )
+
+
+def validate_provenance_rows(
+    headers: list[str], rows: list[list[str]], *, enforce_exact_model: bool = False
+) -> None:
     """Require exactly one ordered, non-empty row per canonical fact."""
     if [cell.casefold() for cell in headers] != ["field", "value"]:
         raise ValueError("Agent Provenance must use a two-column Field | Value table")
@@ -79,11 +108,13 @@ def validate_provenance_rows(headers: list[str], rows: list[list[str]]) -> None:
             raise ValueError("Agent Provenance rows require non-empty Field and Value cells")
         normalized.append(row[0].strip().casefold())
     expected = [field.casefold() for field in CANONICAL_PROVENANCE_FIELDS]
-    if normalized[:4] != expected:
+    if normalized[: len(expected)] != expected:
         raise ValueError("Agent Provenance canonical rows must use the required identity and order")
     for field in expected:
         if normalized.count(field) != 1:
             raise ValueError("Agent Provenance canonical rows must appear exactly once")
+    if enforce_exact_model:
+        validate_exact_model_identity(rows[2][1])
 
 
 def markdown_provenance_rows(source: str) -> list[list[str]] | None:
@@ -119,7 +150,7 @@ def load_structured_provenance(path: Path | None) -> list[list[str]] | None:
     if not isinstance(payload, dict):
         raise ValueError("Structured provenance JSON must be one Field-to-Value object")
     rows = [[str(key), str(value)] for key, value in payload.items()]
-    validate_provenance_rows(["Field", "Value"], rows)
+    validate_provenance_rows(["Field", "Value"], rows, enforce_exact_model=True)
     return rows
 
 

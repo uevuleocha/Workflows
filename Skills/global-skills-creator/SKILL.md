@@ -235,9 +235,28 @@ Ecosystem consistency reminder: every folder-style skill must include `agents/op
 
 ### Required Portable Markdown Table Alignment
 
-Every newly created skill must carry a `## Markdown Table Alignment` section in its own `SKILL.md` with the complete rule below, plus a validation item that checks the rule remains present:
+**Every skill, new or existing, that writes Markdown tables — whether into a durable artifact or into its own chat output — must carry a `## Markdown Table Alignment` section in its own `SKILL.md` with the complete rule below, plus a validation item that checks the rule remains present.** A skill that writes no Markdown tables anywhere is exempt; do not add the section to it as boilerplate.
+
+When the new or updated skill creates or materially edits a file containing Markdown tables, it must also carry `## Deterministic Markdown Table Aligner Integration`, declare `markdown-table-aligner` as a dependency, and place the helper call at the real file-ownership boundary. Record chat-only, pure-serializer, delegated-writer, and helper-owned schema cases as exemptions instead of adding redundant calls.
+
+The discriminator is table authorship, not artifact creation. A misaligned table in a chat briefing is exactly as broken as one inside a durable file, so a chat-only skill that emits tables is in scope, while an artifact-creating skill that never emits a table is not. When in doubt about whether a skill will ever write a table, include the section.
+
+**Carrying the section is conditional; obeying the rule is not.** Every skill obeys pipe alignment in every table it writes — new or existing, being authored or being updated, whether or not it carries the section. There is no grandfather clause for older skills.
+
+The rule to carry:
 
 - **All Markdown tables must be visually pipe-aligned.** Cap every cell at 80 characters, including any overflow marker. If a cell's full content would exceed 80 characters, truncate it at the nearest word boundary within the cap, append a pointer such as `→ see note [row-id]` (using that row's own identifier — its `#`, `Phase`, name, or whichever column already identifies the row), and place the full original text as a plain note directly below the table, keyed by that same identifier. Pad columns so the table is aligned in a monospaced raw-text or Markdown view. Rendered visual alignment is authoritative; raw `|` indices are diagnostic only because Unicode display width (for example emoji, arrows, or wide glyphs) can differ from raw character counts. Do not flag or rework a table solely because raw pipe indices differ when the rendered table is visually aligned. Visibly uneven columns, malformed separators, or cells above 80 characters still fail. This applies to every table an agent writes, not only Estimated Effort tables. **Prefer ASCII-only characters (`->`, `--`, `...`) inside table cells**; Unicode glyphs (arrows, em/en dashes, ellipsis) render wider than one column in most viewers and silently break pipe alignment even when raw character counts match. When a table exceeds approximately 120 characters in total width, narrow the columns (truncate cells to essentials and move detail to notes) so the table renders on a single line without word-wrapping.
+
+### Required Durable-Artifact Provenance
+
+**Every skill, new or existing, that creates first-party durable artifacts must make those artifacts carry agent provenance and an append-only agent change log**, plus a validation item confirming both remain present.
+
+- **Agent Provenance sits immediately after the opening block** — below the opening title, status, and lifecycle lines most artifacts begin with. Use the canonical two-column `Field | Value` table with exactly these rows, in this order: `Content owner`, `Original writing agent`, `Original writing LLM`, `Created`, `Artifact role`. Keep the `Content owner` field and record the original writing agent truthfully.
+- **`Original writing LLM` is the model, not the agent.** `Claude Agent` is the agent family; `Claude Opus 5` is the LLM. They occupy separate rows and neither substitutes for the other. Use `Not recorded` when the model is genuinely unknown, never infer it from the agent label, and never backfill it into an existing artifact.
+- **The Agent Change Log is the last section** — except where a skill already reserves the last position for something else, such as encoded machine state or a required trailer, in which case the change log goes immediately above that reserved section rather than displacing it. Render it as a five-column `Date and Time | Agent | Model | Action | Scope` table.
+- **Change-log timestamps are read, never estimated.** Use `YYYY-MM-DD-HH:mm:ss` on a 24-hour clock, obtained from the machine clock at write time. Leave historical date-only rows exactly as written; a log carrying both shapes is correct, and the boundary between them is itself information.
+- **A `Feedback Section` sits immediately above the change log** in any artifact that carries a DEFINITION OF DONE, a Verification Checklist, or checkboxes an executing agent later ticks. It is present and empty by default, and carries append-only numbered `### Feedback N - date - agent - descriptor` subsections. It is the cross-agent channel: an orchestrator, a verifier, and an implementer all write there and each reads what the others left, without sharing a session or a platform.
+- **A skill that creates no first-party durable artifacts is exempt.** Never inject provenance into product source code, third-party files, databases, generated caches, skill definitions, schema-sensitive or machine-consumed files, or other operational files unless their schema explicitly supports it.
 
 Always validate folder-style skills with the `quick_validate.py` script that ships with your skill-creator install, running Python in UTF-8 mode (`-X utf8`).
 
@@ -250,7 +269,7 @@ Run this validator for:
 - Hermes global folder (under `Personal/`)
 - zCode global folder
 
-Before sync, also inspect the new local-master `SKILL.md` and confirm its Markdown Table Alignment section and corresponding validation item are present. Missing portable alignment governance is a validation failure even when `quick_validate.py` passes.
+Before sync, also inspect the local-master `SKILL.md` — new or existing — and determine whether the skill writes Markdown tables anywhere, in a durable artifact or in its own chat output. If it does, confirm its Markdown Table Alignment section and corresponding validation item are present. If it owns a file-based Markdown-table write or material edit, also confirm the deterministic-aligner integration and dependency declaration are present at the real ownership boundary. Missing applicable governance is a validation failure even when `quick_validate.py` passes. Record non-table and delegated/exempt cases explicitly.
 
 When `global-sync` performs the sync, it runs this validation for every target; this list governs the inline fallback.
 
@@ -260,12 +279,12 @@ When `global-sync` performs the sync, it runs this validation for every target; 
 
 The validator terminates its output with a platform-specific line ending — on Windows, `Skill is valid!\r\n`. A string comparison against `"Skill is valid!"` fails on a perfectly valid skill because of the trailing `\r`.
 
-| Exit  | stderr     | Meaning                          | Action                                     |
-|-------|------------|----------------------------------|--------------------------------------------|
-| `0`   | —          | Skill is valid                   | Proceed.                                   |
-| `1`   | empty      | Skill is invalid                 | stdout explains why. Fix the skill, rerun. |
-| `1`   | non-empty  | Validator / runtime failure      | Stop. Validity is unknown. Do not "fix".   |
-| other | —          | Validation did not complete      | Stop. Claim neither pass nor fail.         |
+| Exit  | stderr    | Meaning                     | Action                                     |
+| ----- | --------- | --------------------------- | ------------------------------------------ |
+| `0`   | —         | Skill is valid              | Proceed.                                   |
+| `1`   | empty     | Skill is invalid            | stdout explains why. Fix the skill, rerun. |
+| `1`   | non-empty | Validator / runtime failure | Stop. Validity is unknown. Do not "fix".   |
+| other | —         | Validation did not complete | Stop. Claim neither pass nor fail.         |
 
 Exit `1` is **overloaded**: an invalid skill and a crash inside the validator produce the same code. **Non-empty stderr is the discriminator.** An invalid skill writes its reason to stdout and leaves stderr empty; a crashed validator writes its traceback to stderr and leaves stdout empty.
 
@@ -321,3 +340,55 @@ After creating or updating a skill, report:
 - validations run and results
 - replacement directories supplied by the user, or `none`
 - manual UI checks still needed, if any
+
+## Checklist Tick Discipline
+
+**Checklist Tick Discipline.** The executing agent ticks every DEFINITION OF DONE and Verification Checklist box its own evidence supports, in the same pass, and states the evidence for each. Leave a box unticked only when the claim is false, unevidenced, or ambiguous — and say which and why. An unticked box means "not done," never "done but awaiting someone else's confirmation." Independent verification re-checks the ticks; it does not supply them. A tick asserts what this pass did and evidenced; it does not assert that the result is proven correct in later production use.
+
+## No Invented Sync Constraints
+
+**No Invented Sync Constraints.** Do not write "local master only," "no global sync in this pass," or any equivalent prohibition into a DEFINITION OF DONE item, Verification Checklist item, CONSTRAINT, FAILURE condition, or instruction unless the user asked for it. Sync authority belongs to the user and is granted at execution time, not predicted at authoring time. When the user later authorizes same-pass sync, an invented constraint turns a correct action into a permanently false checklist item that must be waived. If sequencing genuinely matters, express it as a default the user can override — "stop at the verified local master unless the user authorizes same-pass sync" — never as a completion criterion or failure condition.
+
+This rule binds the authoring agent; it is **never** emitted as artifact text. Its presence is verified by the absence of invented sync constraints in produced artifacts, not by a section in them. It does not authorize syncing and does not change what counts as authorization.
+
+## Non-Blocking Wiki And Git Items
+
+**Non-Blocking Wiki And Git Items.** Do not write a wiki sync, a `stage-commit-push` run, a GitHub push, or a submodule pointer bump into a DEFINITION OF DONE item, Verification Checklist item, CONSTRAINT, or FAILURE condition as a completion criterion. Those operations belong **after** the artifact is finalized: finalization renames and moves the artifact, so syncing first dirties the repository again and leaves the wiki holding a synthesised copy of a path that no longer exists. If such an operation is genuinely worth recording, record it as an explicitly non-blocking follow-up — "after finalization, run `stage-commit-push`" — never as a box whose blank state blocks closure. A finalizer must never refuse or defer closure because a sync, push, or pointer bump has not happened.
+
+**The carve-out.** This does not apply to an artifact **whose subject is** the wiki or Git work. A plan to build `wiki-sync` legitimately carries wiki items in its DEFINITION OF DONE, because there the wiki work *is* the deliverable rather than a publication step for it. The rule targets publication steps, not subject matter. Never strip a legitimate item from an artifact that is correct as written.
+
+Like rule 2, this binds the authoring agent and is never emitted as artifact text.
+
+## Deterministic Markdown Table Aligner Integration
+
+When this skill creates or materially edits a file containing Markdown tables, it must invoke the `markdown-table-aligner` skill after semantic content is complete and before final handoff or Markdown-to-HTML/PDF serialization. It must also require every future skill that owns file-based Markdown tables to carry this integration and the portable rule.
+
+Use the aligner's read-only `check` first. Treat exit `0` as authoritative deterministic monospaced Unicode alignment. For safe padding-only findings, run `format` to a distinct nonexistent staged path, review the diff, adopt it, and rerun `check`. Resolve overflow, malformed, or ambiguous findings manually; stop on operational failure. Confirm the dependency is available before the final write, and never silently replace it with raw character counting. The portable rule below remains compulsory.
+
+## Markdown Table Alignment
+
+Every Markdown table this skill writes - inside a durable manifest or into chat - must obey the workspace pipe-alignment rule, carried here so the rule stays portable after global installation:
+
+- **All Markdown tables must be visually pipe-aligned.** Cap every cell at 80 characters, including any overflow marker. If a cell's full content would exceed 80 characters, truncate it at the nearest word boundary within the cap, append a pointer such as `-> see note [row-id]` (using that row's own identifier - its `#`, `Phase`, name, or whichever column already identifies the row), and place the full original text as a plain note directly below the table, keyed by that same identifier. Pad columns so the table is aligned in a monospaced raw-text or Markdown view. Rendered visual alignment is authoritative; raw `|` indices are diagnostic only because Unicode display width (for example emoji, arrows, or wide glyphs) can differ from raw character counts. Do not flag or rework a table solely because raw pipe indices differ when the rendered table is visually aligned. Visibly uneven columns, malformed separators, or cells above 80 characters still fail. This applies to every table an agent writes, not only Estimated Effort tables. **Prefer ASCII-only characters (`->`, `--`, `...`) inside table cells**; Unicode glyphs (arrows, em/en dashes, ellipsis) render wider than one column in most viewers and silently break pipe alignment even when raw character counts match. When a table exceeds approximately 120 characters in total width, narrow the columns (truncate cells to essentials and move detail to notes) so the table renders on a single line without word-wrapping.
+
+**Validation check:** before handoff, review every table produced this run and confirm visual pipe alignment, the 80-character cell cap with overflow pointers, ASCII-only glyphs inside cells, and single-line rendering for wide tables. Misaligned tables are corrected before delivery.
+
+## Exact Model Attribution
+
+Whenever this skill writes a new model identity, appends a current-run model value, or defines a workflow that does either:
+
+- Record the full model identity actually used when it is safely available from current runtime or session metadata. Use a specific identity such as `GPT-5.6 Sol`, `GPT-5.6 Terra`, or `Claude Opus 5`; a family-only label such as `GPT-5`, `Claude`, or `Codex Agent` is not an acceptable substitute.
+- Resolve identity in this order: current runtime or session metadata; a platform-provided current-model field; only then, when unavoidable, a field-minimized configuration lookup that returns the model field alone. Apply `tread-lightly` to any potentially sensitive configuration and never display, copy, search, diff, or log the whole configuration.
+- Keep the agent family and model identity separate. Never infer an exact model from an agent label, provider name, stale configuration, or model family.
+- Use `Not recorded` only when the exact identity genuinely cannot be established safely. Do not replace an available exact identity with `Not recorded` merely to avoid checking current runtime metadata.
+- Preserve append-only history. Never rewrite a historical provenance or change-log value solely to improve an old model label; add a truthful current correction entry when correction is required.
+
+**Validation check:** For every model value newly written in the current run, accept a full exact identity and the honest `Not recorded` fallback, but reject known ambiguous family-only labels or agent-family substitutions. Confirm model discovery exposed only the required model field and that no historical row was rewritten.
+
+## Validation
+
+- confirm the `## Checklist Tick Discipline` section is present and its rule text is unmodified;
+- confirm the `## No Invented Sync Constraints` section is present, and that a produced artifact contains **no** invented sync constraint in its DEFINITION OF DONE, Verification Checklist, CONSTRAINTS, or FAILURE sections;
+- confirm the `## Non-Blocking Wiki And Git Items` section is present with its carve-out, and that a produced artifact contains **no** wiki-sync, push, `stage-commit-push`, or pointer-bump completion criterion;
+- confirm any newly created artifact-authoring skill requires the five-row Agent Provenance table, the five-column Agent Change Log, and a `## Feedback Section` above it;
+- confirm every newly created or updated model-writing skill is classified as direct, delegated, or exempt; direct and delegated carriers must include the canonical `## Exact Model Attribution` block verbatim and its validation check;- confirm the `## Markdown Table Alignment` section and its validation check are present, and that every table this skill wrote is visually pipe-aligned with cells at 80 characters or fewer and ASCII-only glyphs inside cells;

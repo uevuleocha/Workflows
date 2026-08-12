@@ -1,11 +1,11 @@
 ---
 name: stage-commit-push
-description: Deterministic, explicitly invoked stage/commit/push workflow with scoped staging, remote safety gates, and optional user-approved pointer-only synchronization when the current repository is a parent hub submodule.
+description: Deterministic, explicitly invoked stage/commit/push workflow with scoped staging, remote safety gates, and automatic loud hub pointer synchronization when the current repository is a parent hub submodule.
 ---
 
 # Stage Commit Push
 
-Stage, commit, and push one repository deterministically. When the repository is a submodule of an ancestor hub, optionally synchronize only its gitlink in a separate, user-approved hub commit after proving the nested commit is pushed.
+Stage, commit, and push one repository deterministically. When the repository is a submodule of an ancestor hub, automatically synchronize its gitlink in a separate hub commit loudly after proving the nested commit is pushed (unless the user explicitly opts out).
 
 ## Invocation
 
@@ -53,13 +53,14 @@ Pointer synchronization is a second repository operation, never an implicit exte
 
 ### User gate
 
-Before any hub staging or commit, obtain explicit approval unless the user already opted into hub pointer synchronization for this run. The initial stage/commit/push invocation authorizes the nested repository only; it does not silently authorize a hub commit.
+Hub pointer synchronization is **ON by default** for nested repositories. Unless the user explicitly opts out during invocation (e.g., "no hub sync", "do not sync hub pointer", "nested only"), automatically proceed with hub pointer synchronization after nested push pre-flight/verification succeeds and eligibility gates pass. If the user explicitly opts out, skip hub pointer synchronization and report status as `declined by user`.
 
 ### Eligibility gates
 
 Proceed only if all are true:
 
 - the nested `HEAD` was proved pushed to its upstream;
+- the user did not explicitly opt out of hub pointer synchronization;
 - the hub still tracks the exact named path as mode `160000`;
 - the hub worktree's submodule path resolves to the just-pushed nested repository;
 - `git status --porcelain=v2 -z` and a direct nested status check prove the nested worktree has no lowercase-`m` uncommitted-content condition;
@@ -93,7 +94,7 @@ Never use `git add -A` or `git add .` for pointer synchronization. Never stage a
 
 ## Reporting
 
-Report the two repositories separately:
+Always report both repositories loudly and explicitly in the output log and final response:
 
 ```text
 Nested repository:
@@ -102,21 +103,29 @@ Nested repository:
 - Commit: <sha> — <subject>
 - Pushed/proved at: <upstream>
 
-Hub pointer synchronization:
-- Status: <not applicable | declined | blocked | committed and pushed>
+Hub pointer synchronization (ALWAYS REPORT LOUDLY):
+- Status: <committed and pushed | declined by user | blocked | not applicable>
 - Hub: <path>
 - Pointer path: <path>
 - Pointer commit: <sha or N/A>
 - Verified remote gitlink: <sha or N/A>
 ```
 
+## Markdown Table Alignment
+
+- **All Markdown tables must be visually pipe-aligned.** Cap every cell at 80 characters, including any overflow marker. If a cell's full content would exceed 80 characters, truncate it at the nearest word boundary within the cap, append a pointer such as `→ see note [row-id]` (using that row's own identifier — its `#`, `Phase`, name, or whichever column already identifies the row), and place the full original text as a plain note directly below the table, keyed by that same identifier. Pad columns so the table is aligned in a monospaced raw-text or Markdown view. Rendered visual alignment is authoritative; raw `|` indices are diagnostic only because Unicode display width (for example emoji, arrows, or wide glyphs) can differ from raw character counts. Do not flag or rework a table solely because raw pipe indices differ when the rendered table is visually aligned. Visibly uneven columns, malformed separators, or cells above 80 characters still fail. This applies to every table an agent writes, not only Estimated Effort tables. **Prefer ASCII-only characters (`->`, `--`, `...`) inside table cells**; Unicode glyphs (arrows, em/en dashes, ellipsis) render wider than one column in most viewers and silently break pipe alignment even when raw character counts match. When a table exceeds approximately 120 characters in total width, narrow the columns (truncate cells to essentials and move detail to notes) so the table renders on a single line without word-wrapping.
+
 ## Validation
 
 - Confirm the nested staged list matched scope and the commit carried the correct executing-platform trailer.
 - Confirm the nested commit is reachable from the upstream before hub mutation.
+- Confirm auto hub pointer synchronization defaults to ON unless explicitly opted out by the user.
+- Confirm hub pointer synchronization status is always reported loudly.
 - Confirm the hub commit, when made, changes exactly one `160000` gitlink.
 - Confirm scoped mode never stages an unnamed pointer.
 - Confirm lowercase `m` blocks pointer synchronization.
 - Confirm remote-ahead, diverged, pre-existing-commit, and unrelated-staged-change gates were respected independently in both repositories.
+- Confirm the portable Markdown Table Alignment section remains present.
 
 When updating this skill, run the folder-style skill validator with Python UTF-8 mode and test two-repository behavior only in disposable repositories.
+s.

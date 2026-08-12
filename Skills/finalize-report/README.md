@@ -11,6 +11,11 @@ It verifies completion evidence, changes the dismissible footer to `REPORTED ✅
 
 The terminal state never splits into sent versus read. Revisions and reopening belong exclusively to `report-this`.
 
+When a report is finalized, its send-ready staged copy (created by `report-this` under `tmp\<subject>-reports-send-ready\`) is deleted, and the staging folder is removed once it empties.
+
 ## Optional artifact formats
 
 Pairs with `html-this` and `pdf-this` so every existing format sibling is finalized together without changing the owning lifecycle gate.
+## Deterministic table dependency
+
+Adopt `markdown-table-aligner` with this skill. It supplies the deterministic final padding pass for file-based Markdown tables; the portable rule remains the content and fallback contract.

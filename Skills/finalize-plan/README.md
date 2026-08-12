@@ -23,3 +23,6 @@ Read this README and SKILL.md. This skill pairs with `plan-this` and understands
 ## Optional artifact formats
 
 Pairs with `html-this` and `pdf-this` so every existing format sibling is finalized together without changing the owning lifecycle gate.
+## Deterministic table dependency
+
+Adopt `markdown-table-aligner` with this skill. It supplies the deterministic final padding pass for file-based Markdown tables; the portable rule remains the content and fallback contract.

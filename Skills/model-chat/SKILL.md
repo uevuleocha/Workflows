@@ -55,15 +55,15 @@ Every participant receives the **entire prior conversation** each round, so inpu
 
 ## Configuration
 
-| Parameter | Default | Description |
-|-----------|---------|-------------|
-| `topic` | required | Topic or problem to debate (positional argument) |
-| `--agents` | `5` | Number of participants; min `2`, max `8` |
-| `--rounds` | `5` | Number of debate rounds; min `1`, max `10` |
-| `--interactive` | off | Prompt for optional moderator input between rounds |
-| `--model` | `claude-sonnet-4-6` | Anthropic model id; also via `MODEL_CHAT_MODEL` env var |
-| `--output-dir` | `tmp\model-chat` | Base output directory relative to the working directory; also via `MODEL_CHAT_OUTPUT_DIR` env var |
-| `--check-setup` | off | Verify dependencies and key presence with no API call, then exit |
+| Parameter       | Default             | Description                                                      |
+| --------------- | ------------------- | ---------------------------------------------------------------- |
+| `topic`         | required            | Topic or problem to debate (positional argument)                 |
+| `--agents`      | `5`                 | Number of participants; min `2`, max `8`                         |
+| `--rounds`      | `5`                 | Number of debate rounds; min `1`, max `10`                       |
+| `--interactive` | off                 | Prompt for optional moderator input between rounds               |
+| `--model`       | `claude-sonnet-4-6` | Anthropic model id; `MODEL_CHAT_MODEL` also works                |
+| `--output-dir`  | `tmp\model-chat`    | Relative base output directory                                   |
+| `--check-setup` | off                 | Verify dependencies and key presence with no API call, then exit |
 
 ## Agent Framings
 
@@ -94,10 +94,10 @@ With the default 5 agents, the first five framings participate.
 
 Each run saves to `<output-dir>\<YYYYMMDD-HHMMSS>\`:
 
-| File | Description |
-|------|-------------|
-| `conversation.json` | Full structured log: topic, config, model, agents, every round entry, failures, synthesis, completion flag |
-| `synthesis.md` | The final synthesized answer with run metadata |
+| File                | Description                                                 |
+| ------------------- | ----------------------------------------------------------- |
+| `conversation.json` | Structured run log: config, rounds, failures, and synthesis |
+| `synthesis.md`      | The final synthesized answer with run metadata              |
 
 `<output-dir>\latest.json` is a Windows-safe pointer (plain JSON metadata, not a symlink) recording the latest run folder, topic, and timestamp. Previous runs are preserved.
 
@@ -168,10 +168,12 @@ This skill applies the workspace's first-party durable-artifact provenance rule 
 
 For every in-scope artifact:
 
-- place an `## Agent Provenance` section near the top with `Content owner`, `Original writing agent`, `Created`, and `Artifact role`;
+- place an `## Agent Provenance` section immediately after the artifact's opening block -- its title, status, and lifecycle lines -- carrying `Content owner`, `Original writing agent`, `Original writing LLM`, `Created`, and `Artifact role`, in that order;
+- record `Original writing LLM` as the model that produced the artifact, kept distinct from the agent family that performed the write; use `Not recorded` when the model is genuinely unknown, and never infer it from the agent label or backfill it later;
 - use a stable truthful agent-family label such as `Codex Agent`, `Claude Agent`, `Antigravity Agent`, `Hermes Agent`, or `zCode Agent`;
 - keep the original writing-agent entry immutable;
-- keep an append-only `## Agent Change Log` near the bottom, recording the date, acting agent, action, and concise scope for every material edit;
+- keep an append-only `## Agent Change Log` as the last section, or immediately above any section the artifact already reserves for the last position, rendered as a five-column `Date and Time | Agent | Model | Action | Scope` table with one row per material edit;
+- stamp every change-log row `YYYY-MM-DD-HH:mm:ss` on a 24-hour clock, read from the machine clock and never estimated; leave historical date-only rows exactly as written rather than backfilling them, because a log carrying both shapes is correct and the boundary between them is itself information;
 - if a legacy artifact lacks reliable creator evidence, use `Not recorded` rather than guessing, then log the current agent's actual change; and
 - treat copying or global synchronization as transport, not authorship.
 
@@ -183,7 +185,35 @@ This skill owns debate execution, structured conversation state, synthesis conte
 
 If synthesis format siblings exist, treat them as one logical artifact and update them consistently. This section overrides `synthesis.md` examples only for the co-invoked run.
 
+## Deterministic Markdown Table Aligner Integration
+
+When this skill creates or materially edits a file containing Markdown tables, it must invoke the `markdown-table-aligner` skill after semantic content is complete and before final handoff or Markdown-to-HTML/PDF serialization.
+
+Use the aligner's read-only `check` first. Treat exit `0` as authoritative deterministic monospaced Unicode alignment. For safe padding-only findings, run `format` to a distinct nonexistent staged path, review the diff, adopt it, and rerun `check`. Resolve overflow, malformed, or ambiguous findings manually; stop on operational failure. Confirm the dependency is available before the final write, and never silently replace it with raw character counting. The portable rule below remains compulsory.
+
+## Markdown Table Alignment
+
+Every Markdown table this skill writes - inside a durable manifest or into chat - must obey the workspace pipe-alignment rule, carried here so the rule stays portable after global installation:
+
+- **All Markdown tables must be visually pipe-aligned.** Cap every cell at 80 characters, including any overflow marker. If a cell's full content would exceed 80 characters, truncate it at the nearest word boundary within the cap, append a pointer such as `-> see note [row-id]` (using that row's own identifier - its `#`, `Phase`, name, or whichever column already identifies the row), and place the full original text as a plain note directly below the table, keyed by that same identifier. Pad columns so the table is aligned in a monospaced raw-text or Markdown view. Rendered visual alignment is authoritative; raw `|` indices are diagnostic only because Unicode display width (for example emoji, arrows, or wide glyphs) can differ from raw character counts. Do not flag or rework a table solely because raw pipe indices differ when the rendered table is visually aligned. Visibly uneven columns, malformed separators, or cells above 80 characters still fail. This applies to every table an agent writes, not only Estimated Effort tables. **Prefer ASCII-only characters (`->`, `--`, `...`) inside table cells**; Unicode glyphs (arrows, em/en dashes, ellipsis) render wider than one column in most viewers and silently break pipe alignment even when raw character counts match. When a table exceeds approximately 120 characters in total width, narrow the columns (truncate cells to essentials and move detail to notes) so the table renders on a single line without word-wrapping.
+
+**Validation check:** before handoff, review every table produced this run and confirm visual pipe alignment, the 80-character cell cap with overflow pointers, ASCII-only glyphs inside cells, and single-line rendering for wide tables. Misaligned tables are corrected before delivery.
+
+## Exact Model Attribution
+
+Whenever this skill writes a new model identity, appends a current-run model value, or defines a workflow that does either:
+
+- Record the full model identity actually used when it is safely available from current runtime or session metadata. Use a specific identity such as `GPT-5.6 Sol`, `GPT-5.6 Terra`, or `Claude Opus 5`; a family-only label such as `GPT-5`, `Claude`, or `Codex Agent` is not an acceptable substitute.
+- Resolve identity in this order: current runtime or session metadata; a platform-provided current-model field; only then, when unavoidable, a field-minimized configuration lookup that returns the model field alone. Apply `tread-lightly` to any potentially sensitive configuration and never display, copy, search, diff, or log the whole configuration.
+- Keep the agent family and model identity separate. Never infer an exact model from an agent label, provider name, stale configuration, or model family.
+- Use `Not recorded` only when the exact identity genuinely cannot be established safely. Do not replace an available exact identity with `Not recorded` merely to avoid checking current runtime metadata.
+- Preserve append-only history. Never rewrite a historical provenance or change-log value solely to improve an old model label; add a truthful current correction entry when correction is required.
+
+**Validation check:** For every model value newly written in the current run, accept a full exact identity and the honest `Not recorded` fallback, but reject known ambiguous family-only labels or agent-family substitutions. Confirm model discovery exposed only the required model field and that no historical row was rewritten.
+
 ## Validation
+
+- confirm the `## Markdown Table Alignment` section and its validation check are present, and that every table this skill wrote is visually pipe-aligned with cells at 80 characters or fewer and ASCII-only glyphs inside cells;
 
 After creating or updating this skill:
 

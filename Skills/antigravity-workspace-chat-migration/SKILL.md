@@ -79,7 +79,14 @@ $WORKSPACE/Archive/Historical/Manifests/Antigravity/
 ./Archive/Historical/Manifests/Antigravity/
 ```
 
-The platform folder is the chat platform being migrated (`Antigravity`), regardless of which agent performs the work. Every manifest must start with the next sequential `N.) ` prefix based only on the highest existing numbered file in that platform folder. Use the migration grammar `N.) Who + Topic + What`: `N.) <Platform> <Topic> Manifest.json`, Title Case with spaces, where `<Platform>` is the chat platform being migrated; for example, `1.) Antigravity Trading Chats Manifest.json`. When updating or renaming a staged manifest, preserve its sequence number. Do not leave migration manifests unnumbered. One destination project means one manifest.
+Create the manifest through the `manifest-this` skill. `manifest-this` owns the content, the sequential `N.) ` prefix (next integer after the highest existing numbered file in the `Antigravity` platform folder), the migration grammar `N.) Who + Topic + What` -> `N.) <Platform> <Topic> Manifest.md` (Title Case with spaces; for example `1.) Antigravity Trading Chats Manifest.md`), and the always-historical placement under `Archive/Historical/Manifests/Antigravity/`. **The manifest default format for migration skills is Markdown (`.md`), not HTML** - pass the Markdown override to `manifest-this`. The Markdown manifest embeds the exact native JSON payload in a fenced block so the Execution Workflow can recover it. When updating or renaming a staged manifest, preserve its sequence number. Do not leave migration manifests unnumbered. One destination project means one manifest.
+
+**Availability guard (both workflows).** Before the manifest step, confirm the `manifest-this` skill is present in the agent's loaded skills.
+
+- If it is NOT available, pause and tell the user:
+  > The `manifest-this` skill is not loaded. It is required to create or update the migration manifest. Please make it available, or tell me to continue without it.
+- If the user insists on continuing without it, write the manifest by hand in the same folder with the same naming and grammar, then note in your handoff or feedback summary that the dedicated skill was unavailable.
+- Never silently skip the manifest.
 
 ## Front-Door Workflow
 
@@ -98,7 +105,7 @@ Use from inside any agent. Gather inputs, discover the real metadata, build the 
 
 ### Front-Door Output
 
-1. Save (or update in place) a sequentially numbered manifest under `Archive/Historical/Manifests/Antigravity/`.
+1. Create the manifest by explicitly invoking the `manifest-this` skill (Markdown default; see **Manifest Storage**), saved under the active workspace's `Archive/Historical/Manifests/Antigravity/` folder.
 2. Produce the migration handoff summary by explicitly invoking the `session-summary` skill (see **Session Summary Integration**), saved under `Archive/Historical/Summaries/Migration/Antigravity/`. Apply the availability guard if it is not loaded.
 
 ### Front-Door Stop Boundary
@@ -137,7 +144,7 @@ Leave `agyhub_summaries_proto.pb` alone — Antigravity rebuilds it from the con
 
 ### Helper Script
 
-Use `scripts/migrate_antigravity_workspace_chat.py` for deterministic migration. Prefer `--dry-run` first. Requires `blackboxprotobuf` in the Python runtime. Save the manifest under `Archive/Historical/Manifests/Antigravity/`.
+Use `scripts/migrate_antigravity_workspace_chat.py` for deterministic migration. Prefer `--dry-run` first. Requires `blackboxprotobuf` in the Python runtime. The helper consumes the native JSON recovered from the durable manifest into an approved temporary `.json` (see **Durable Artifact Format Handling**); keep the durable Markdown manifest in `Archive/Historical/Manifests/Antigravity/` (see **Manifest Storage**).
 
 Expected manifest shape:
 
@@ -161,9 +168,9 @@ Run modes: `--dry-run` (inspect/report, no writes) and `--apply` (write after ba
 - User reopens Antigravity Desktop and confirms each chat appears under the destination Project, opens/resumes, and stays grouped after startup settles.
 - (Optional) the old/source Project shows the conversations gone; if it is now empty the user may delete it.
 
-### Execution Summary
+### Execution Feedback
 
-After verification passes, produce an execution report by explicitly invoking the `session-summary` skill (see **Session Summary Integration**), scoped to the helper's portion, saved under `Archive/Historical/Summaries/Migration/Antigravity/`.
+After verification passes, produce an execution feedback summary by explicitly invoking the `session-summary` skill (see **Session Summary Integration**), scoped to the helper's portion, saved under `Archive/Historical/Summaries/Migration/Antigravity/`. If the helper updates the manifest (for example marking conversations applied or recording a rollback), do so through the `manifest-this` skill (update mode) so the artifact, its number, and its change log stay consistent.
 
 ### Failure And Rollback
 
@@ -171,7 +178,7 @@ If anything fails before a conversation is fully written, stop and report the fa
 
 ## Agent Provenance For Durable Artifacts
 
-The migration manifest is a first-party durable artifact and must carry schema-safe agent provenance. Native JSON manifests use a top-level `agent_provenance` object containing `content_owner`, `original_writing_agent`, `created`, `artifact_role`, and an append-only `change_log`. Each change-log item records the date, truthful acting agent, action, and concise scope. Preserve the original writer permanently.
+The migration manifest is a first-party durable artifact and must carry schema-safe agent provenance. `manifest-this` renders the visible Agent Provenance table and append-only Agent Change Log in the manifest artifact; the embedded native JSON payload keeps its own top-level `agent_provenance` object containing `content_owner`, `original_writing_agent`, `original_writing_llm`, `created`, `artifact_role`, and an append-only `change_log`. Each change-log item records the clock-read `YYYY-MM-DD-HH:mm:ss` timestamp, truthful acting agent, that agent's `model`, action, and concise scope. Preserve the original writer and the original writing model permanently.
 
 The helper for this skill accepts additional top-level manifest metadata, but never add provenance to application databases, transcripts, caches, registries, backups, or other migrated operational state. If another manifest consumer has a strict schema that rejects the metadata, keep the native execution manifest unchanged and place provenance in an approved human-readable companion instead.
 
@@ -179,9 +186,9 @@ The helper for this skill accepts additional top-level manifest metadata, but ne
 
 ## Durable Artifact Format Handling
 
-This skill owns migration discovery, safety gates, manifest schema, execution, backups, verification, and handoff/report scope. When co-invoked with `html-this` or `pdf-this`, pass the requested format to `session-summary` and create only the requested human-readable handoff/report format.
+This skill owns migration discovery, safety gates, manifest schema, execution, backups, verification, and handoff/feedback scope. When co-invoked with `html-this` or `pdf-this`, pass the requested format to `session-summary` and create only the requested human-readable handoff/feedback format.
 
-The execution manifest remains native JSON by default. If the user explicitly requests an HTML-only or PDF-only manifest, embed the exact JSON through the format skill. Before execution, recover it to an approved temporary `.json`, validate the original manifest schema, and give only that temporary file to the migration helper. Backups, databases, protobufs, and app state always remain in their required native formats. Treat same-stem format variants as one manifest.
+The migration manifest is created through `manifest-this`, whose default format for migration skills is Markdown (`.md`) with the exact native JSON embedded in a fenced block. If the user explicitly requests an HTML-only or PDF-only manifest, `manifest-this` embeds the exact JSON through the format skill. Before execution, recover the JSON to an approved temporary `.json`, validate the original manifest schema, and give only that temporary file to the migration helper; remove it afterward per the workspace temporary-file policy. Backups, databases, protobufs, and app state always remain in their required native formats. Treat same-stem format variants as one manifest.
 
 ## Session Summary Integration
 
@@ -190,7 +197,7 @@ Both workflows close by producing an explicit session summary through the `sessi
 **Availability guard (both workflows).** Before the summary step, confirm the `session-summary` skill is loaded.
 
 - If NOT available, pause and tell the user:
-  > The `session-summary` skill is not loaded. It is required to produce the migration handoff/report summary. Please make it available, or tell me to continue without it.
+  > The `session-summary` skill is not loaded. It is required to produce the migration handoff/feedback summary. Please make it available, or tell me to continue without it.
 - If the user insists, write a plain markdown summary into the same folder with the same naming and note the dedicated skill was unavailable. Never silently skip the summary.
 
 **Save location and naming (both workflows).** Invoke `session-summary` pre-filled:
@@ -198,4 +205,16 @@ Both workflows close by producing an explicit session summary through the `sessi
 - Directory: `<workspace_root>/Archive/Historical/Summaries/Migration/Antigravity/`
 - Filename templates — the migration grammar `N.) Who + Topic + What`. These override the `session-summary` skill's default filename convention: pre-fill the filename so the output uses this exact shape, with no trailing `Summary N` and no `Execution` wording.
   - Handoff, written by the front-door agent: `N.) <Front-Door Agent> <Topic> Handoff.md` — e.g. `1.) Antigravity Trading Chats Handoff.md`
-  - Report, written by the helper agent: `N.) <Helper Agent> <Topic> Report.md` — e.g. `2.) Hermes Trading Chats Report.md`
+  - Feedback, written by the helper agent: `N.) <Helper Agent> <Topic> Feedback.md` — e.g. `2.) Hermes Trading Chats Feedback.md`
+
+## Exact Model Attribution
+
+Whenever this skill writes a new model identity, appends a current-run model value, or defines a workflow that does either:
+
+- Record the full model identity actually used when it is safely available from current runtime or session metadata. Use a specific identity such as `GPT-5.6 Sol`, `GPT-5.6 Terra`, or `Claude Opus 5`; a family-only label such as `GPT-5`, `Claude`, or `Codex Agent` is not an acceptable substitute.
+- Resolve identity in this order: current runtime or session metadata; a platform-provided current-model field; only then, when unavoidable, a field-minimized configuration lookup that returns the model field alone. Apply `tread-lightly` to any potentially sensitive configuration and never display, copy, search, diff, or log the whole configuration.
+- Keep the agent family and model identity separate. Never infer an exact model from an agent label, provider name, stale configuration, or model family.
+- Use `Not recorded` only when the exact identity genuinely cannot be established safely. Do not replace an available exact identity with `Not recorded` merely to avoid checking current runtime metadata.
+- Preserve append-only history. Never rewrite a historical provenance or change-log value solely to improve an old model label; add a truthful current correction entry when correction is required.
+
+**Validation check:** For every model value newly written in the current run, accept a full exact identity and the honest `Not recorded` fallback, but reject known ambiguous family-only labels or agent-family substitutions. Confirm model discovery exposed only the required model field and that no historical row was rewritten.

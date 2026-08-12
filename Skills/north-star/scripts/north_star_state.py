@@ -19,8 +19,18 @@ CHANGE_LOG_SECTION_RE = re.compile(r"(?ms)^## Agent Change Log[ \t]*\n.*?(?=^## 
 NONTERMINAL = {"in_progress", "active", "paused"}
 SAFE_SEGMENT_RE = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
 NUMBERED_ARTIFACT_RE = re.compile(r"^(?P<number>-?\d+)\.\) .+\.md$", re.I)
+AMBIGUOUS_MODEL_IDENTITIES = {"chatgpt", "claude", "codex", "gemini", "gpt"}
+GPT_FAMILY_ONLY_RE = re.compile(r"^gpt[- ]?5(?:\.\d+)?$", re.I)
 
 class NorthStarError(RuntimeError): pass
+
+def validate_exact_model_identity(value):
+    """Reject known family-only or agent-family substitutions on new writes."""
+    model=(value or "").strip(); folded=model.casefold()
+    if folded=="not recorded": return model
+    if not model or folded in AMBIGUOUS_MODEL_IDENTITIES or GPT_FAMILY_ONLY_RE.fullmatch(model) or folded.endswith(" agent"):
+        raise NorthStarError("Model identity must be a full exact model name or the honest Not recorded fallback; family-only and agent-family labels are invalid.")
+    return model
 
 def now_local(): return datetime.now().astimezone().replace(microsecond=0)
 def iso(value): return value.isoformat()
@@ -115,9 +125,21 @@ def normalize_state(state):
         state["definition_of_done_complete"]=state.get("verification_complete",[])
     state.setdefault("definition_of_done_complete",[]); state.setdefault("failure_active",[]); state.setdefault("contract_review",None)
     created_day=str(state.get("started_at",""))[:10] or "Not recorded"
-    state.setdefault("provenance",{"content_owner":"Uzo","original_writing_agent":"Not recorded","created":created_day,"artifact_role":"Durable North Star pursuit record"})
-    state.setdefault("change_log",[{"date":created_day,"agent":state["provenance"].get("original_writing_agent","Not recorded"),"action":"Created the North Star artifact."}])
-    state["schema_version"]=6
+    state.setdefault("provenance",{"content_owner":"Uzo","original_writing_agent":"Not recorded","original_writing_llm":"Not recorded","created":created_day,"artifact_role":"Durable North Star pursuit record"})
+    state["provenance"].setdefault("original_writing_llm","Not recorded")
+    state.setdefault("change_log",[{"date":created_day,"agent":state["provenance"].get("original_writing_agent","Not recorded"),"model":state["provenance"].get("original_writing_llm","Not recorded"),"action":"Created the North Star artifact."}])
+    for entry in state["change_log"]:
+        entry.setdefault("model","Not recorded")
+    state.setdefault("feedback",[])
+    clean_feedback=[]
+    for index,item in enumerate(state.get("feedback",[]),1):
+        if not isinstance(item,dict): raise NorthStarError("Feedback entries must be objects.")
+        row=dict(item); row["number"]=index
+        row.setdefault("date","Not recorded"); row.setdefault("agent","Not recorded"); row.setdefault("model","Not recorded")
+        row.setdefault("descriptor","Feedback"); row.setdefault("body","Not recorded")
+        clean_feedback.append(row)
+    state["feedback"]=clean_feedback
+    state["schema_version"]=7
     for key in ("inactivity_threshold_seconds","inactive_excluded_total_seconds","inactivity_exclusions","paused_total_seconds","active_duration_seconds"):
         state.pop(key,None)
 
@@ -163,6 +185,7 @@ def provenance_section(state):
     body=[
         ["Content owner",cap_cell(provenance.get("content_owner") or "Not recorded")],
         ["Original writing agent",cap_cell(provenance.get("original_writing_agent") or "Not recorded")],
+        ["Original writing LLM",cap_cell(provenance.get("original_writing_llm") or "Not recorded")],
         ["Created",cap_cell(provenance.get("created") or "Not recorded")],
         ["Artifact role",cap_cell(provenance.get("artifact_role") or "Durable North Star pursuit record")],
     ]
@@ -171,19 +194,61 @@ def provenance_section(state):
     table=[row(headers),"|"+"|".join("-"*(w+2) for w in widths)+"|",*(row(values) for values in body)]
     return "\n".join(["## Agent Provenance","",*table])
 
-def append_change(state,agent,action):
+def append_change(state,agent,action,model=None,scope=None):
     agent=(agent or "").strip()
     if not agent: raise NorthStarError("A truthful --acting-agent is required for this material North Star change.")
-    state.setdefault("change_log",[]).append({"date":now_local().date().isoformat(),"agent":agent,"action":action})
+    exact_model=validate_exact_model_identity((model or "").strip() or "Not recorded")
+    state.setdefault("change_log",[]).append({"date":now_local().strftime("%Y-%m-%d-%H:%M:%S"),"agent":agent,"model":exact_model,"action":action,"scope":(scope or "").strip() or None})
 
 def change_log_lines(state):
     normalize_state(state)
     entries=state.get("change_log") or []
     lines=["## Agent Change Log",""]
     if not entries: return [*lines,"- Not recorded"]
+    headers=["Date and Time","Agent","Model","Action","Scope"]
+    body=[]
     for entry in entries:
-        lines.append(f"- {entry.get('date') or 'Not recorded'} — {entry.get('agent') or 'Not recorded'} — {entry.get('action') or 'Material North Star change.'}")
-    return lines
+        action=str(entry.get("action") or "Material North Star change.")
+        scope=entry.get("scope") or action
+        body.append([
+            cap_cell(entry.get("date") or "Not recorded"),
+            cap_cell(entry.get("agent") or "Not recorded"),
+            cap_cell(entry.get("model") or "Not recorded"),
+            cap_cell(action.split(".")[0].split(";")[0].strip() or "Updated"),
+            cap_cell(scope),
+        ])
+    widths=[max(len(headers[i]),*(len(row[i]) for row in body)) for i in range(5)]
+    def row(values): return "| "+" | ".join(values[i].ljust(widths[i]) for i in range(5))+" |"
+    return [*lines,row(headers),"|"+"|".join("-"*(w+2) for w in widths)+"|",*(row(values) for values in body)]
+
+def feedback_section_lines(state):
+    normalize_state(state)
+    entries=state.get("feedback") or []
+    lines=["## Feedback Section",""]
+    if not entries:
+        return [*lines,"_No feedback yet. Use `feedback-add` to append a numbered `### Feedback N` subsection._"]
+    for entry in entries:
+        lines.append(f"### Feedback {entry['number']} — {entry.get('date') or 'Not recorded'} — {entry.get('agent') or 'Not recorded'} — {entry.get('descriptor') or 'Feedback'}")
+        lines.append("")
+        lines.append(str(entry.get("body") or "Not recorded"))
+        lines.append("")
+    return [line for line in lines[:-1]]
+
+def append_feedback(state,agent,descriptor,body,model=None):
+    normalize_state(state)
+    agent=(agent or "").strip()
+    if not agent: raise NorthStarError("A truthful --acting-agent is required to append feedback.")
+    body=(body or "").strip()
+    if not body: raise NorthStarError("Feedback requires a non-empty --body.")
+    exact_model=validate_exact_model_identity((model or "").strip() or "Not recorded")
+    state.setdefault("feedback",[]).append({
+        "number":len(state.get("feedback",[]))+1,
+        "date":now_local().strftime("%Y-%m-%d-%H:%M:%S"),
+        "agent":agent,
+        "model":exact_model,
+        "descriptor":(descriptor or "").strip() or "Feedback",
+        "body":body,
+    })
 
 def normalize_human_sections(text,state):
     cleaned=PROVENANCE_SECTION_RE.sub("",text)
@@ -196,16 +261,18 @@ def normalize_human_sections(text,state):
 def validate_artifact_layout(text):
     if len(re.findall(r"(?m)^## Agent Provenance[ \t]*$",text))!=1: raise NorthStarError("North Star must contain exactly one Agent Provenance section.")
     if len(re.findall(r"(?m)^## Agent Change Log[ \t]*$",text))!=1: raise NorthStarError("North Star must contain exactly one Agent Change Log section.")
+    if len(re.findall(r"(?m)^## Feedback Section[ \t]*$",text))!=1: raise NorthStarError("North Star must contain exactly one Feedback Section.")
     lifecycle=list(re.finditer(r"(?m)^North Star lifecycle: [^\n]*$",text))
     provenance=re.search(r"(?m)^## Agent Provenance[ \t]*$",text)
     north=re.search(r"(?m)^## North Star[ \t]*$",text)
+    feedback=re.search(r"(?m)^## Feedback Section[ \t]*$",text)
     change_log=re.search(r"(?m)^## Agent Change Log[ \t]*$",text)
     state_marker=STATE_RE.search(text)
-    if len(lifecycle)!=1 or not all((provenance,north,change_log,state_marker)): raise NorthStarError("North Star mandatory structure is incomplete.")
+    if len(lifecycle)!=1 or not all((provenance,north,feedback,change_log,state_marker)): raise NorthStarError("North Star mandatory structure is incomplete.")
     if text[lifecycle[0].end():provenance.start()].strip(): raise NorthStarError("Agent Provenance must appear immediately after the North Star lifecycle line.")
-    if not (lifecycle[0].start()<provenance.start()<north.start()<change_log.start()<state_marker.start()): raise NorthStarError("North Star sections are not in the mandatory lifecycle, provenance, content, change-log, machine-state order.")
+    if not (lifecycle[0].start()<provenance.start()<north.start()<feedback.start()<change_log.start()<state_marker.start()): raise NorthStarError("North Star sections are not in the mandatory lifecycle, provenance, content, feedback, change-log, machine-state order.")
     if re.search(r"(?m)^#{1,6} ",text[change_log.end():state_marker.start()]): raise NorthStarError("Agent Change Log must be the final human-readable section.")
-    required_rows=("Content owner","Original writing agent","Created","Artifact role")
+    required_rows=("Content owner","Original writing agent","Original writing LLM","Created","Artifact role")
     provenance_text=text[provenance.start():north.start()]
     if not all(f"| {field}" in provenance_text for field in required_rows): raise NorthStarError("Agent Provenance must use the mandatory Field/Value table.")
 
@@ -220,7 +287,7 @@ def render_block(state):
     active_label=(f"Pursuit {active['number']} open since {active['started_at']}" if active else "None")
     prov=state.get("provisional")
     prov_label=(f"Open since {prov['started_at']}" if prov else "None")
-    lines=[RUN_BEGIN.format(run_id=state["run_id"]),f"### {state['indicator']} North Star Run `{state['run_id']}`","",f"- **Mode:** `north-star`",f"- **Status:** {status}",f"- **Indicator:** {state['indicator']} (`{state['indicator_index']}`)",f"- **Initial run mode:** {str(state['initial_mode']).title()}",f"- **Current run mode:** {str(state['current_mode']).title()}",f"- **Started:** {state['started_at']}",f"- **Finished:** {state.get('finished_at') or chr(0x2014)}",f"- **Formal pause:** {'Yes' if state.get('status')=='paused' else 'No'}",f"- **Open pursuit:** {active_label}",f"- **Provisional timer:** {prov_label}",f"- **Completed pursuits:** {len(state['pursuits'])}",f"- **Grand total active pursuit time:** {human_duration(total_seconds(state))}",f"- **Current batch:** {state.get('current_batch') or 'Not recorded'}",f"- **Next action:** {state.get('next_action') or 'Not recorded'}","","#### Pursuit","",state.get("pursuit") or "Not recorded.","","#### Prompt Contract","","##### GOAL","",pc["goal"],"","##### CONSTRAINTS","",*markdown_lines(pc["constraints"]),"","##### FORMAT","",*markdown_lines(pc["format"]),"","##### DEFINITION OF DONE","",*checklist,"","##### FAILURE","",*failures,"","#### Mode Transition History","",*markdown_lines([f"{x['at']}: {x['from'].title()} -> {x['to'].title()} — {x['reason']}" for x in state.get("mode_transitions",[])]),"","#### Active Pursuit Log","",*rows,"","#### Evidence","",*markdown_lines(state.get("evidence",[])),"","#### Checkpoint Notes","",*markdown_lines(state.get("notes",[])),"",*change_log_lines(state),"",f"{STATE_PREFIX}{encode_state(state)}{STATE_SUFFIX}",RUN_END]
+    lines=[RUN_BEGIN.format(run_id=state["run_id"]),f"### {state['indicator']} North Star Run `{state['run_id']}`","",f"- **Mode:** `north-star`",f"- **Status:** {status}",f"- **Indicator:** {state['indicator']} (`{state['indicator_index']}`)",f"- **Initial run mode:** {str(state['initial_mode']).title()}",f"- **Current run mode:** {str(state['current_mode']).title()}",f"- **Started:** {state['started_at']}",f"- **Finished:** {state.get('finished_at') or chr(0x2014)}",f"- **Formal pause:** {'Yes' if state.get('status')=='paused' else 'No'}",f"- **Open pursuit:** {active_label}",f"- **Provisional timer:** {prov_label}",f"- **Completed pursuits:** {len(state['pursuits'])}",f"- **Grand total active pursuit time:** {human_duration(total_seconds(state))}",f"- **Current batch:** {state.get('current_batch') or 'Not recorded'}",f"- **Next action:** {state.get('next_action') or 'Not recorded'}","","#### Pursuit","",state.get("pursuit") or "Not recorded.","","#### Prompt Contract","","##### GOAL","",pc["goal"],"","##### CONSTRAINTS","",*markdown_lines(pc["constraints"]),"","##### FORMAT","",*markdown_lines(pc["format"]),"","##### DEFINITION OF DONE","",*checklist,"","##### FAILURE","",*failures,"","#### Mode Transition History","",*markdown_lines([f"{x['at']}: {x['from'].title()} -> {x['to'].title()} — {x['reason']}" for x in state.get("mode_transitions",[])]),"","#### Active Pursuit Log","",*rows,"","#### Evidence","",*markdown_lines(state.get("evidence",[])),"","#### Checkpoint Notes","",*markdown_lines(state.get("notes",[])),"",*feedback_section_lines(state),"",*change_log_lines(state),"",f"{STATE_PREFIX}{encode_state(state)}{STATE_SUFFIX}",RUN_END]
     return "\n".join(lines)
 
 def append_run(text,block,state):
@@ -278,7 +345,8 @@ def command_init(args):
     idx=secrets.randbelow(len(INDICATORS)) if args.indicator_index is None else args.indicator_index
     complete=set(args.verify_complete or []); maximum=len(args.definition_of_done or [])
     if any(i<1 or i>maximum for i in complete): raise NorthStarError("Definition of Done index is outside the checklist.")
-    state={"schema_version":6,"run_id":make_run_id(started),"pursuit":(args.pursuit or "").strip(),"initial_mode":args.mode,"current_mode":args.mode,"mode_transitions":[],"prompt_contract":{"goal":args.goal.strip(),"constraints":args.constraint or [],"format":args.format or [],"definition_of_done":args.definition_of_done or [],"failure":args.failure or []},"definition_of_done_complete":sorted(complete),"failure_active":[],"contract_review":None,"provenance":{"content_owner":args.content_owner,"original_writing_agent":args.writing_agent,"created":started.date().isoformat(),"artifact_role":args.artifact_role},"change_log":[{"date":started.date().isoformat(),"agent":args.writing_agent,"action":"Created the North Star artifact."}],"indicator_index":idx,"indicator":INDICATORS[idx],"status":"in_progress","started_at":iso(started),"finished_at":None,"current_batch":args.batch or "Activation","next_action":args.next_action or "Begin pursuit","evidence":args.evidence or [],"notes":args.note or [],"pursuits":[],"active_pursuit":None,"provisional":None,"pursuit_corrections":[],"reopen_count":0,"pursuit_ledger_migrated":True}
+    writing_llm=validate_exact_model_identity(getattr(args,"writing_llm",None) or "Not recorded")
+    state={"schema_version":7,"run_id":make_run_id(started),"pursuit":(args.pursuit or "").strip(),"initial_mode":args.mode,"current_mode":args.mode,"mode_transitions":[],"prompt_contract":{"goal":args.goal.strip(),"constraints":args.constraint or [],"format":args.format or [],"definition_of_done":args.definition_of_done or [],"failure":args.failure or []},"definition_of_done_complete":sorted(complete),"failure_active":[],"contract_review":None,"provenance":{"content_owner":args.content_owner,"original_writing_agent":args.writing_agent,"original_writing_llm":writing_llm,"created":started.date().isoformat(),"artifact_role":args.artifact_role},"change_log":[{"date":started.strftime("%Y-%m-%d-%H:%M:%S"),"agent":args.writing_agent,"model":writing_llm,"action":"Created the North Star artifact.","scope":"Initial authoring"}],"indicator_index":idx,"indicator":INDICATORS[idx],"status":"in_progress","started_at":iso(started),"finished_at":None,"current_batch":args.batch or "Activation","next_action":args.next_action or "Begin pursuit","evidence":args.evidence or [],"notes":args.note or [],"pursuits":[],"active_pursuit":None,"provisional":None,"pursuit_corrections":[],"reopen_count":0,"pursuit_ledger_migrated":True}
     save_context(path,append_run(text,render_block(state),state),newline,bom); return state
 
 def command_create(args):
@@ -288,7 +356,8 @@ def command_create(args):
     prev=max(numbered_values(live)+numbered_values(hist),default=0); number=prev+1
     if number_is_owned(live,number) or number_is_owned(hist,number): raise NorthStarError(f"Number {number} is already owned.")
     artifact=live/f"{number}.) {topic}_in_progress.md"; started=parse_time(args.started_at) if args.started_at else now_local()
-    seed={"started_at":iso(started),"provenance":{"content_owner":args.content_owner,"original_writing_agent":args.writing_agent,"created":started.date().isoformat(),"artifact_role":args.artifact_role},"change_log":[]}
+    writing_llm=validate_exact_model_identity(getattr(args,"writing_llm",None) or "Not recorded")
+    seed={"started_at":iso(started),"provenance":{"content_owner":args.content_owner,"original_writing_agent":args.writing_agent,"original_writing_llm":writing_llm,"created":started.date().isoformat(),"artifact_role":args.artifact_role},"change_log":[]}
     exclusive_write(artifact,artifact_shell(subject,topic,started,seed)); args.artifact=str(artifact)
     try: state=command_init(args)
     except BaseException:
@@ -297,8 +366,11 @@ def command_create(args):
 
 def mutate(args,fn,allow_terminal=False,change_action=None):
     path,text,newline,bom,runs=load_context(args.artifact); run=select_run(runs,args.run_id,allow_terminal=allow_terminal); state=dict(run["state"]); normalize_state(state); fn(state)
-    if change_action: append_change(state,getattr(args,"acting_agent",None),change_action)
+    if change_action: append_change(state,getattr(args,"acting_agent",None),change_action,getattr(args,"acting_llm",None))
     save_context(path,replace_run(text,run,state),newline,bom); return state
+
+def command_feedback_add(args):
+    return mutate(args,lambda state: append_feedback(state,getattr(args,"acting_agent",None),args.descriptor,args.body,getattr(args,"acting_llm",None)),change_action="Appended a Feedback Section entry.")
 
 def command_pursuit_start(args):
     def fn(state):
@@ -404,6 +476,10 @@ def command_refine(args):
         state["definition_of_done_complete"]=sorted(complete); state["prompt_contract"]=pc
         if args.batch: state["current_batch"]=args.batch
         if args.next_action: state["next_action"]=args.next_action
+        if getattr(args,"writing_llm",None):
+            current=(state.get("provenance",{}).get("original_writing_llm") or "Not recorded").strip()
+            if current and current!="Not recorded": raise NorthStarError("Original writing LLM is immutable once recorded; it cannot be rewritten.")
+            state.setdefault("provenance",{})["original_writing_llm"]=validate_exact_model_identity(args.writing_llm)
         if args.note: state.setdefault("notes",[]).append(f"Refined: {args.note}")
     return mutate(args,fn,change_action="Refined the North Star scope or Prompt Contract.")
 
@@ -558,9 +634,9 @@ def print_result(state,as_json=False):
     print(f"grand_total_active_pursuit_time={human_duration(total_seconds(state))}\ninitial_mode={state.get('initial_mode') or ''}\ncurrent_mode={state.get('current_mode') or ''}\ncurrent_batch={state.get('current_batch') or ''}\nnext_action={state.get('next_action') or ''}")
 
 def add_common(p): p.add_argument("--artifact",required=True); p.add_argument("--run-id")
-def add_actor(p): p.add_argument("--acting-agent",required=True)
+def add_actor(p): p.add_argument("--acting-agent",required=True); p.add_argument("--acting-llm")
 def init_args(p):
-    p.add_argument("--writing-agent",required=True); p.add_argument("--content-owner",default="Uzo"); p.add_argument("--artifact-role",default="Durable North Star pursuit record"); p.add_argument("--goal",required=True); p.add_argument("--pursuit"); p.add_argument("--mode",choices=("full","batch"),default="full"); p.add_argument("--definition-of-done",action="append"); p.add_argument("--verify-complete",type=int,action="append"); p.add_argument("--constraint",action="append"); p.add_argument("--format",action="append"); p.add_argument("--failure",action="append"); p.add_argument("--batch"); p.add_argument("--next-action"); p.add_argument("--started-at"); p.add_argument("--evidence",action="append"); p.add_argument("--note",action="append"); p.add_argument("--indicator-index",type=int,choices=range(len(INDICATORS)),metavar="0..7")
+    p.add_argument("--writing-agent",required=True); p.add_argument("--writing-llm"); p.add_argument("--content-owner",default="Uzo"); p.add_argument("--artifact-role",default="Durable North Star pursuit record"); p.add_argument("--goal",required=True); p.add_argument("--pursuit"); p.add_argument("--mode",choices=("full","batch"),default="full"); p.add_argument("--definition-of-done",action="append"); p.add_argument("--verify-complete",type=int,action="append"); p.add_argument("--constraint",action="append"); p.add_argument("--format",action="append"); p.add_argument("--failure",action="append"); p.add_argument("--batch"); p.add_argument("--next-action"); p.add_argument("--started-at"); p.add_argument("--evidence",action="append"); p.add_argument("--note",action="append"); p.add_argument("--indicator-index",type=int,choices=range(len(INDICATORS)),metavar="0..7")
 def build_parser():
     parser=argparse.ArgumentParser(description="Maintain artifact-backed North Star state and per-turn pursuit timing."); subs=parser.add_subparsers(dest="command",required=True)
     p=subs.add_parser("create"); p.add_argument("--workspace-root",required=True); p.add_argument("--subject",required=True); p.add_argument("--topic",required=True); init_args(p); p.set_defaults(handler=command_create)
@@ -573,7 +649,8 @@ def build_parser():
     p=subs.add_parser("provisional-discard"); add_common(p); p.set_defaults(handler=command_provisional_discard)
     p=subs.add_parser("provisional-commit"); add_common(p); add_actor(p); p.add_argument("--summary",required=True); p.add_argument("--batch"); p.add_argument("--ended-at"); p.set_defaults(handler=command_provisional_commit)
     p=subs.add_parser("checkpoint"); add_common(p); add_actor(p); p.add_argument("--batch"); p.add_argument("--next-action"); p.add_argument("--note"); p.add_argument("--another-iteration"); p.add_argument("--verify-complete",type=int,action="append"); p.add_argument("--failure-active",type=int,action="append"); p.add_argument("--clear-failures",action="store_true"); p.set_defaults(handler=command_checkpoint)
-    p=subs.add_parser("refine"); add_common(p); add_actor(p); p.add_argument("--goal"); p.add_argument("--pursuit"); p.add_argument("--constraint",action="append"); p.add_argument("--format",action="append"); p.add_argument("--definition-of-done",action="append"); p.add_argument("--failure",action="append"); p.add_argument("--verify-complete",type=int,action="append"); p.add_argument("--batch"); p.add_argument("--next-action"); p.add_argument("--note"); p.set_defaults(handler=command_refine)
+    p=subs.add_parser("refine"); add_common(p); add_actor(p); p.add_argument("--writing-llm"); p.add_argument("--goal"); p.add_argument("--pursuit"); p.add_argument("--constraint",action="append"); p.add_argument("--format",action="append"); p.add_argument("--definition-of-done",action="append"); p.add_argument("--failure",action="append"); p.add_argument("--verify-complete",type=int,action="append"); p.add_argument("--batch"); p.add_argument("--next-action"); p.add_argument("--note"); p.set_defaults(handler=command_refine)
+    p=subs.add_parser("feedback-add"); add_common(p); add_actor(p); p.add_argument("--descriptor",required=True); p.add_argument("--body",required=True); p.set_defaults(handler=command_feedback_add)
     p=subs.add_parser("pause"); add_common(p); add_actor(p); p.add_argument("--reason"); p.set_defaults(handler=command_pause)
     p=subs.add_parser("resume"); add_common(p); add_actor(p); p.set_defaults(handler=command_resume)
     p=subs.add_parser("recover"); add_common(p); add_actor(p); p.add_argument("--interrupted-at"); p.add_argument("--note"); p.set_defaults(handler=command_recover)

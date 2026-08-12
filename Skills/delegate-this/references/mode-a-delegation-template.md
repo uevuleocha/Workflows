@@ -101,7 +101,7 @@ the Plan/Task or Delegation number.
 Return-report filenames **end in `Report.md`** and carry the reserved child
 prefix from the Summary family. Each is created (under the execution workspace's
 `Archive\Historical\Summaries\<Subject>\`) when its assignment returns. A return
-report uses session-summary structure plus an append-only `## Feedback` ledger.
+report uses session-summary structure plus an append-only `## Delegation Ledger`.
 
 ## Shared Context
 
@@ -175,7 +175,7 @@ Each packet states explicitly:
   `<workspace>\Archive\Historical\Summaries\<Subject>\` with a filename ending
   in `Report.md`. The return report is mandatory at packet/wave completion.
 - A return report uses session-summary structure plus an append-only
-  `## Feedback` ledger. Existing report content and earlier feedback entries are
+  `## Delegation Ledger`. Existing report content and earlier feedback entries are
   immutable; feedback is appendable only while the delegation is active and
   freezes when `finalize-delegation` closes it.
 - Bring every return back to the orchestrator session.
@@ -188,7 +188,7 @@ Each packet states explicitly:
   and verification.
 - When integration is verified, run `finalize-delegation` to move this record to
   `Archive\Historical\Delegations\<Subject>\` as `_completed`. Closing the
-  delegation freezes every return report and its `## Feedback` ledger.
+  delegation freezes every return report and its `## Delegation Ledger`.
 
 ## Global Stop Conditions
 

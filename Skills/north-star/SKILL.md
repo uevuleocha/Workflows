@@ -118,6 +118,7 @@ python -X utf8 "<skill-dir>/scripts/north_star_state.py" create \
   --subject "<Subject>" \
   --topic "<Topic>" \
   --writing-agent "<truthful agent family>" \
+  --writing-llm "<truthful model name>" \
   --goal "<North Star goal>" \
   --pursuit "<approach>" \
   --mode full \
@@ -127,11 +128,11 @@ python -X utf8 "<skill-dir>/scripts/north_star_state.py" create \
   --failure "<invalid outcome or thing to avoid>"
 ```
 
-The helper creates the folders, captures the combined namespace maximum, writes `_in_progress.md` exclusively, and compulsorily creates both provenance sections. Immediately after the status and `North Star lifecycle:` lines, it renders `## Agent Provenance` as the canonical two-column `Field | Value` table with Content owner, Original writing agent, Created, and Artifact role. It renders `## Agent Change Log` as the final human-readable section immediately before Base64 machine state. Creation and reopening do not start timing. In each pursued turn, call `pursuit-start` when North Star work actually begins and `pursuit-stop` when it actually ends; keep unrelated same-turn work outside that interval.
+The helper creates the folders, captures the combined namespace maximum, writes `_in_progress.md` exclusively, and compulsorily creates all three mandatory sections. Immediately after the status and `North Star lifecycle:` lines, it renders `## Agent Provenance` as the canonical two-column `Field | Value` table with Content owner, Original writing agent, Original writing LLM, Created, and Artifact role. It renders `## Feedback Section` after the North Star content, and `## Agent Change Log` as the final human-readable section immediately before Base64 machine state, as a five-column `Date and Time | Agent | Model | Action | Scope` table. Creation and reopening do not start timing. In each pursued turn, call `pursuit-start` when North Star work actually begins and `pursuit-stop` when it actually ends; keep unrelated same-turn work outside that interval.
 
 ### Terminal Machine-State Invariant
 
-The generated Base64 state is compulsory and makes the artifact self-contained. The section order is mandatory: status, lifecycle, Agent Provenance table, remaining human-readable North Star content, Agent Change Log, Base64 state marker, then `north-star:run-end`. Agent Change Log is the final human-readable section; Base64 state is the final machine section. The state marker must immediately precede `north-star:run-end`, and `north-star:run-end` must be the final nonblank line in the entire file. Nothing may follow it. Never hand-edit, relocate, or delete either mandatory provenance section or machine state; use the helper, which validates and normalizes every mutation.
+The generated Base64 state is compulsory and makes the artifact self-contained. The section order is mandatory: status, lifecycle, Agent Provenance table, remaining human-readable North Star content, Feedback Section, Agent Change Log, Base64 state marker, then `north-star:run-end`. Agent Change Log is the final human-readable section; Base64 state is the final machine section. The Feedback Section sits immediately above the change log, never below it. The state marker must immediately precede `north-star:run-end`, and `north-star:run-end` must be the final nonblank line in the entire file. Nothing may follow it. Never hand-edit, relocate, or delete either mandatory provenance section or machine state; use the helper, which validates and normalizes every mutation.
 
 Use `scripts/north_star_state.py` for every lifecycle and timing mutation. Read `references/state-helper.md` before using it. The helper is the only timing authority.
 ## Mode Indicator
@@ -319,6 +320,7 @@ Use the helper commands documented in `references/state-helper.md`:
 - `pause` and `resume` preserve deliberate user-approved suspension and refuse open provisional or authoritative timing;
 - `recover` discards an interrupted open pursuit and any open provisional timer without counting guessed time;
 - `pursuit-remove` makes an auditable correction and sequentially renumbers;
+- `feedback-add --descriptor "<short label>" --body "<message>"` appends one numbered `### Feedback N` subsection to the Feedback Section, stamped with the acting agent, its model, and a clock-read timestamp. This is the cross-agent channel: an orchestrator, a verifier, and an implementer all write here, and each reads what the others left;
 - `reopen` returns a terminal artifact to Live with its ledger intact;
 - `status --json` reports the latest pursuit, provisional state, and helper-computed grand total;
 - `format-receipt --type <kind>` outputs the exact production user-facing text for timing statements, fallback disclosure, Prompt Contract opt-in display, all selected-star footer states, and finalizer receipts — agents must use this rather than independently composing equivalent wording; and
@@ -345,6 +347,25 @@ When every Prompt Contract completion gate has evidence:
 
 A blocker pauses or leaves the run in progress; it does not prove completion.
 
+## Feedback Section
+
+Every North Star artifact carries a `## Feedback Section`, **present and empty by default**, rendered immediately above `## Agent Change Log` and therefore above the terminal Base64 state.
+
+It exists so agents can talk to each other through the artifact instead of through a chat session neither of them shares. An orchestrator writes what it needs verified; a verifier writes what it found; the implementer writes back what it changed. Each reads what the others left, across platforms and across sessions.
+
+**This section is helper-owned, which makes it different from every other skill's Feedback Section.** It lives in the encoded state, so a hand-written entry is silently discarded by the next helper mutation. Append only through:
+
+```text
+python -X utf8 "<skill-dir>/scripts/north_star_state.py" feedback-add \
+  --artifact "<live-path>" \
+  --acting-agent "<truthful agent family>" \
+  --acting-llm "<truthful model name>" \
+  --descriptor "<short label>" \
+  --body "<the message>"
+```
+
+The helper numbers each entry `### Feedback N — <clock timestamp> — <agent> — <descriptor>`, starting at 1 and never renumbering. Entries are append-only and immutable: a correction is a **new** entry, never an edit to an earlier one. An empty Feedback Section is correct and must never be pruned for being empty — `finalize-north-star` preserves it as found.
+
 ## Agent Provenance For Durable Artifacts
 
 This skill applies the workspace's first-party durable-artifact provenance rule to North Star artifacts and every checkpoint, refinement, pause, resume, recovery, end, or lifecycle update.
@@ -352,10 +373,12 @@ This skill applies the workspace's first-party durable-artifact provenance rule 
 For every in-scope artifact:
 
 - always create exactly one `## Agent Provenance` section immediately after the `North Star lifecycle:` line, before Subject, Topic, and the remaining North Star content;
-- render Agent Provenance only as the canonical two-column `Field | Value` table with `Content owner`, `Original writing agent`, `Created`, and `Artifact role` rows;
-- use a stable truthful agent-family label such as `Codex Agent`, `Claude Agent`, `Antigravity Agent`, `Hermes Agent`, or `zCode Agent`;
-- keep the original writing-agent entry immutable;
-- always create exactly one append-only `## Agent Change Log`, store it in helper-owned state, and render it as the final human-readable section immediately before `north-star:state-b64`;
+- render Agent Provenance only as the canonical two-column `Field | Value` table with `Content owner`, `Original writing agent`, `Original writing LLM`, `Created`, and `Artifact role` rows, in that order;
+- use a stable truthful agent-family label such as `Codex Agent`, `Claude Agent`, `Antigravity Agent`, `Hermes Agent`, or `zCode Agent`, and pass the model separately through `--writing-llm`;
+- keep the original writing-agent entry immutable; `Original writing LLM` is likewise immutable once recorded, and `refine --writing-llm` may set it only while it still reads `Not recorded`;
+- always create exactly one append-only `## Agent Change Log`, store it in helper-owned state, and render it as the final human-readable section immediately before `north-star:state-b64`, as a five-column `Date and Time | Agent | Model | Action | Scope` table with `YYYY-MM-DD-HH:mm:ss` timestamps read from the machine clock;
+- always create exactly one `## Feedback Section` immediately above the change log; it is helper-owned state, empty by default, and appended to only through `feedback-add`, which numbers each entry `### Feedback N — date — agent — descriptor`;
+- never hand-edit the Feedback Section. Because it lives in helper-owned Base64 state, a hand-written entry is silently discarded by the next helper mutation. Any agent, on any platform, appends through `feedback-add`;
 - pass truthful `--acting-agent "<agent family>"` on every material helper mutation; the helper refuses material changes that cannot be attributed;
 - if a legacy artifact lacks reliable creator evidence, use `Not recorded` rather than guessing, then log the current agent's actual change; and
 - treat copying or global synchronization as transport, not authorship.
@@ -368,6 +391,18 @@ This skill owns the North Star objective, checklist, permanent number, encoded s
 
 On checkpoint, refine, pause, resume, recover, reopen, or end, recover the embedded native source when necessary, apply the helper operation, and regenerate every existing same-stem format sibling as one atomic artifact set. Deduplicate siblings during number scans. This section overrides `.md`-only examples only for co-invoked serialization; every encoded-state and lifecycle gate remains mandatory.
 
+## Exact Model Attribution
+
+Whenever this skill writes a new model identity, appends a current-run model value, or defines a workflow that does either:
+
+- Record the full model identity actually used when it is safely available from current runtime or session metadata. Use a specific identity such as `GPT-5.6 Sol`, `GPT-5.6 Terra`, or `Claude Opus 5`; a family-only label such as `GPT-5`, `Claude`, or `Codex Agent` is not an acceptable substitute.
+- Resolve identity in this order: current runtime or session metadata; a platform-provided current-model field; only then, when unavoidable, a field-minimized configuration lookup that returns the model field alone. Apply `tread-lightly` to any potentially sensitive configuration and never display, copy, search, diff, or log the whole configuration.
+- Keep the agent family and model identity separate. Never infer an exact model from an agent label, provider name, stale configuration, or model family.
+- Use `Not recorded` only when the exact identity genuinely cannot be established safely. Do not replace an available exact identity with `Not recorded` merely to avoid checking current runtime metadata.
+- Preserve append-only history. Never rewrite a historical provenance or change-log value solely to improve an old model label; add a truthful current correction entry when correction is required.
+
+**Validation check:** For every model value newly written in the current run, accept a full exact identity and the honest `Not recorded` fallback, but reject known ambiguous family-only labels or agent-family substitutions. Confirm model discovery exposed only the required model field and that no historical row was rewritten.
+
 ## Validation
 
 When creating or updating this skill:
@@ -379,7 +414,10 @@ When creating or updating this skill:
 - smoke-test `finalize-north-star` moving a verified run to Historical;
 - confirm helper edits remain inside the chosen artifact and collisions never overwrite; and
 - confirm all global copies validate and have recursive byte parity.
-- confirm provenance immediately follows lifecycle, uses the Field/Value table, and remains above every other North Star section;
+- confirm provenance immediately follows lifecycle, uses the Field/Value table with all five canonical rows in order including `Original writing LLM`, and remains above every other North Star section;
+- confirm the Feedback Section exists exactly once, sits immediately above the change log, renders numbered `### Feedback N` subsections, and accepts entries from any acting agent through `feedback-add`;
+- confirm the Agent Change Log renders the five columns `Date and Time`, `Agent`, `Model`, `Action`, `Scope`, that new rows carry clock-read `YYYY-MM-DD-HH:mm:ss` timestamps, and that pre-migration date-only rows keep `Not recorded` in `Model` rather than being backfilled;
+- confirm a legacy schema-6 artifact migrates in place on its next mutation without losing pursuits, corrections, or terminal state;
 - confirm Agent Change Log is the final human-readable section, Base64 state is last, and material mutations without `--acting-agent` are refused without changing the file.
 
 When updating pursuit timing, reporting, or footer enforcement, additionally prove all of the following:

@@ -22,18 +22,22 @@ SOURCE = """# Provenance Fixture
 |---|---|
 | Content owner | Uzo |
 | Original writing agent | Codex Agent |
+| Original writing LLM | GPT-5.1-Codex |
 | Created | 2026-08-03 |
 | Artifact role | A deliberately long role value that verifies wrapping without changing the exact embedded native source packet. |
 | HTML rendition agent | Conversion Agent |
 
 ## Agent Change Log
 
-- 2026-08-03 — Codex Agent — Created fixture.
+| Date and Time | Agent | Model | Action | Scope |
+|---|---|---|---|---|
+| 2026-08-03 | Codex Agent | Not recorded | Created | Created fixture. |
 """
 
 STRUCTURED = [
     ["Content owner", "Uzo"],
     ["Original writing agent", "Codex Agent"],
+    ["Original writing LLM", "GPT-5.1-Codex"],
     ["Created", "2026-08-03"],
     ["Artifact role", "Structured provenance fixture"],
 ]
@@ -56,6 +60,8 @@ def main() -> int:
     assert '<table class="provenance-table">' in document
     assert '<th scope="col">Field</th>' in document
     assert '<th scope="row">Content owner</th>' in document
+    assert '<th scope="row">Original writing LLM</th>' in document
+    assert "<td>GPT-5.1-Codex</td>" in document
     assert '<th scope="row">HTML rendition agent</th>' in document
     assert "<td>Conversion Agent</td>" in document
     assert 'aria-label="Agent provenance"' in document
@@ -100,12 +106,25 @@ def main() -> int:
             payload, source_format, STRUCTURED, None
         ) == STRUCTURED
 
+    # A four-row table in the pre-2026-08-11 canonical order must now be rejected:
+    # it omits "Original writing LLM" and slides "Created" into its position.
+    legacy_four_row = [
+        STRUCTURED[0],
+        STRUCTURED[1],
+        STRUCTURED[3],
+        STRUCTURED[4],
+    ]
+
     for bad_rows in (
-        STRUCTURED[:3],
+        STRUCTURED[:4],
+        legacy_four_row,
+        [*STRUCTURED[:2], STRUCTURED[3], STRUCTURED[2], STRUCTURED[4]],
         [STRUCTURED[0], STRUCTURED[0], *STRUCTURED[2:]],
         [STRUCTURED[1], STRUCTURED[0], *STRUCTURED[2:]],
         [STRUCTURED[0], ["Original writer", "Codex Agent"], *STRUCTURED[2:]],
-        [*STRUCTURED[:3], ["Artifact role", ""]],
+        [*STRUCTURED[:2], ["Original writing model", "GPT-5.1-Codex"], *STRUCTURED[3:]],
+        [*STRUCTURED[:4], ["Artifact role", ""]],
+        [*STRUCTURED[:2], ["Original writing LLM", ""], *STRUCTURED[3:]],
     ):
         assert_rejected(
             lambda bad_rows=bad_rows: html_this.validate_provenance_rows(
@@ -114,8 +133,25 @@ def main() -> int:
             "Agent Provenance",
         )
 
+    for exact_model in ("GPT-5.6 Sol", "gpt-5.6-sol", "Claude Opus 5", "Not recorded"):
+        rows = [*STRUCTURED[:2], ["Original writing LLM", exact_model], *STRUCTURED[3:]]
+        html_this.validate_provenance_rows(
+            ["Field", "Value"], rows, enforce_exact_model=True
+        )
+    for ambiguous_model in ("GPT-5", "GPT-5.6", "Claude", "Codex Agent"):
+        rows = [*STRUCTURED[:2], ["Original writing LLM", ambiguous_model], *STRUCTURED[3:]]
+        assert_rejected(
+            lambda rows=rows: html_this.validate_provenance_rows(
+                ["Field", "Value"], rows, enforce_exact_model=True
+            ),
+            "full exact model name",
+        )
+
     injected = html_this.provenance_table_html(STRUCTURED)
     assert '<th scope="row">Original writing agent</th>' in injected
+    assert '<th scope="row">Original writing LLM</th>' in injected
+    assert injected.index("Original writing agent") < injected.index("Original writing LLM")
+    assert injected.index("Original writing LLM") < injected.index("Created")
     assert_rejected(
         lambda: html_this.require_creation_provenance(injected + injected, "html", None, None),
         "exactly one canonical provenance table",

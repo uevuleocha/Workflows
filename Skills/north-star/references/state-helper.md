@@ -4,7 +4,7 @@
 
 ## Core State
 
-Every schema-6 run records:
+Every schema-7 run records:
 
 - `initial_mode`: `full` or `batch`.
 - `current_mode`: `full` or `batch`.
@@ -13,8 +13,9 @@ Every schema-6 run records:
 - `definition_of_done_complete`: evidence-supported DoD indexes.
 - `failure_active`: currently active Failure indexes.
 - `contract_review`: final evidence review of Constraints, Format, Failure, and DoD.
-- `provenance`: mandatory Content owner, immutable Original writing agent, Created date, and Artifact role values for the canonical Field/Value table immediately after lifecycle.
-- `change_log`: append-only attributed material changes rendered as the final human-readable section.
+- `provenance`: mandatory Content owner, immutable Original writing agent, immutable Original writing LLM, Created date, and Artifact role values for the canonical five-row Field/Value table immediately after lifecycle.
+- `change_log`: append-only attributed material changes rendered as the final human-readable section, as a five-column `Date and Time | Agent | Model | Action | Scope` table with clock-read `YYYY-MM-DD-HH:mm:ss` timestamps.
+- `feedback`: append-only numbered cross-agent messages rendered as `## Feedback Section` immediately above the change log. Empty by default. Written only through `feedback-add`; a hand-edited entry is discarded on the next helper mutation because the section is regenerated from this state.
 - `pursuits`, `active_pursuit`, `provisional`, corrections, evidence, notes, lifecycle, indicator, and navigation state.
 
 A Full run changes permanently to Batch immediately when `checkpoint --another-iteration` records a known follow-up after pursuit 1, automatically before pursuit 2, when a material contract refinement follows pursuit work, or when a terminal run is reopened. Batch never silently returns to Full.
@@ -27,6 +28,7 @@ python -X utf8 "<skill-dir>/scripts/north_star_state.py" create \
   --subject "<Subject>" \
   --topic "<Topic>" \
   --writing-agent "<truthful agent family>" \
+  --writing-llm "<truthful model name>" \
   --goal "<Prompt Contract GOAL>" \
   --pursuit "<approach>" \
   --mode full \
@@ -100,6 +102,21 @@ python -X utf8 "<skill-dir>/scripts/north_star_state.py" refine \
 ```
 
 A checkpoint may mark supported DoD items, set `--failure-active <N>`, or clear resolved failure state with `--clear-failures`. Evidence-only checkpointing does not rewrite the Prompt Contract. Supplying any contract field to `refine` is a material replacement of that field; replacing DoD or Failure resets the corresponding completion or active indexes. Material refinement after pursuit work begins changes Full to Batch.
+
+## Feedback Section
+
+```text
+python -X utf8 "<skill-dir>/scripts/north_star_state.py" feedback-add \
+  --artifact "<live-path>" \
+  --acting-agent "<truthful agent family>" \
+  --acting-llm "<truthful model name>" \
+  --descriptor "<short label, e.g. Independent verification>" \
+  --body "<the message>"
+```
+
+Appends one numbered `### Feedback N — <clock timestamp> — <agent> — <descriptor>` subsection. Entries are append-only and immutable: a correction is a new entry, never an edit to an earlier one. This is the cross-agent channel — an orchestrator, a verifier, and an implementer all write here and each reads what the others left, without needing the same chat session or the same platform.
+
+`--writing-llm` on `refine` sets `Original writing LLM` only while it still reads `Not recorded`. Once recorded it is immutable and the helper refuses to rewrite it, exactly as it does for the original writing agent.
 
 ## Pause, Resume, Recovery, And Corrections
 

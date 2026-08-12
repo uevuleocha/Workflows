@@ -65,6 +65,7 @@ Use evidence, not optimism or checklist appearance.
 - Keep implementation work distinct from verification work.
 - Identify dependencies between remaining items. If one item cannot begin until another item or condition is complete, state that blocking relationship in words; list order alone is not an adequate dependency signal.
 - Identify a decision as remaining only when it genuinely blocks or changes the outcome.
+- Phrase items that wait on the user explicitly, for example `awaiting your decision on X` or `awaiting your input on Y`, so the briefing always shows what is left for the user.
 - Label an uncertain item as unknown instead of inventing status.
 - If the goal is already met, say that nothing substantive remains and name any final confirmation or deliberate lifecycle close that is still needed.
 - If the finish line itself is unclear, state the smallest missing definition needed to establish it.
@@ -73,7 +74,7 @@ Do not silently expand the original goal, prescribe optional polish as mandatory
 
 ## Output
 
-Create exactly one section for each resolved subject. One subject gets one section; several subjects get one section each. Use this compact shape, omitting any line that would add no value:
+Create exactly one section for each resolved subject. One subject gets one section; several subjects get one section each. Every section must emit all six fields below — never omit a field. Field order is fixed as shown and the labels are verbatim; do not paraphrase, rename, or restructure them. When a field has no content, write the placeholder instead of dropping the line: `None identified` for **Dependencies:**, **Verification still needed:**, **Blockers or unknowns:**, and **Best next move:**; `Nothing substantive remains for this subject.` for **What is left:**. Use this compact shape:
 
 ```markdown
 ## [Subject]
@@ -143,5 +144,7 @@ When creating or updating this skill:
 - confirm a multi-subject request produces one section per subject;
 - confirm chat-only context works without a durable artifact;
 - confirm a blocked item explicitly states in words which item or condition blocks it instead of relying on list order;
+- confirm every subject section emits all six fields in the fixed order with verbatim labels, using `None identified` or `Nothing substantive remains for this subject.` as placeholders instead of omitting any field;
+- confirm items awaiting the user's decision or input are phrased explicitly as such;
 - confirm an authoritative artifact-backed subject is briefed only after its subject section has been read in full, without widening into unrelated sections or broad repository searching; and
 - confirm artifact-backed context remains read-only and creates no linkage.

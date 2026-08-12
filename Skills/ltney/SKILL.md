@@ -1,6 +1,6 @@
 ---
 name: ltney
-description: Enter LTNEY mode, meaning LETS TALK NO EXECUTIONS YET. Use when the user explicitly invokes /ltney, $ltney, LTNEY, LETS TALK NO EXECUTIONS YET, or asks to answer questions and stand by without mutating commands, creating files, editing files, generating product-code snippets, running validation/build/test workflows, or making workspace changes. Read-only inspection is allowed. When combined with another explicitly invoked skill, perform that skill under LTNEY's diligent/no-execution discipline unless green-light supersedes LTNEY for a named task.
+description: Enter LTNEY mode, meaning LETS TALK NO EXECUTIONS YET. Use when the user explicitly invokes /ltney, $ltney, LTNEY, LETS TALK NO EXECUTIONS YET, or asks to answer questions and stand by without mutating commands, creating files, editing files, generating product-code snippets, running validation/build/test workflows, or making workspace changes. Reading and inspecting files is never blocked unless the user explicitly says so, including transitive reads of files referenced inside other user-provided files. When combined with another explicitly invoked skill, perform that skill under LTNEY's diligent/no-execution discipline unless green-light supersedes LTNEY for a named task.
 ---
 
 # LTNEY
@@ -43,27 +43,58 @@ If LTNEY is invoked together with another explicit skill, LTNEY does not globall
 - no file creation or file edits unless the other named skill requires it and is explicitly approved
 - no product-code generation
 - no direct product-code edits
-- read-only inspection remains allowed when it supports the user's requested discussion or comparison
+- read-only inspection is always allowed — reading and inspecting files is never blocked by LTNEY unless the user explicitly says so, including transitive reads of files referenced inside other user-provided files
 - be diligent, meticulous, and surgical
 - ask clarifying questions when the user's intent is vague
 - preserve all project-contract and product-code safety boundaries
 
-## Read-Only Inspection Is Allowed
+## Reading And Inspection Are Never Blocked
 
-LTNEY does not block passive observation. Reading, viewing, listing, searching, and comparing files is allowed when it supports the user's discussion request.
+**LTNEY never blocks reading or inspecting files, unless the user explicitly says so.**
+
+This is absolute and unconditional by default. Reading, viewing, listing, searching, and comparing files is not an execution in the LTNEY sense — it is context gathering, and context gathering always proceeds under LTNEY. An agent in LTNEY mode must not treat read or inspection work as something it needs permission for, or something it should stop short of, or something it should defer to a later turn. Read and inspect freely; stand by only on the execution side.
+
+The only thing that can narrow this rule is an explicit user instruction in the current conversation — for example "don't read any other files," "just answer from what's in front of you," or "stay in chat only." Absent such an explicit instruction, the default is: reading and inspection are always allowed.
+
+### Transitive reads (files referenced inside other files)
+
+The read-never-blocks rule extends to files that the user did not name directly but that are referenced inside a file the user provided or named.
+
+A prompt file, plan, task, report, summary, or any other user-provided file may itself instruct the agent to read further files. Under LTNEY, the agent follows those read references and reads every referenced file as part of working the provided file — without needing a second prompt or explicit per-file permission. This is still read-only inspection, not execution.
+
+Concrete example: the user hands the agent a prompt file (authored by another agent or platform) and says "work this prompt file under LTNEY." That prompt file says "read files A, B, and C." The agent reads the prompt file, then reads A, B, and C — all under LTNEY, all in the same turn, no second prompt required. The agent performs every read the prompt file asks for; it simply does not perform the executions the prompt file asks for until LTNEY is superseded for those executions.
+
+This prevents the failure mode where an over-literal agent reads only the directly-named file and stops, forcing the user to spend a second turn explicitly telling it to read the referenced files.
+
+### What read-only inspection includes
 
 Allowed read-only inspection includes:
 
-- reading files the user names
+- reading files the user names, directly or indirectly
+- reading files referenced inside other user-provided files (transitive reads)
 - listing directories to understand available files
 - searching text with read-only tools such as `rg`
 - comparing already-existing files or task records
 - inspecting configuration, skill, plan, task, summary, or documentation files
 - summarizing what was found without editing anything
 
-These actions are context gathering, not execution in the LTNEY sense. Do not ask the user to leave LTNEY just to read or inspect files they asked about.
+These actions are context gathering, not execution. Do not ask the user to leave LTNEY just to read or inspect files they asked about, or files those files reference.
 
-LTNEY still blocks actions that change state or run operational workflows, including file writes, moves, deletes, patches, validators, tests, builds, scripts that execute project logic, global sync, or durable artifact creation unless a scoped execution workflow such as `green-light` supersedes LTNEY for the named task.
+### LTNEY still blocks executions
+
+LTNEY still blocks actions that change state or run operational workflows, including file writes, moves, deletes, patches, validators, tests, builds, scripts that execute project logic, global sync, or durable artifact creation unless a scoped execution workflow such as `green-light` supersedes LTNEY for the named task. The execution side of working a prompt file — writing, editing, running, syncing — remains blocked until LTNEY is superseded for those actions.
+
+### Ambiguous action phrases are not a green-light
+
+"Let's get to work," "get to work," "go ahead," "continue," "proceed," and "please XYZ = <path>!!" are **not** a greenlight while LTNEY is active. Under LTNEY they mean: proceed with reading, research, and context-gathering — no writes, no mutations, no executions. Only an explicit `green-light` invocation lifts the block, and only for the named task. Never infer a greenlight from urgency, enthusiasm, or an action verb; when unsure, stay in LTNEY and confirm.
+
+The user has stated the rule directly:
+
+> "When I want the green light, I'll give you the green light."
+>
+> "If the LTNEY skill is active, and I say let's get to work, that just means get to work on doing the research and everything or whatever you need to do, but no actual executions yet."
+
+This also governs `inspect` Mode C, whose trigger list includes "Inspect this, then get to work on what it describes." Under LTNEY, that phrase authorizes the reading half only; the described work waits for an explicit green-light.
 
 ## LTNEY And Green-Light
 
@@ -156,7 +187,7 @@ In LTNEY mode this means:
 - do not over-scope the response into unrelated implementation work
 - flag uncertainty clearly
 - keep recommendations tightly tied to the user's stated goal
-- preserve project-contract safety boundaries while allowing read-only inspection as context gathering
+- preserve project-contract safety boundaries while reading and inspecting freely — reading and inspection are never blocked by LTNEY unless the user explicitly says so, including transitive reads
 
 ## Relationship To Other Skills
 
@@ -188,4 +219,4 @@ After creating or updating this skill:
 
 - confirm every edited file is inside the allowed path for that task per the project's canonical contract
 - validate folder-style skills with the `quick_validate.py` script that ships with your skill-creator install, running Python in UTF-8 mode (`-X utf8`).
-- smoke-check for `LETS TALK NO EXECUTIONS YET`, `DO NOT EXECUTE YET`, `read-only inspection is allowed`, `stand by`, `Diligent, Meticulous, and Surgical`, `no mutating command execution`, `LTNEY does not globally block other explicitly invoked skills`, and `green-light` scoped supersession handling.
+- smoke-check for `LETS TALK NO EXECUTIONS YET`, `DO NOT EXECUTE YET`, `Reading And Inspection Are Never Blocked`, `LTNEY never blocks reading or inspecting files, unless the user explicitly says so`, `transitive reads`, `stand by`, `Diligent, Meticulous, and Surgical`, `no mutating command execution`, `LTNEY does not globally block other explicitly invoked skills`, `Ambiguous action phrases are not a green-light`, and `green-light` scoped supersession handling.

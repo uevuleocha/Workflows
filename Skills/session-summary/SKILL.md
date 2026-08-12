@@ -212,6 +212,16 @@ Use this structure unless the user explicitly asks for a different one:
 
 ---
 
+## Agent Provenance
+
+| Field                  | Value                  |
+|------------------------|------------------------|
+| Content owner          | Uzo                    |
+| Original writing agent | <agent family>         |
+| Original writing LLM   | <model>                |
+| Created                | <YYYY-MM-DD>           |
+| Artifact role          | <what this artifact is>|
+
 ## 🎭 ACT I: [Specific Act Title]
 
 [Granular narrative of what happened.]
@@ -264,6 +274,16 @@ DoD met when:
 ## Next Session Pickup
 
 [Concrete next action for the next agent.]
+## Feedback Section
+
+<Always present, empty by default. Any agent appends `### Feedback N - YYYY-MM-DD - Agent - short descriptor`. Append-only; a correction is a new entry, never an edit. Never prune this section for being empty.>
+
+## Agent Change Log
+
+| Date and Time       | Agent     | Model   | Action  | Scope   |
+|---------------------|-----------|---------|---------|---------|
+| YYYY-MM-DD-HH:mm:ss | <agent>   | <model> | Created | <scope> |
+
 ```
 
 ## Definition of Done ACT
@@ -341,13 +361,13 @@ A return report:
 - carries a **lowercase child prefix** (`Na.)`, `Nb.)`, …) from the **Summary family** master `N` (the Summary Subject namespace), reserved by the orchestrator. The orchestrator/master summary is `N.)`; return reports inherit that Summary master number (e.g. `9.)` → reports `9a.)`, `9b.)`, …);
 - has a filename that **ends in `Report.md`** (for example, `9a.) claude_packet1_wave1_Report.md`);
 - lives under `<project root>\Archive\Historical\Summaries\<Subject>\`, beside the orchestrator/master summary;
-- adds one delegation-specific section: an **append-only `## Feedback` ledger**, placed after the session-summary body (after the `## Next Session Pickup` block).
+- adds one delegation-specific section: an **append-only `## Delegation Ledger`**, placed after the session-summary body (after the `## Next Session Pickup` block).
 
 **Separate namespace anchor.** The Summary family's master `N` comes from the Summary Subject namespace only — it is independent of the delegation's Plan/Task number and of the Delegation record's own number. The families are connected by explicit path pointers, not a shared number; do not expect the Summary master `N` to match the Plan or Delegation `N`.
 
-### Feedback ledger rules
+### Delegation Ledger rules
 
-The `## Feedback` section is append-only:
+The `## Delegation Ledger` section is append-only:
 
 - **Existing report content is immutable.** Never rewrite a returned deliverable, ACT, or earlier line of the report.
 - **Earlier feedback entries are immutable.** Once written, a feedback line is never edited or deleted — corrections are added as new lines.
@@ -357,7 +377,7 @@ The `## Feedback` section is append-only:
 Example:
 
 ```markdown
-## Feedback
+## Delegation Ledger
 
 - [2026-07-11] Orchestrator: deliverable matched DoD; one nit — rename helper.
 - [2026-07-11] Worker: helper renamed; re-validated, clean.
@@ -367,16 +387,33 @@ Example:
 
 This skill owns the **report/feedback shape** only. It does **not** know about delegation routing, packets, or lifecycle moves — that is `delegate-this` (reserve + mandate) and `finalize-delegation` (freeze on close). When asked to write a return report, use the reserved prefix supplied by the orchestrator, use session-summary structure, append `## Feedback`, and stop there.
 
+## Deterministic Markdown Table Aligner Integration
+
+When this skill creates or materially edits a file containing Markdown tables, it must invoke the `markdown-table-aligner` skill after semantic content is complete and before final handoff or Markdown-to-HTML/PDF serialization.
+
+Use the aligner's read-only `check` first. Treat exit `0` as authoritative deterministic monospaced Unicode alignment. For safe padding-only findings, run `format` to a distinct nonexistent staged path, review the diff, adopt it, and rerun `check`. Resolve overflow, malformed, or ambiguous findings manually; stop on operational failure. Confirm the dependency is available before the final write, and never silently replace it with raw character counting. The portable rule below remains compulsory.
+
+## Markdown Table Alignment
+
+Every Markdown table this skill writes - inside a durable artifact or into chat - must obey the workspace pipe-alignment rule, carried here so the rule stays portable after global installation:
+
+- **All Markdown tables must be visually pipe-aligned.** Cap every cell at 80 characters, including any overflow marker. If a cell's full content would exceed 80 characters, truncate it at the nearest word boundary within the cap, append a pointer such as `-> see note [row-id]` (using that row's own identifier - its `#`, `Phase`, name, or whichever column already identifies the row), and place the full original text as a plain note directly below the table, keyed by that same identifier. Pad columns so the table is aligned in a monospaced raw-text or Markdown view. Rendered visual alignment is authoritative; raw `|` indices are diagnostic only because Unicode display width (for example emoji, arrows, or wide glyphs) can differ from raw character counts. Do not flag or rework a table solely because raw pipe indices differ when the rendered table is visually aligned. Visibly uneven columns, malformed separators, or cells above 80 characters still fail. This applies to every table an agent writes, not only Estimated Effort tables. **Prefer ASCII-only characters (`->`, `--`, `...`) inside table cells**; Unicode glyphs (arrows, em/en dashes, ellipsis) render wider than one column in most viewers and silently break pipe alignment even when raw character counts match. When a table exceeds approximately 120 characters in total width, narrow the columns (truncate cells to essentials and move detail to notes) so the table renders on a single line without word-wrapping.
+
+**Validation check:** before handoff, review every table produced this run and confirm visual pipe alignment, the 80-character cell cap with overflow pointers, ASCII-only glyphs inside cells, and single-line rendering for wide tables. Misaligned tables are corrected before delivery.
+
+
 ## Agent Provenance For Durable Artifacts
 
 This skill applies the workspace's first-party durable-artifact provenance rule to session summaries, including migration handoffs and execution reports.
 
 For every in-scope artifact:
 
-- place an `## Agent Provenance` section near the top with `Content owner`, `Original writing agent`, `Created`, and `Artifact role`;
+- place an `## Agent Provenance` section immediately after the artifact's opening block -- its title, status, and lifecycle lines -- carrying `Content owner`, `Original writing agent`, `Original writing LLM`, `Created`, and `Artifact role`, in that order;
+- record `Original writing LLM` as the model that produced the artifact, kept distinct from the agent family that performed the write; use `Not recorded` when the model is genuinely unknown, and never infer it from the agent label or backfill it later;
 - use a stable truthful agent-family label such as `Codex Agent`, `Claude Agent`, `Antigravity Agent`, `Hermes Agent`, or `zCode Agent`;
 - keep the original writing-agent entry immutable;
-- keep an append-only `## Agent Change Log` near the bottom, recording the date, acting agent, action, and concise scope for every material edit;
+- keep an append-only `## Agent Change Log` as the last section, or immediately above any section the artifact already reserves for the last position, rendered as a five-column `Date and Time | Agent | Model | Action | Scope` table with one row per material edit;
+- stamp every change-log row `YYYY-MM-DD-HH:mm:ss` on a 24-hour clock, read from the machine clock and never estimated; leave historical date-only rows exactly as written rather than backfilling them, because a log carrying both shapes is correct and the boundary between them is itself information;
 - if a legacy artifact lacks reliable creator evidence, use `Not recorded` rather than guessing, then log the current agent's actual change; and
 - treat copying or global synchronization as transport, not authorship.
 
@@ -387,3 +424,43 @@ Keep `Content owner` for now. In Uzo's personal artifacts it normally resolves t
 This skill owns summary scope, ACTS structure, metadata, Subject, permanent number, path, delegation-report shape, and content. When co-invoked with `html-this` or `pdf-this`, run the complete summary workflow but save only the requested `.html` or `.pdf` artifact unless the user requests multiple formats. Pass the requested format through when this skill is called by a migration or delegation workflow.
 
 Treat same-stem `.md`, `.html`, and `.pdf` variants as one summary-family artifact and one reserved prefix. Update every existing sibling consistently. Return-report names use `Report.html` or `Report.pdf` in the requested format. This section overrides `.md`-only examples only for the co-invoked run.
+
+## Feedback Section
+
+Every artifact this skill creates carries a `## Feedback Section`, **present and empty by default**, placed immediately above the `## Agent Change Log`.
+
+The section exists so agents can talk to each other through the artifact instead of through a chat session neither of them shares. An orchestrator writes what it needs verified; a verifier writes what it found; the implementer writes back what it changed. Each reads what the others left, across platforms and across sessions.
+
+Entries are append-only and numbered:
+
+```markdown
+## Feedback Section
+
+### Feedback 1 - 2026-08-03 - Hermes Agent - Initial implementation
+
+[what was done]
+
+### Feedback 2 - 2026-08-03 - Bolu (Codex sub-agent) - Independent verification
+
+[what was found, and what remains]
+```
+
+Rules:
+
+- The parent heading is `## Feedback Section` and is always present, even with no entries.
+- Each entry is `### Feedback N - date - agent - short descriptor`, numbered from 1 and never renumbered.
+- Earlier entries are immutable. A correction is a **new** entry, never an edit to an old one.
+- Entries may nest `####` sub-detail (an evidence ledger, a scenario table) inside a single entry.
+- An empty Feedback Section is correct and must never be pruned for being empty.
+
+## Exact Model Attribution
+
+Whenever this skill writes a new model identity, appends a current-run model value, or defines a workflow that does either:
+
+- Record the full model identity actually used when it is safely available from current runtime or session metadata. Use a specific identity such as `GPT-5.6 Sol`, `GPT-5.6 Terra`, or `Claude Opus 5`; a family-only label such as `GPT-5`, `Claude`, or `Codex Agent` is not an acceptable substitute.
+- Resolve identity in this order: current runtime or session metadata; a platform-provided current-model field; only then, when unavoidable, a field-minimized configuration lookup that returns the model field alone. Apply `tread-lightly` to any potentially sensitive configuration and never display, copy, search, diff, or log the whole configuration.
+- Keep the agent family and model identity separate. Never infer an exact model from an agent label, provider name, stale configuration, or model family.
+- Use `Not recorded` only when the exact identity genuinely cannot be established safely. Do not replace an available exact identity with `Not recorded` merely to avoid checking current runtime metadata.
+- Preserve append-only history. Never rewrite a historical provenance or change-log value solely to improve an old model label; add a truthful current correction entry when correction is required.
+
+**Validation check:** For every model value newly written in the current run, accept a full exact identity and the honest `Not recorded` fallback, but reject known ambiguous family-only labels or agent-family substitutions. Confirm model discovery exposed only the required model field and that no historical row was rewritten.

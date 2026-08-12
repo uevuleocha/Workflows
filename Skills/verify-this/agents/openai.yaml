@@ -1,0 +1,7 @@
+interface:
+  display_name: "Verify This"
+  short_description: "Confirm goals/DoD met, write feedback"
+  default_prompt: "Use $verify-this to confirm that work done by an implementation agent met its stated goals and Definitions of Done, then write a new dated feedback subsection (PASS/READY/CHANGES NEEDED/BLOCKED) into the durable artifact so the orchestrator is never blocked. Anti-over-sabi: report unmet goals and blatant defects, never hunt edge cases or nitpick."
+
+policy:
+  allow_implicit_invocation: true

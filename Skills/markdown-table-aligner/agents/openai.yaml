@@ -1,0 +1,8 @@
+interface:
+  display_name: "Markdown Table Aligner"
+  short_description: "Align Markdown tables deterministically"
+  default_prompt: "Use $markdown-table-aligner to check or safely align Markdown pipe tables using Unicode display width without changing cell content."
+
+policy:
+  allow_implicit_invocation: true
+

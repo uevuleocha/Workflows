@@ -65,10 +65,25 @@ done-criteria, and the failure conditions the moment it opens this file.>
 - [ ] No FAILURE condition remains active.
 - [ ] Relevant tests, validators, inspections, or manual checks are recorded.
 
+## Checklist Tick Discipline
+
+**Checklist Tick Discipline.** The executing agent ticks every DEFINITION OF DONE and Verification Checklist box its own evidence supports, in the same pass, and states the evidence for each. Leave a box unticked only when the claim is false, unevidenced, or ambiguous — and say which and why. An unticked box means "not done," never "done but awaiting someone else's confirmation." Independent verification re-checks the ticks; it does not supply them. A tick asserts what this pass did and evidenced; it does not assert that the result is proven correct in later production use.
+
 ## Notes
 
 <Optional. Provenance, related prompts, reopen history.>
-```
+
+## Feedback Section
+
+<Always present, empty by default. Any agent appends a numbered subsection:
+`### Feedback N - YYYY-MM-DD - Agent - short descriptor`. Append-only; a
+correction is a new entry, never an edit to an earlier one. Never prune this
+section for being empty.>
+## Agent Change Log
+
+| Date and Time       | Agent        | Model         | Action  | Scope   |
+|---------------------|--------------|---------------|---------|---------|
+| YYYY-MM-DD-HH:mm:ss | <agent>      | <model>       | Created | <scope> |```
 
 ---
 

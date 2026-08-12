@@ -44,7 +44,7 @@ Normally infer these from the invocation and workspace:
 3. Declared source roots and exclusion rules.
 4. Existing `index.md`, `log.md`, and wiki pages.
 5. Requested scope: all detected changes, named sources, or source-root update.
-6. User-approved history-aware treatment choices for detected groups, if any.
+6. Any user permission already granted for a full-source-page exception on a detected historical group. Absent such permission, the mandatory mine-and-fold + light history default applies and is not an input to gather.
 
 Ask only when the requested ingest order, schema meaning, source-root change, or federation action is ambiguous. Batching is never inferred as approved.
 
@@ -94,28 +94,32 @@ Before synthesis, show the manifest summary and the intended ingest order.
 
 For an ordinary small manifest, confirm the manifest/order as part of the normal sync checkpoint; do not manufacture unnecessary batches.
 
-### 6. Detect and confirm history-aware treatment
+### 6. Apply history-aware treatment
 
-Inspect the manifest for any folder or coherent source group that is mostly a point-in-time historical record rather than durable reference knowledge. Session summaries, changelogs, migration logs, and backups are examples only; never hardcode detection to one folder name or artifact family.
+Inspect the manifest for any folder or coherent source group that is mostly a point-in-time historical record rather than durable reference knowledge. Session summaries, changelogs, migration logs, and backups are examples only; never hardcode detection to one folder name or artifact family. Detection stays context-driven and schema-driven; only the treatment applied after detection is fixed.
 
-When such a group is detected:
+**Mandatory default.** For every detected historical group, **mine-and-fold + light history is the compulsory, explicit default treatment.** Apply it directly. Do not pause, do not ask the user to choose, and do not treat full source pages as the fallback. This default is not advisory and an agent may not substitute its own preference for it.
 
-1. Name the exact group and explain briefly why it appears mostly historical.
-2. Ask the user to choose for that group:
-   - normal ingestion with a full schema-defined source page per item; or
-   - **mine-and-fold + light history** treatment.
-3. Use mine-and-fold + light history only after explicit user agreement. If the user declines or does not agree, ingest that group normally.
-4. Record the choice per group; different groups may use different treatments.
+**The one exception — full source page, by permission only.** An agent may use normal ingestion with a full schema-defined source page for a historical group or item **only** when it has a specific, articulable, genuinely strong reason that the default would lose something the wiki needs. In that case it must:
 
-For an approved mine-and-fold + light history group:
+1. Stop before writing that group.
+2. Name the exact group or item and state the specific reason a full source page is better for it.
+3. Wait for the user's explicit permission.
+4. Proceed with full source pages only if permission is granted. **If the user declines, or gives no clear agreement, apply the mandatory mine-and-fold + light history default immediately and continue the run without asking a follow-up question.**
+
+Reserve this escalation for genuine cases. Do not stop on every historical group, do not stop out of caution, and do not use the exception to reintroduce ask-every-time behavior. A run that raises no exception is the normal, correct run.
+
+Record the treatment applied per group; a granted exception may make different groups use different treatments.
+
+For a mine-and-fold + light history group:
 
 - Mine durable lessons, decisions, outcomes, what worked, and what failed, then fold them into the relevant knowledge pages declared by the active schema.
 - Create one light provenance page per historical item, carrying the schema's required metadata plus title, date, key decisions, what worked/failed, and links to affected knowledge pages or their schema-equivalent fields.
 - File those light pages under a dedicated history type/topic/folder declared by the active schema so they remain discoverable without dominating navigation.
-- If the schema does not declare a suitable history location or page format, show the exact schema amendment and wait for approval before using the treatment. Never hardcode a folder or taxonomy into the skill.
+- If the schema does not declare a suitable history location or page format, show the exact schema amendment and wait for approval before using the treatment. This gate stays blocking even though the treatment itself is the mandatory default; a mandatory treatment never authorizes inventing a folder or taxonomy. Never hardcode a folder or taxonomy into the skill.
 - Preserve coverage and provenance for every item. The treatment changes depth and filing, not whether an item is represented.
 
-This decision is separate from batching: a confirmed batch may contain normal and history-aware groups, but each group's user-approved treatment remains binding.
+This is separate from batching: a confirmed batch may contain ordinary and historical groups, but each historical group's treatment - the default, or a permitted exception - remains binding.
 
 ### 7. Synthesize according to the schema
 
@@ -180,8 +184,27 @@ Stop and report instead of claiming success if:
 - duplicate pages are knowingly introduced;
 - a child source would be ingested into a hub wiki;
 - ingestion was batched without confirmation, truncated, or reordered against the user's instruction;
-- a historical group was compressed, mined, or given light pages without being detected, named, and explicitly approved by the user;
+- a detected historical group was given full schema-defined source pages without the agent stopping, naming the group, stating a specific strong reason, and receiving explicit user permission;
+- a detected historical group was given anything other than mine-and-fold + light history while no such permission was in force;
+- the user was asked to choose a treatment for a historical group, or the run paused on one, without a specific strong reason for a full source page being raised;
+- mine-and-fold + light history was applied while the active schema declared no suitable history location or page format and no schema amendment was approved;
+- coverage or provenance was dropped for any historical item, rather than only its depth and filing being reduced;
 - history-aware behavior was hardcoded to a folder name, artifact family, page taxonomy, or output folder rather than driven by context and the schema.
+
+## Deterministic Markdown Table Aligner Integration
+
+When this skill creates or materially edits a file containing Markdown tables, it must invoke the `markdown-table-aligner` skill after semantic content is complete and before final handoff or Markdown-to-HTML/PDF serialization.
+
+Use the aligner's read-only `check` first. Treat exit `0` as authoritative deterministic monospaced Unicode alignment. For safe padding-only findings, run `format` to a distinct nonexistent staged path, review the diff, adopt it, and rerun `check`. Resolve overflow, malformed, or ambiguous findings manually; stop on operational failure. Confirm the dependency is available before the final write, and never silently replace it with raw character counting. The portable rule below remains compulsory.
+
+## Markdown Table Alignment
+
+Every Markdown table this skill writes - inside a durable artifact or into chat - must obey the workspace pipe-alignment rule, carried here so the rule stays portable after global installation:
+
+- **All Markdown tables must be visually pipe-aligned.** Cap every cell at 80 characters, including any overflow marker. If a cell's full content would exceed 80 characters, truncate it at the nearest word boundary within the cap, append a pointer such as `-> see note [row-id]` (using that row's own identifier - its `#`, `Phase`, name, or whichever column already identifies the row), and place the full original text as a plain note directly below the table, keyed by that same identifier. Pad columns so the table is aligned in a monospaced raw-text or Markdown view. Rendered visual alignment is authoritative; raw `|` indices are diagnostic only because Unicode display width (for example emoji, arrows, or wide glyphs) can differ from raw character counts. Do not flag or rework a table solely because raw pipe indices differ when the rendered table is visually aligned. Visibly uneven columns, malformed separators, or cells above 80 characters still fail. This applies to every table an agent writes, not only Estimated Effort tables. **Prefer ASCII-only characters (`->`, `--`, `...`) inside table cells**; Unicode glyphs (arrows, em/en dashes, ellipsis) render wider than one column in most viewers and silently break pipe alignment even when raw character counts match. When a table exceeds approximately 120 characters in total width, narrow the columns (truncate cells to essentials and move detail to notes) so the table renders on a single line without word-wrapping.
+
+**Validation check:** before handoff, review every table produced this run and confirm visual pipe alignment, the 80-character cell cap with overflow pointers, ASCII-only glyphs inside cells, and single-line rendering for wide tables. Misaligned tables are corrected before delivery.
+
 
 ## Agent Provenance For Durable Artifacts
 
@@ -189,16 +212,29 @@ This skill applies the workspace's first-party durable-artifact provenance rule 
 
 For every in-scope artifact:
 
-- place an `## Agent Provenance` section near the top with `Content owner`, `Original writing agent`, `Created`, and `Artifact role`;
+- place an `## Agent Provenance` section immediately after the artifact's opening block -- its title, status, and lifecycle lines -- carrying `Content owner`, `Original writing agent`, `Original writing LLM`, `Created`, and `Artifact role`, in that order;
+- record `Original writing LLM` as the model that produced the artifact, kept distinct from the agent family that performed the write; use `Not recorded` when the model is genuinely unknown, and never infer it from the agent label or backfill it later;
 - use a stable truthful agent-family label such as `Codex Agent`, `Claude Agent`, `Antigravity Agent`, `Hermes Agent`, or `zCode Agent`;
 - keep the original writing-agent entry immutable;
-- keep an append-only `## Agent Change Log` near the bottom, recording the date, acting agent, action, and concise scope for every material edit;
+- keep an append-only `## Agent Change Log` as the last section, or immediately above any section the artifact already reserves for the last position, rendered as a five-column `Date and Time | Agent | Model | Action | Scope` table with one row per material edit;
+- stamp every change-log row `YYYY-MM-DD-HH:mm:ss` on a 24-hour clock, read from the machine clock and never estimated; leave historical date-only rows exactly as written rather than backfilling them, because a log carrying both shapes is correct and the boundary between them is itself information;
 - if a legacy artifact lacks reliable creator evidence, use `Not recorded` rather than guessing, then log the current agent's actual change; and
 - treat copying or global synchronization as transport, not authorship.
 
 Keep `Content owner` for now. In Uzo's personal artifacts it normally resolves to `Uzo`; do not confuse content ownership with the agent that performed the filesystem write. Do not inject provenance into product source, third-party files, databases, generated caches, skill definitions, schema-sensitive or machine-consumed files, or other operational files unless their schema explicitly supports it.
 
+## Exact Model Attribution
+
+Whenever this skill writes a new model identity, appends a current-run model value, or defines a workflow that does either:
+
+- Record the full model identity actually used when it is safely available from current runtime or session metadata. Use a specific identity such as `GPT-5.6 Sol`, `GPT-5.6 Terra`, or `Claude Opus 5`; a family-only label such as `GPT-5`, `Claude`, or `Codex Agent` is not an acceptable substitute.
+- Resolve identity in this order: current runtime or session metadata; a platform-provided current-model field; only then, when unavoidable, a field-minimized configuration lookup that returns the model field alone. Apply `tread-lightly` to any potentially sensitive configuration and never display, copy, search, diff, or log the whole configuration.
+- Keep the agent family and model identity separate. Never infer an exact model from an agent label, provider name, stale configuration, or model family.
+- Use `Not recorded` only when the exact identity genuinely cannot be established safely. Do not replace an available exact identity with `Not recorded` merely to avoid checking current runtime metadata.
+- Preserve append-only history. Never rewrite a historical provenance or change-log value solely to improve an old model label; add a truthful current correction entry when correction is required.
+
+**Validation check:** For every model value newly written in the current run, accept a full exact identity and the honest `Not recorded` fallback, but reject known ambiguous family-only labels or agent-family substitutions. Confirm model discovery exposed only the required model field and that no historical row was rewritten.
+
 ## Validation
 
-Report the resolved workspace, schema used, source roots, detection method, processed/uncertain sources, wiki outputs, federation actions, and before/after source-state result. State the confirmed ingest order, whether execution was one-shot or batched, every detected historical group and its user-selected treatment, and the per-pass immutability result. State plainly whether the sync passed or failed.
-
+Report the resolved workspace, schema used, source roots, detection method, processed/uncertain sources, wiki outputs, federation actions, and before/after source-state result. State the confirmed ingest order, whether execution was one-shot or batched, every detected historical group with the treatment applied to it, and the per-pass immutability result. Name any group where the mandatory mine-and-fold + light history default was displaced by a permitted full-source-page exception, along with the reason given and the user's explicit permission, so a misjudged detection stays auditable after the run. State plainly whether the sync passed or failed.

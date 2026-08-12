@@ -94,13 +94,20 @@ $WORKSPACE/Archive/Historical/Manifests/zCode/
 
 All three notations mean the same thing: the `Archive/Historical/Manifests/zCode/` folder of the workspace currently being worked in. The platform folder is determined by the chat platform being migrated, not by the agent performing the work: a Codex or Claude helper executing a zCode migration still uses the `zCode` folder. Once a migration is confirmed, the manifest is no longer needed — the user can ask an agent to delete it from there.
 
-Every manifest saved in `Archive/Historical/Manifests/zCode/` must start with the next sequential `N.) ` prefix based only on the highest existing numbered file in that platform folder. Use the migration grammar `N.) Who + Topic + What`: `N.) <Platform> <Topic> Manifest.json`, Title Case with spaces, where `<Platform>` is the chat platform being migrated; for example, `1.) zCode Trading Chats Manifest.json`. When updating or renaming a staged manifest, preserve its existing sequence number while changing the descriptive portion to match its current scope and state. Do not leave migration manifests unnumbered.
+Create the manifest through the `manifest-this` skill. `manifest-this` owns the content, the sequential `N.) ` prefix (next integer after the highest existing numbered file in the `zCode` platform folder), the migration grammar `N.) Who + Topic + What` -> `N.) <Platform> <Topic> Manifest.md` (Title Case with spaces; for example `1.) zCode Trading Chats Manifest.md`), and the always-historical placement under `Archive/Historical/Manifests/zCode/`. **The manifest default format for migration skills is Markdown (`.md`), not HTML** - pass the Markdown override to `manifest-this`. The Markdown manifest embeds the exact native JSON payload in a fenced block so the Execution Workflow can recover it. When updating or renaming a staged manifest, preserve its existing sequence number while changing the descriptive portion to match its current scope and state. Do not leave migration manifests unnumbered.
 
-When a migration is staged (e.g. one-session test first, then the rest), prefer updating the existing manifest in place to reflect what is done and what remains, rather than creating a second file, unless the sessions come from more than one source workspace. One source workspace means one manifest.
+**Availability guard (both workflows).** Before the manifest step, confirm the `manifest-this` skill is present in the agent's loaded skills.
+
+- If it is NOT available, pause and tell the user:
+  > The `manifest-this` skill is not loaded. It is required to create or update the migration manifest. Please make it available, or tell me to continue without it.
+- If the user insists on continuing without it, write the manifest by hand in the same folder with the same naming and grammar, then note in your handoff or feedback summary that the dedicated skill was unavailable.
+- Never silently skip the manifest.
+
+When a migration is staged (e.g. one-session test first, then the rest), prefer updating the existing manifest in place through the `manifest-this` skill (update mode) to reflect what is done and what remains, rather than creating a second file, unless the sessions come from more than one source workspace. One source workspace means one manifest.
 
 ## Agent Provenance For Durable Artifacts
 
-The migration manifest is a first-party durable artifact and must carry schema-safe agent provenance. Native JSON manifests use a top-level `agent_provenance` object containing `content_owner`, `original_writing_agent`, `created`, `artifact_role`, and an append-only `change_log`. Each change-log item records the date, truthful acting agent, action, and concise scope. Preserve the original writer permanently.
+The migration manifest is a first-party durable artifact and must carry schema-safe agent provenance. `manifest-this` renders the visible Agent Provenance table and append-only Agent Change Log in the manifest artifact; the embedded native JSON payload keeps its own top-level `agent_provenance` object containing `content_owner`, `original_writing_agent`, `original_writing_llm`, `created`, `artifact_role`, and an append-only `change_log`. Each change-log item records the clock-read `YYYY-MM-DD-HH:mm:ss` timestamp, truthful acting agent, that agent's `model`, action, and concise scope. Preserve the original writer and the original writing model permanently.
 
 The helper for this skill accepts additional top-level manifest metadata, but never add provenance to application databases, transcripts, caches, registries, backups, or other migrated operational state. If another manifest consumer has a strict schema that rejects the metadata, keep the native execution manifest unchanged and place provenance in an approved human-readable companion instead.
 
@@ -108,9 +115,9 @@ The helper for this skill accepts additional top-level manifest metadata, but ne
 
 ## Durable Artifact Format Handling
 
-This skill owns migration discovery, safety gates, manifest schema, execution, backups, verification, and handoff/report scope. When co-invoked with `html-this` or `pdf-this`, pass the requested format to `session-summary` and create only the requested human-readable handoff/report format.
+This skill owns migration discovery, safety gates, manifest schema, execution, backups, verification, and handoff/feedback scope. When co-invoked with `html-this` or `pdf-this`, pass the requested format to `session-summary` and create only the requested human-readable handoff/feedback format.
 
-The execution manifest remains native JSON by default. If the user explicitly requests an HTML-only or PDF-only manifest, embed the exact JSON through the format skill. Before execution, recover it to an approved temporary `.json`, validate the original manifest schema, and give only that temporary file to the migration helper. Backups, databases, and app state always remain in their required native formats. Treat same-stem format variants as one manifest.
+The migration manifest is created through `manifest-this`, whose default format for migration skills is Markdown (`.md`) with the exact native JSON embedded in a fenced block. If the user explicitly requests an HTML-only or PDF-only manifest, `manifest-this` embeds the exact JSON through the format skill. Before execution, recover the JSON to an approved temporary `.json`, validate the original manifest schema, and give only that temporary file to the migration helper; remove it afterward per the workspace temporary-file policy. Backups, databases, and app state always remain in their required native formats. Treat same-stem format variants as one manifest.
 
 ## Session Summary Integration
 
@@ -119,8 +126,8 @@ Both workflows close by producing an explicit session summary through the `sessi
 **Availability guard (both workflows).** Before the summary step, confirm the `session-summary` skill is present in the agent's loaded skills.
 
 - If it is NOT available, pause and tell the user:
-  > The `session-summary` skill is not loaded. It is required to produce the migration handoff/report summary. Please make it available, or tell me to continue without it.
-- If the user insists on continuing without it, proceed and write a plain markdown summary into the same folder with the same naming, then note in your final report that the dedicated skill was unavailable.
+  > The `session-summary` skill is not loaded. It is required to produce the migration handoff/feedback summary. Please make it available, or tell me to continue without it.
+- If the user insists on continuing without it, proceed and write a plain markdown summary into the same folder with the same naming, then note in your final feedback summary that the dedicated skill was unavailable.
 - Never silently skip the summary.
 
 **Save location and naming (both workflows).** Invoke `session-summary` pre-filled so the user does not have to complete its input template:
@@ -130,7 +137,7 @@ Both workflows close by producing an explicit session summary through the `sessi
 - Sequence number: the next integer after the highest existing `N.)` file in the `zCode` platform folder only.
 - Filename templates — the migration grammar `N.) Who + Topic + What`. These override the `session-summary` skill's default filename convention: pre-fill the filename so the output uses this exact shape, with no trailing `Summary N` and no `Execution` wording.
   - Handoff, written by the front-door agent: `N.) <Front-Door Agent> <Topic> Handoff.md` — e.g. `1.) zCode Trading Chats Handoff.md`
-  - Report, written by the helper agent: `N.) <Helper Agent> <Topic> Report.md` — e.g. `2.) Hermes Trading Chats Report.md`
+  - Feedback, written by the helper agent: `N.) <Helper Agent> <Topic> Feedback.md` — e.g. `2.) Hermes Trading Chats Feedback.md`
 
 ## Front-Door Workflow
 
@@ -169,7 +176,7 @@ Use read-only inspection of:
 
 Once discovery is complete:
 
-1. Save (or update in place) a sequentially numbered `N.) ` manifest under the active workspace's `Archive/Historical/Manifests/zCode/` folder.
+1. Create the manifest by explicitly invoking the `manifest-this` skill (Markdown default; see **Manifest Storage**), saved under the active workspace's `Archive/Historical/Manifests/zCode/` folder.
 2. Produce the migration handoff summary by explicitly invoking the `session-summary` skill (see **Session Summary Integration**). Scope it to the helper agent's portion, pre-fill the skill's inputs, and save it under `Archive/Historical/Summaries/Migration/zCode/`. Apply the availability guard if the skill is not loaded.
 3. Group sessions by real discovered old workspace when needed. If there are mixed-source sessions, represent them as separate source groups rather than flattening them into one assumed old workspace.
 
@@ -207,7 +214,7 @@ When preparing a batch or front-door package for another agent:
 
 Use this workflow only when a non-zCode helper agent is running and zCode is fully closed.
 
-The Execution Workflow consumes the manifest and handoff package prepared by the Front-Door Workflow. It performs the real migration writes, verification, and reporting.
+The Execution Workflow consumes the manifest and handoff package prepared by the Front-Door Workflow. It performs the real migration writes, verification, and feedback summary generation.
 
 ### Pre-flight
 
@@ -288,7 +295,7 @@ These do not affect sidebar grouping. Skip unless the user asks for a tidy DB.
 
 ### Helper Script
 
-Use `scripts/migrate_zcode_workspace_chat.py` for deterministic migration when available. Prefer `--dry-run` first. Save the manifest you pass to it under the workspace's `Archive/Historical/Manifests/zCode/` folder (see **Manifest Storage**).
+Use `scripts/migrate_zcode_workspace_chat.py` for deterministic migration when available. Prefer `--dry-run` first. The helper consumes the native JSON recovered from the durable manifest into an approved temporary `.json` (see **Durable Artifact Format Handling**); keep the durable Markdown manifest in `Archive/Historical/Manifests/zCode/` (see **Manifest Storage**).
 
 The helper script belongs to the **Execution Workflow** side. It is not the front door. zCode may help discover inputs and generate the manifest, but a non-zCode helper agent should run the script while zCode is fully closed.
 
@@ -331,9 +338,9 @@ After migration and before telling the user it is done:
 - **HARD PASS/FAIL GATE — sidebar visibility:** after the user reopens zCode, the migrated chat MUST appear under the destination project group in the sidebar and stay there after a restart. **No message-send is required.** If it is still absent, the migration is **not done** — see Failure And Rollback.
 - Confirm the chat opens/resumes normally in the destination working directory.
 
-### Execution Summary
+### Execution Feedback
 
-After verification passes and before considering the migration closed, produce an execution report by explicitly invoking the `session-summary` skill (see **Session Summary Integration**). Scope it to the helper agent's portion: the handoff it received plus every change it applied, verified, or rolled back. Pre-fill the skill's inputs and save under `Archive/Historical/Summaries/Migration/zCode/` so the user (and the front-door agent) can review it. Apply the availability guard if the skill is not loaded.
+After verification passes and before considering the migration closed, produce an execution feedback summary by explicitly invoking the `session-summary` skill (see **Session Summary Integration**). Scope it to the helper agent's portion: the handoff it received plus every change it applied, verified, or rolled back. Pre-fill the skill's inputs and save under `Archive/Historical/Summaries/Migration/zCode/` so the user (and the front-door agent) can review it. Apply the availability guard if the skill is not loaded. If the helper updates the manifest (for example marking sessions applied or recording a rollback), do so through the `manifest-this` skill (update mode) so the artifact, its number, and its change log stay consistent.
 
 ### Failure And Rollback
 
@@ -352,3 +359,15 @@ If anything else fails before a session is fully written, stop and report the fa
 4. Only after `tasks-index.sqlite` is confirmed correct, check the `db.sqlite session` row (for resume dir). A stale `session` row makes the chat open in the wrong folder but does **not** hide it from the sidebar.
 
 Do not declare the migration done until the chat is visibly grouped under the destination after a restart. **There is no "send a message" fix and no folder-deletion requirement** — those were disproven. If `tasks-index.sqlite` is confirmed correct and the chat is still hidden, escalate to investigating whether an additional store exists (none has been found beyond `tasks-index.sqlite` as of 2026-07-07).
+
+## Exact Model Attribution
+
+Whenever this skill writes a new model identity, appends a current-run model value, or defines a workflow that does either:
+
+- Record the full model identity actually used when it is safely available from current runtime or session metadata. Use a specific identity such as `GPT-5.6 Sol`, `GPT-5.6 Terra`, or `Claude Opus 5`; a family-only label such as `GPT-5`, `Claude`, or `Codex Agent` is not an acceptable substitute.
+- Resolve identity in this order: current runtime or session metadata; a platform-provided current-model field; only then, when unavoidable, a field-minimized configuration lookup that returns the model field alone. Apply `tread-lightly` to any potentially sensitive configuration and never display, copy, search, diff, or log the whole configuration.
+- Keep the agent family and model identity separate. Never infer an exact model from an agent label, provider name, stale configuration, or model family.
+- Use `Not recorded` only when the exact identity genuinely cannot be established safely. Do not replace an available exact identity with `Not recorded` merely to avoid checking current runtime metadata.
+- Preserve append-only history. Never rewrite a historical provenance or change-log value solely to improve an old model label; add a truthful current correction entry when correction is required.
+
+**Validation check:** For every model value newly written in the current run, accept a full exact identity and the honest `Not recorded` fallback, but reject known ambiguous family-only labels or agent-family substitutions. Confirm model discovery exposed only the required model field and that no historical row was rewritten.

@@ -1,7 +1,7 @@
 interface:
   display_name: "Stage Commit Push"
-  short_description: "Safe push with optional nested-repo pointer sync"
-  default_prompt: "Use $stage-commit-push for the explicit scope. If this repo is a hub submodule, prove its commit is pushed and ask before a separate pointer-only hub commit."
+  short_description: "Safe push with automatic loud nested-repo pointer sync"
+  default_prompt: "Use $stage-commit-push for the explicit scope. If this repo is a hub submodule, prove its commit is pushed and automatically perform loud pointer-only hub sync unless explicitly opted out."
 
 policy:
   allow_implicit_invocation: false

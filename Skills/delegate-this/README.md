@@ -101,3 +101,6 @@ the first Mode A run. Do not assume the original maintainer's platform set or pa
 ## Optional artifact formats
 
 Pair with `html-this` or `pdf-this` for HTML-only or PDF-only human-readable artifacts while this skill retains content and workflow ownership.
+## Deterministic table dependency
+
+Adopt `markdown-table-aligner` with this skill. It supplies the deterministic final padding pass for file-based Markdown tables; the portable rule remains the content and fallback contract.

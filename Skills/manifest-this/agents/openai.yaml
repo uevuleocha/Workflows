@@ -1,0 +1,7 @@
+interface:
+  display_name: "Manifest This"
+  short_description: "Create or update official manifests"
+  default_prompt: "Use $manifest-this to create or update an official manifest of things to edit, update, delete, or deal with."
+
+policy:
+  allow_implicit_invocation: true

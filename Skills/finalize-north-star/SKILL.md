@@ -126,7 +126,8 @@ The helper must:
 - move the file from Live to the matching Historical Subject;
 - refuse to overwrite or renumber on collision; and
 - leave no duplicate on the Live side.
-- preserve exactly one mandatory Agent Provenance table immediately after lifecycle and append the finalizer entry to the helper-owned Agent Change Log;
+- preserve exactly one mandatory Agent Provenance table immediately after lifecycle, with all five canonical rows including `Original writing LLM`, and append the finalizer entry to the helper-owned five-column Agent Change Log;
+- preserve exactly one Feedback Section immediately above the change log, including an empty one;
 - refuse unattributed finalization when `--acting-agent` is absent; and
 - keep Agent Change Log as the final human-readable section immediately before terminal Base64 state.
 
@@ -197,7 +198,9 @@ When finalization is refused or deferred, report the missing gate, any helper-de
 
 ## Agent Provenance For Durable Artifacts
 
-Finalization never replaces the original creator. Preserve exactly one `## Agent Provenance` section immediately after the lifecycle line, including its canonical two-column `Field | Value` table and immutable Original writing agent. Pass the truthful finalizer through required `--acting-agent`; the helper appends the lifecycle action to its state-owned `## Agent Change Log`. That log is compulsory and must remain the final human-readable section immediately before the Base64 marker. The Base64 state marker and `north-star:run-end` remain the final two nonblank lines with nothing below them.
+Finalization never replaces the original creator. Preserve exactly one `## Agent Provenance` section immediately after the lifecycle line, including its canonical two-column `Field | Value` table and its immutable `Original writing agent` and `Original writing LLM` rows. Pass the truthful finalizer through required `--acting-agent`, and its model through `--acting-llm`; the helper appends the lifecycle action to its state-owned `## Agent Change Log` as a five-column `Date and Time | Agent | Model | Action | Scope` row with a clock-read `YYYY-MM-DD-HH:mm:ss` timestamp. That log is compulsory and must remain the final human-readable section immediately before the Base64 marker. Preserve exactly one `## Feedback Section` immediately above it, including an empty one — never prune a Feedback Section because it carries no entries, and never tick or rewrite what an earlier agent left there. The Base64 state marker and `north-star:run-end` remain the final two nonblank lines with nothing below them.
+
+**Publication steps are never a closure gate.** A wiki sync, a `stage-commit-push` run, a GitHub push, or a submodule pointer bump must never block, defer, or fail finalization, and this finalizer never performs one itself. Those operations belong after the artifact reaches its final Historical path — finalization renames and moves the file, so syncing first leaves the wiki holding a synthesised copy of a path that no longer exists. Where such an item appears in a DEFINITION OF DONE or Verification Checklist, report it, recommend a waiver, and close.
 
 When same-stem Markdown, HTML, or PDF siblings exist, apply the same provenance history to the complete artifact set. If a legacy artifact lacks reliable creator evidence, record `Original writing agent: Not recorded` rather than guessing, and log the current finalizer's work. Do not add embedded provenance to product source, third-party files, databases, generated caches, skill definitions, schema-sensitive or machine-consumed files, or other operational files unless their schema explicitly supports it.
 
@@ -207,7 +210,43 @@ This skill still owns every Prompt Contract, evidence record, and finalization g
 
 An HTML-only or PDF-only North Star remains in that format; do not manufacture Markdown. Stop rather than finalize only part of a sibling set. Extension-only search and helper-path examples become format-neutral for this run.
 
+## Checklist Tick Discipline
+
+**Checklist Tick Discipline.** The executing agent ticks every DEFINITION OF DONE and Verification Checklist box its own evidence supports, in the same pass, and states the evidence for each. Leave a box unticked only when the claim is false, unevidenced, or ambiguous — and say which and why. An unticked box means "not done," never "done but awaiting someone else's confirmation." Independent verification re-checks the ticks; it does not supply them. A tick asserts what this pass did and evidenced; it does not assert that the result is proven correct in later production use.
+
+As a finalizer, read an unticked box as **not done**. Never treat a blank box as "done, the executor was being cautious," and never supply the executor's ticks to make an artifact look complete. Where a box is unticked but its evidence is plainly present, report the discrepancy to the user rather than silently resolving it in either direction.
+
+## No Invented Sync Constraints
+
+**No Invented Sync Constraints.** Do not write "local master only," "no global sync in this pass," or any equivalent prohibition into a DEFINITION OF DONE item, Verification Checklist item, CONSTRAINT, FAILURE condition, or instruction unless the user asked for it. Sync authority belongs to the user and is granted at execution time, not predicted at authoring time. When the user later authorizes same-pass sync, an invented constraint turns a correct action into a permanently false checklist item that must be waived. If sequencing genuinely matters, express it as a default the user can override — "stop at the verified local master unless the user authorizes same-pass sync" — never as a completion criterion or failure condition.
+
+This rule binds the authoring agent; it is **never** emitted as artifact text. Its presence is verified by the absence of invented sync constraints in produced artifacts, not by a section in them. It does not authorize syncing and does not change what counts as authorization.
+
+## Non-Blocking Wiki And Git Items
+
+**Non-Blocking Wiki And Git Items.** Do not write a wiki sync, a `stage-commit-push` run, a GitHub push, or a submodule pointer bump into a DEFINITION OF DONE item, Verification Checklist item, CONSTRAINT, or FAILURE condition as a completion criterion. Those operations belong **after** the artifact is finalized: finalization renames and moves the artifact, so syncing first dirties the repository again and leaves the wiki holding a synthesised copy of a path that no longer exists. If such an operation is genuinely worth recording, record it as an explicitly non-blocking follow-up — "after finalization, run `stage-commit-push`" — never as a box whose blank state blocks closure. A finalizer must never refuse or defer closure because a sync, push, or pointer bump has not happened.
+
+**The carve-out.** This does not apply to an artifact **whose subject is** the wiki or Git work. A plan to build `wiki-sync` legitimately carries wiki items in its DEFINITION OF DONE, because there the wiki work *is* the deliverable rather than a publication step for it. The rule targets publication steps, not subject matter. Never strip a legitimate item from an artifact that is correct as written.
+
+Like rule 2, this binds the authoring agent and is never emitted as artifact text.
+
+## Exact Model Attribution
+
+Whenever this skill writes a new model identity, appends a current-run model value, or defines a workflow that does either:
+
+- Record the full model identity actually used when it is safely available from current runtime or session metadata. Use a specific identity such as `GPT-5.6 Sol`, `GPT-5.6 Terra`, or `Claude Opus 5`; a family-only label such as `GPT-5`, `Claude`, or `Codex Agent` is not an acceptable substitute.
+- Resolve identity in this order: current runtime or session metadata; a platform-provided current-model field; only then, when unavoidable, a field-minimized configuration lookup that returns the model field alone. Apply `tread-lightly` to any potentially sensitive configuration and never display, copy, search, diff, or log the whole configuration.
+- Keep the agent family and model identity separate. Never infer an exact model from an agent label, provider name, stale configuration, or model family.
+- Use `Not recorded` only when the exact identity genuinely cannot be established safely. Do not replace an available exact identity with `Not recorded` merely to avoid checking current runtime metadata.
+- Preserve append-only history. Never rewrite a historical provenance or change-log value solely to improve an old model label; add a truthful current correction entry when correction is required.
+
+**Validation check:** For every model value newly written in the current run, accept a full exact identity and the honest `Not recorded` fallback, but reject known ambiguous family-only labels or agent-family substitutions. Confirm model discovery exposed only the required model field and that no historical row was rewritten.
+
 ## Validation
+
+- confirm the `## Checklist Tick Discipline` section is present and its rule text is unmodified;
+- confirm the `## No Invented Sync Constraints` section is present, and that a produced artifact contains **no** invented sync constraint in its DEFINITION OF DONE, Verification Checklist, CONSTRAINTS, or FAILURE sections;
+- confirm the `## Non-Blocking Wiki And Git Items` section is present with its carve-out, and that a produced artifact contains **no** wiki-sync, push, `stage-commit-push`, or pointer-bump completion criterion;
 
 When creating or updating this skill:
 
@@ -238,4 +277,5 @@ When updating the **Mandatory Completion Receipt** contract, additionally prove:
 - the successful finalization response ends with the selected-star `FINALIZED THIS TURN` footer exactly once;
 - Prompt Contract display remains opt-in rather than automatic; and
 - the Agent Change Log remains the final human-readable section immediately before Base64 state while `north-star:run-end` remains terminal.
-- provenance remains immediately after lifecycle in the canonical Field/Value table, Agent Change Log is the final human-readable section, and missing `--acting-agent` blocks finalization without mutation.
+- provenance remains immediately after lifecycle in the canonical five-row Field/Value table, the Feedback Section survives finalization even when empty, Agent Change Log is the final human-readable section with its five columns intact, and missing `--acting-agent` blocks finalization without mutation;
+- an unperformed wiki sync, push, or submodule pointer bump never blocks or defers finalization, and the finalizer performs none of them.

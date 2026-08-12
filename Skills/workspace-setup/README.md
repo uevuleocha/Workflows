@@ -16,3 +16,6 @@ Any actual instruction text supplied by the Hub standard or another authoritativ
 
 - `set-the-stage` — **required**. `workspace-setup` uses it to present the setup/parity briefing before execution. `set-the-stage` remains read-only.
 - `global-skills-creator-auto` — created and synced this skill across all agent platforms.
+## Deterministic table dependency
+
+Adopt `markdown-table-aligner` with this skill. It supplies the deterministic final padding pass for file-based Markdown tables; the portable rule remains the content and fallback contract.

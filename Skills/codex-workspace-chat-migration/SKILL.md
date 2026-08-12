@@ -121,11 +121,18 @@ $WORKSPACE/Archive/Historical/Manifests/Codex/
 
 All three notations mean the same thing: the `Archive/Historical/Manifests/Codex/` folder of the workspace currently being worked in. The platform folder is determined by the chat platform being migrated, not by the agent performing the work: a Claude or Antigravity helper executing a Codex migration still uses the `Codex` folder. Once a migration is confirmed, the manifest is no longer needed — the user can ask an agent to delete it from there.
 
-Every manifest saved in `Archive/Historical/Manifests/Codex/` must start with the next sequential `N.) ` prefix based only on the highest existing numbered file in that platform folder. Use the migration grammar `N.) Who + Topic + What`: `N.) <Platform> <Topic> Manifest.json`, Title Case with spaces, where `<Platform>` is the chat platform being migrated; for example, `1.) Codex Trading Chats Manifest.json`. When updating or renaming a staged manifest, preserve its existing sequence number while changing the descriptive portion to match its current scope and state. Do not leave migration manifests unnumbered.
+Create the manifest through the `manifest-this` skill. `manifest-this` owns the content, the sequential `N.) ` prefix (next integer after the highest existing numbered file in the `Codex` platform folder), the migration grammar `N.) Who + Topic + What` -> `N.) <Platform> <Topic> Manifest.md` (Title Case with spaces; for example `1.) Codex Trading Chats Manifest.md`), and the always-historical placement under `Archive/Historical/Manifests/Codex/`. **The manifest default format for migration skills is Markdown (`.md`), not HTML** - pass the Markdown override to `manifest-this`. The Markdown manifest embeds the exact native JSON payload in a fenced block so the Execution Workflow can recover it. When updating or renaming a staged manifest, preserve its existing sequence number while changing the descriptive portion to match its current scope and state. Do not leave migration manifests unnumbered.
+
+**Availability guard (both workflows).** Before the manifest step, confirm the `manifest-this` skill is present in the agent's loaded skills.
+
+- If it is NOT available, pause and tell the user:
+  > The `manifest-this` skill is not loaded. It is required to create or update the migration manifest. Please make it available, or tell me to continue without it.
+- If the user insists on continuing without it, write the manifest by hand in the same folder with the same naming and grammar, then note in your handoff or feedback summary that the dedicated skill was unavailable.
+- Never silently skip the manifest.
 
 ## Agent Provenance For Durable Artifacts
 
-The migration manifest is a first-party durable artifact and must carry schema-safe agent provenance. Native JSON manifests use a top-level `agent_provenance` object containing `content_owner`, `original_writing_agent`, `created`, `artifact_role`, and an append-only `change_log`. Each change-log item records the date, truthful acting agent, action, and concise scope. Preserve the original writer permanently.
+The migration manifest is a first-party durable artifact and must carry schema-safe agent provenance. `manifest-this` renders the visible Agent Provenance table and append-only Agent Change Log in the manifest artifact; the embedded native JSON payload keeps its own top-level `agent_provenance` object containing `content_owner`, `original_writing_agent`, `original_writing_llm`, `created`, `artifact_role`, and an append-only `change_log`. Each change-log item records the clock-read `YYYY-MM-DD-HH:mm:ss` timestamp, truthful acting agent, that agent's `model`, action, and concise scope. Preserve the original writer and the original writing model permanently.
 
 The helper for this skill accepts additional top-level manifest metadata, but never add provenance to application databases, transcripts, caches, registries, backups, or other migrated operational state. If another manifest consumer has a strict schema that rejects the metadata, keep the native execution manifest unchanged and place provenance in an approved human-readable companion instead.
 
@@ -133,9 +140,9 @@ The helper for this skill accepts additional top-level manifest metadata, but ne
 
 ## Durable Artifact Format Handling
 
-This skill owns migration discovery, safety gates, manifest schema, execution, backups, verification, and handoff/report scope. When co-invoked with `html-this` or `pdf-this`, pass the requested format to `session-summary` and create only the requested human-readable handoff/report format.
+This skill owns migration discovery, safety gates, manifest schema, execution, backups, verification, and handoff/feedback scope. When co-invoked with `html-this` or `pdf-this`, pass the requested format to `session-summary` and create only the requested human-readable handoff/feedback format.
 
-The execution manifest remains native JSON by default. If the user explicitly requests an HTML-only or PDF-only manifest, embed the exact JSON through the format skill. Before execution, recover it to an approved temporary `.json`, validate the original manifest schema, and give only that temporary file to the migration helper. Backups, databases, transcripts, and app state always remain in their required native formats. Treat same-stem format variants as one manifest.
+The migration manifest is created through `manifest-this`, whose default format for migration skills is Markdown (`.md`) with the exact native JSON embedded in a fenced block. If the user explicitly requests an HTML-only or PDF-only manifest, `manifest-this` embeds the exact JSON through the format skill. Before execution, recover the JSON to an approved temporary `.json`, validate the original manifest schema, and give only that temporary file to the migration helper; remove it afterward per the workspace temporary-file policy. Backups, databases, transcripts, and app state always remain in their required native formats. Treat same-stem format variants as one manifest.
 
 ## Session Summary Integration
 
@@ -144,8 +151,8 @@ Both workflows close by producing an explicit session summary through the `sessi
 **Availability guard (both workflows).** Before the summary step, confirm the `session-summary` skill is present in the agent's loaded skills.
 
 - If it is NOT available, pause and tell the user:
-  > The `session-summary` skill is not loaded. It is required to produce the migration handoff/report summary. Please make it available, or tell me to continue without it.
-- If the user insists on continuing without it, proceed and write a plain markdown summary into the same folder with the same naming, then note in your final report that the dedicated skill was unavailable.
+  > The `session-summary` skill is not loaded. It is required to produce the migration handoff/feedback summary. Please make it available, or tell me to continue without it.
+- If the user insists on continuing without it, proceed and write a plain markdown summary into the same folder with the same naming, then note in your final feedback summary that the dedicated skill was unavailable.
 - Never silently skip the summary.
 
 **Save location and naming (both workflows).** Invoke `session-summary` pre-filled so the user does not have to complete its input template:
@@ -155,7 +162,7 @@ Both workflows close by producing an explicit session summary through the `sessi
 - Sequence number: the next integer after the highest existing `N.)` file in the `Codex` platform folder only.
 - Filename templates — the migration grammar `N.) Who + Topic + What`. These override the `session-summary` skill's default filename convention: pre-fill the filename so the output uses this exact shape, with no trailing `Summary N` and no `Execution` wording.
   - Handoff, written by the front-door agent: `N.) <Front-Door Agent> <Topic> Handoff.md` — e.g. `1.) Codex Trading Chats Handoff.md`
-  - Report, written by the helper agent: `N.) <Helper Agent> <Topic> Report.md` — e.g. `2.) Hermes Trading Chats Report.md`
+  - Feedback, written by the helper agent: `N.) <Helper Agent> <Topic> Feedback.md` — e.g. `2.) Hermes Trading Chats Feedback.md`
 
 **Scope of each summary.** Each side summarizes only its own portion; do not re-summarize the other side beyond referencing the handoff.
 
@@ -255,7 +262,7 @@ Verification must parse structured values, not raw text search, and confirm:
 
 Once discovery is complete:
 
-1. Save a sequentially numbered `N.) ` manifest under the active workspace's `Archive/Historical/Manifests/Codex/` folder.
+1. Create the manifest by explicitly invoking the `manifest-this` skill (Markdown default; see **Manifest Storage**), saved under the active workspace's `Archive/Historical/Manifests/Codex/` folder.
 2. Produce the migration handoff summary by explicitly invoking the `session-summary` skill (see **Session Summary Integration**). Scope it to Codex's portion of the chat, pre-fill the skill's inputs, and save it under `Archive/Historical/Summaries/Migration/Codex/`. Apply the availability guard if the skill is not loaded.
 3. Group sessions by real discovered old workspace when needed. If there are mixed-source sessions, represent them as separate source groups rather than flattening them into one assumed old workspace.
 4. Clearly identify whether a target session is projectless and record the real projectless source cwd if so.
@@ -306,7 +313,7 @@ When preparing a batch or front-door package for another agent:
 
 Use this workflow only when a non-Codex helper agent is running and Codex Desktop is fully closed.
 
-The Execution Workflow consumes the manifest and handoff package prepared by the Front-Door Workflow. It performs the real migration writes, verification, and reporting.
+The Execution Workflow consumes the manifest and handoff package prepared by the Front-Door Workflow. It performs the real migration writes, verification, and feedback summary generation.
 
 ### Pre-flight Guards (apply only)
 
@@ -366,7 +373,7 @@ In the selected live `state_5.sqlite` path recorded in the manifest:
 
 ### Helper Script
 
-Use `scripts/migrate_codex_workspace_chat.py` for deterministic migration when available. Prefer `--dry-run` first. Save the manifest you pass to it under the workspace's `Archive/Historical/Manifests/Codex/` folder (see **Manifest Storage**).
+Use `scripts/migrate_codex_workspace_chat.py` for deterministic migration when available. Prefer `--dry-run` first. The helper consumes the native JSON recovered from the durable manifest into an approved temporary `.json` (see **Durable Artifact Format Handling**); keep the durable Markdown manifest in `Archive/Historical/Manifests/Codex/` (see **Manifest Storage**).
 
 The helper script belongs to the **Execution Workflow** side. It is not the front door. Codex may help discover inputs and generate the manifest, but a non-Codex helper agent should run the script while Codex Desktop is fully closed.
 
@@ -408,8 +415,8 @@ After migration and before telling the user it is done:
 - `state_5.sqlite` `PRAGMA integrity_check` returns `ok`; the selected DB was unambiguous (no silent mtime tiebreak).
 - `threads.cwd` is `\\?\<destination workspace>` for each migrated session.
 - `threads.sandbox_policy` contains destination structured paths and no old workspace structured paths.
-- For `workspace_group_migration`, every in-scope structured old-workspace binding has been redirected unless explicitly excluded in the manifest and final report.
-- For `selected_chat_migration`, every structured binding tied to the selected chat(s), including related child/helper/internal/reviewer rows, has been redirected unless explicitly excluded in the manifest and final report.
+- For `workspace_group_migration`, every in-scope structured old-workspace binding has been redirected unless explicitly excluded in the manifest and final feedback summary.
+- For `selected_chat_migration`, every structured binding tied to the selected chat(s), including related child/helper/internal/reviewer rows, has been redirected unless explicitly excluded in the manifest and final feedback summary.
 - Any excluded internal/system rows are listed with their IDs, current workspace binding, visibility status, and reason for exclusion.
 - Non-target SQLite rows are unchanged.
 - User reopens Codex Desktop and confirms:
@@ -418,10 +425,22 @@ After migration and before telling the user it is done:
   - `Copy > Copy working directory` returns destination,
   - chat opens/resumes normally.
 
-### Execution Summary
+### Execution Feedback
 
-After verification passes and before considering the migration closed, produce an execution report by explicitly invoking the `session-summary` skill (see **Session Summary Integration**). Scope it to the helper agent's portion: the Codex handoff it received plus every change it applied, verified, or rolled back. Pre-fill the skill's inputs and save under `Archive/Historical/Summaries/Migration/Codex/` so Codex can review it. Apply the availability guard if the skill is not loaded.
+After verification passes and before considering the migration closed, produce an execution feedback summary by explicitly invoking the `session-summary` skill (see **Session Summary Integration**). Scope it to the helper agent's portion: the Codex handoff it received plus every change it applied, verified, or rolled back. Pre-fill the skill's inputs and save under `Archive/Historical/Summaries/Migration/Codex/` so Codex can review it. Apply the availability guard if the skill is not loaded. If the helper updates the manifest (for example marking sessions applied or recording a rollback), do so through the `manifest-this` skill (update mode) so the artifact, its number, and its change log stay consistent.
 
 ### Failure And Rollback
 
 If anything fails before commit, stop and report the failing session ID and file. **Coordinated backup restoration:** if a post-write verification fails (transcript re-parse, global-state re-parse, or SQLite integrity), the helper automatically restores every file to its **recorded original path** from the run's explicit original→backup manifest (never matching by basename), verifying each restored file byte-for-byte, so the state DB, global state, and every touched transcript return to pre-migration state — the migration is fully rolled back in one pass rather than requiring manual reassembly of individual files. Any file that cannot be restored and verified is reported loudly rather than skipped. Only after restoration is confirmed may the operator try a different approach. If the UI still moves the chat back after all three layers agree, inspect parsed JSONL in the SQLite `threads.rollout_path` transcript first, then inspect `electron-saved-workspace-roots`, `project-order`, `logs_2.sqlite` around startup, and any additional project membership tables or derived caches.
+
+## Exact Model Attribution
+
+Whenever this skill writes a new model identity, appends a current-run model value, or defines a workflow that does either:
+
+- Record the full model identity actually used when it is safely available from current runtime or session metadata. Use a specific identity such as `GPT-5.6 Sol`, `GPT-5.6 Terra`, or `Claude Opus 5`; a family-only label such as `GPT-5`, `Claude`, or `Codex Agent` is not an acceptable substitute.
+- Resolve identity in this order: current runtime or session metadata; a platform-provided current-model field; only then, when unavoidable, a field-minimized configuration lookup that returns the model field alone. Apply `tread-lightly` to any potentially sensitive configuration and never display, copy, search, diff, or log the whole configuration.
+- Keep the agent family and model identity separate. Never infer an exact model from an agent label, provider name, stale configuration, or model family.
+- Use `Not recorded` only when the exact identity genuinely cannot be established safely. Do not replace an available exact identity with `Not recorded` merely to avoid checking current runtime metadata.
+- Preserve append-only history. Never rewrite a historical provenance or change-log value solely to improve an old model label; add a truthful current correction entry when correction is required.
+
+**Validation check:** For every model value newly written in the current run, accept a full exact identity and the honest `Not recorded` fallback, but reject known ambiguous family-only labels or agent-family substitutions. Confirm model discovery exposed only the required model field and that no historical row was rewritten.
