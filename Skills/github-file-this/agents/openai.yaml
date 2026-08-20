@@ -1,0 +1,7 @@
+interface:
+  display_name: "GitHub File This"
+  short_description: "Review and safely publish or track GitHub involvements"
+  default_prompt: "Use $github-file-this to verify current evidence, check duplicates, review exact public text, publish an approved GitHub issue, PR, discussion, or comment, or track a post to follow, and record it in the GitHub Involvements document."
+
+policy:
+  allow_implicit_invocation: true

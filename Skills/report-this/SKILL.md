@@ -78,6 +78,7 @@ Strip from every staged copy all workspace-only material, so what remains is exa
 
 - the dismissible footer block, including its HTML comment banner and the divider that introduces it;
 - the `## Agent Provenance` section and its table;
+- the `## Feedback Section` and any feedback entries;
 - the `## Agent Change Log` section and its table;
 - any other internal workflow metadata, lifecycle marker, or agent-coordination block that would be meaningless or inappropriate outside the workspace.
 
@@ -116,15 +117,26 @@ Keep source-faithful summary separate from author analysis or inference. If a so
 
 ## Contract And Effort Controls
 
-A Prompt Contract is optional by default. Use `prompt-contracts` when the user asks for explicit acceptance criteria or when a complex Mode B assignment needs a testable thesis, source, analysis, citation, or delivery gate. Keep any contract in a clearly labeled workspace-only section above the footer.
+A Prompt Contract is optional by default. Use `prompt-contracts` when the user asks for explicit acceptance criteria or when a complex Mode B assignment needs a testable thesis, source, analysis, citation, or delivery gate. Keep any contract in a clearly labeled workspace-only section above `## Feedback Section`.
 
 An Estimated Effort table is optional. Include one only when the report itself commissions or evaluates multi-phase follow-up work.
 
 ## Dismissible Footer
 
-Every report ends with the exact footer from `references/dismissible-footer.md`. The official report begins at line 1 with its title or report content; never put workflow status or mode metadata at the top. The footer carries only lifecycle and dates, includes no mode tag, and instructs the user to delete everything below the final divider before external delivery.
+Every report ends with the exact footer from `references/dismissible-footer.md` as its final block. The required trailing section order for every report artifact is:
 
-Footer cardinality is strict: every report contains exactly one canonical dismissible footer. Creation appends the footer once. Update and reopen locate the existing footer and replace or normalize that block in place; they never append another footer. If update/reopen finds no footer or more than one footer, stop and repair the report to exactly one canonical footer before continuing.
+```text
+...report body...
+## Feedback Section
+## Agent Change Log
+<dismissible footer -- final block>
+```
+
+The official report begins at line 1 with its title or report content; never put workflow status or mode metadata at the top. The footer carries only lifecycle and dates, includes no mode tag, and instructs the user to delete everything from `## Feedback Section` to the end of the file before external delivery.
+
+**Why the cut marker is `## Feedback Section`:** The dismissible footer sits as the final block below `## Feedback Section` and `## Agent Change Log`. Cutting from `## Feedback Section` to the end of the file cleanly removes all workspace-only material (the Feedback Section, Agent Change Log, and the dismissible footer itself) in a single clean cut without leaking internal coordination blocks or truncating any report body content. (The `## Agent Provenance` section near the top is stripped separately during send-ready staging).
+
+Footer cardinality is strict: every report contains exactly one canonical dismissible footer. Creation appends the footer once as the final block. Update and reopen locate the existing footer and replace or normalize that block in place; they never append another footer. If update/reopen finds no footer or more than one footer, stop and repair the report to exactly one canonical footer before continuing.
 
 ## Workflow
 
@@ -133,7 +145,7 @@ Footer cardinality is strict: every report contains exactly one canonical dismis
 3. Resolve ambiguity before writing; do not guess evidence or source content.
 4. For create, calculate the combined Live plus Historical number.
 5. For reopen, collision-check the Live destination before moving and renaming.
-6. For creation, draft the body and append the exact pending footer once. For update/reopen, replace or normalize the one existing footer in place. Never append a footer during update/reopen. Preserve unrelated user-authored content.
+6. For creation, draft the body and append the exact pending footer once as the final block. For update/reopen, replace or normalize the one existing footer in place. Never append a footer during update/reopen. Preserve unrelated user-authored content.
 7. Write UTF-8 and verify the path, filename, required sections, source honesty, and footer.
 8. Report the path, Mode used, Subject, number, and any access limitations.
 9. For a staging request, follow the Send-Ready Staging section instead; staging never enters the create/update/reopen workflow.
@@ -152,7 +164,7 @@ For every in-scope artifact:
 - record `Original writing LLM` as the model that produced the artifact, kept distinct from the agent family that performed the write; use `Not recorded` when the model is genuinely unknown, and never infer it from the agent label or backfill it later;
 - use a stable truthful agent-family label such as `Codex Agent`, `Claude Agent`, `Antigravity Agent`, `Hermes Agent`, or `zCode Agent`;
 - keep the original writing-agent entry immutable;
-- keep an append-only `## Agent Change Log` as the last section, or immediately above any section the artifact already reserves for the last position, rendered as a five-column `Date and Time | Agent | Model | Action | Scope` table with one row per material edit;
+- keep an append-only `## Agent Change Log` immediately above the dismissible footer (which is reserved as the final block of the report), rendered as a five-column `Date and Time | Agent | Model | Action | Scope` table with one row per material edit;
 - stamp every change-log row `YYYY-MM-DD-HH:mm:ss` on a 24-hour clock, read from the machine clock and never estimated; leave historical date-only rows exactly as written rather than backfilling them, because a log carrying both shapes is correct and the boundary between them is itself information;
 - if a legacy artifact lacks reliable creator evidence, use `Not recorded` rather than guessing, then log the current agent's actual change; and
 - treat copying or global synchronization as transport, not authorship.
@@ -218,15 +230,18 @@ Rules:
 
 ## Exact Model Attribution
 
-Whenever this skill writes a new model identity, appends a current-run model value, or defines a workflow that does either:
+Before this skill creates or materially edits the first first-party durable artifact in a session, invoke `exact-model-confirmation-gate`. The gate must finish before any new `Original writing LLM` or current-run Agent Change Log `Model` value is written.
 
-- Record the full model identity actually used when it is safely available from current runtime or session metadata. Use a specific identity such as `GPT-5.6 Sol`, `GPT-5.6 Terra`, or `Claude Opus 5`; a family-only label such as `GPT-5`, `Claude`, or `Codex Agent` is not an acceptable substitute.
-- Resolve identity in this order: current runtime or session metadata; a platform-provided current-model field; only then, when unavoidable, a field-minimized configuration lookup that returns the model field alone. Apply `tread-lightly` to any potentially sensitive configuration and never display, copy, search, diff, or log the whole configuration.
-- Keep the agent family and model identity separate. Never infer an exact model from an agent label, provider name, stale configuration, or model family.
-- Use `Not recorded` only when the exact identity genuinely cannot be established safely. Do not replace an available exact identity with `Not recorded` merely to avoid checking current runtime metadata.
-- Preserve append-only history. Never rewrite a historical provenance or change-log value solely to improve an old model label; add a truthful current correction entry when correction is required.
+- Reuse the gate's verified identity for later durable-artifact writes while the exact model context, acting agent, task or thread, and execution environment remain unchanged. Do not ask again during that stable session.
+- If authoritative current runtime or session evidence cannot establish the exact model, stop before the first write and ask the user once. Cache a valid answer only for the current stable session.
+- Invalidate prospectively when the user reports a model change or authoritative evidence shows that the model, agent, task or thread, or execution environment changed. Never rewrite historical provenance or change-log rows.
+- Keep reasoning effort, service tier, provider, model family, and agent family separate from exact identity. Reject labels such as `Medium`, `Priority`, `OpenAI`, `GPT-5`, and `Codex Agent` as substitutes for a full model identity.
+- Do not inspect configuration, environment data, credentials, logs, transcripts, or unrelated files by default. Only the gate's genuinely unavoidable file-backed branch may invoke `tread-lightly`, request one model field, and accept it only when it authoritatively identifies the current session. This skill does not gain a blanket `tread-lightly` dependency.
+- Use `Not recorded` only when no interactive user is available, the user cannot identify the model, or exact identity remains safely unresolvable after the permitted attempt.
 
-**Validation check:** For every model value newly written in the current run, accept a full exact identity and the honest `Not recorded` fallback, but reject known ambiguous family-only labels or agent-family substitutions. Confirm model discovery exposed only the required model field and that no historical row was rewritten.
+If `exact-model-confirmation-gate` is unavailable and no verified stable-session result already exists, fail closed before the artifact write rather than guessing, silently using `Not recorded`, or performing broader discovery.
+
+**Validation check:** Confirm the dependency is named in this skill and its README; the canonical caller block is byte-identical to `exact-model-confirmation-gate/references/canonical-caller-block.md`; first-write blocking, one-time confirmation, stable-session reuse, proactive change, context invalidation, identity separation, targeted lookup, unresolved fallback, and append-only history pass the shared deterministic suite; and no historical row was rewritten.
 
 ## Validation
 

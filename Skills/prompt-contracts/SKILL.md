@@ -275,11 +275,11 @@ FAILURE:
 
 These settings are behavioral defaults for agents using the skill. They are not guaranteed executable parameters unless the host tool, runtime, or calling workflow explicitly implements them.
 
-| Parameter | Default | Description |
-|-----------|---------|-------------|
-| verify | true | Run self-verification before delivering |
-| strict | true | Fail the task if any DoD criterion is unmet or any FAILURE condition is triggered |
-| template | standard | Contract template (standard, minimal, detailed) |
+| Parameter | Default  | Description                                                      |
+| --------- | -------- | ---------------------------------------------------------------- |
+| verify    | true     | Run self-verification before delivering                          |
+| strict    | true     | Fail if any DoD item is unmet or any FAILURE condition is active |
+| template  | standard | Contract template (standard, minimal, detailed)                  |
 
 ## Edge cases
 
@@ -314,6 +314,15 @@ Do not:
 
 This rule is **emitted into** every artifact this skill produces, adjacent to the DEFINITION OF DONE or Verification Checklist it governs — not buried in a trailing notes section. The executing agent must read it inside the artifact it was handed, without consulting any workspace contract.
 
+## In-Pass And Deferred Real-World Verification
+
+**In-Pass And Deferred Real-World Verification.** Classify every verification item before saving or finalizing an artifact:
+
+- **In-Pass Verification:** evidence the executing agent can produce safely in the current pass, including deterministic tests, fixtures, simulations, and mock scenarios. These items remain blocking completion criteria and follow Checklist Tick Discipline.
+- **Deferred Real-World Verification:** evidence that genuinely requires later live use, elapsed time, user adoption, or an external event. Put only these items in a separate `## Deferred Real-World Verification` checklist. They are non-blocking for finalization and may remain unticked after all in-pass completion criteria are met. State the future trigger and evidence required for each item.
+
+Never defer an item the current agent can safely verify now merely to claim completion. Omit the deferred section when no genuine deferred item exists.
+
 ## No Invented Sync Constraints
 
 **No Invented Sync Constraints.** Do not write "local master only," "no global sync in this pass," or any equivalent prohibition into a DEFINITION OF DONE item, Verification Checklist item, CONSTRAINT, FAILURE condition, or instruction unless the user asked for it. Sync authority belongs to the user and is granted at execution time, not predicted at authoring time. When the user later authorizes same-pass sync, an invented constraint turns a correct action into a permanently false checklist item that must be waived. If sequencing genuinely matters, express it as a default the user can override — "stop at the verified local master unless the user authorizes same-pass sync" — never as a completion criterion or failure condition.
@@ -341,6 +350,7 @@ Every Markdown table this skill writes - inside a durable manifest or into chat 
 - confirm the `## Markdown Table Alignment` section and its validation check are present, and that every table this skill wrote is visually pipe-aligned with cells at 80 characters or fewer and ASCII-only glyphs inside cells;
 
 - confirm the `## Checklist Tick Discipline` section is present and its rule text is unmodified;
+- confirm the `## In-Pass And Deferred Real-World Verification` section is present; immediately verifiable items remain blocking and any genuine later-use items are isolated under a non-blocking `## Deferred Real-World Verification` checklist with their trigger and required evidence;
 - confirm the `## No Invented Sync Constraints` section is present, and that a produced artifact contains **no** invented sync constraint in its DEFINITION OF DONE, Verification Checklist, CONSTRAINTS, or FAILURE sections;
 - confirm a newly produced artifact actually carries the Checklist Tick Discipline rule verbatim, since the section can survive in this skill while the template silently loses it;
 - confirm the `## Non-Blocking Wiki And Git Items` section is present with its carve-out, and that a produced artifact contains **no** wiki-sync, push, `stage-commit-push`, or pointer-bump completion criterion;

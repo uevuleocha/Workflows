@@ -1,7 +1,7 @@
 interface:
   display_name: "Wiki Sync"
   short_description: "Safely sync a schema-driven workspace wiki"
-  default_prompt: "Use $wiki-sync to sync the current workspace's schema-declared sources. Confirm manifest, order, and batching. Detect mostly historical groups and apply mine-and-fold plus light history as the mandatory default without asking; use a full source page only with a stated strong reason and explicit user permission. Obey one-shot instructions, never mutate sources or cross nested workspaces, and verify each pass."
+  default_prompt: "Use $wiki-sync to autonomously sync the current workspace's explicitly schema-declared sources. Default a plain invocation to workspace-full; never infer source roots. Bridge a missing coverage contract only from unambiguous schema declarations, run reconciliation before and after synthesis, maintain forward-only unresolved verification, apply light history without pausing, report full-page recommendations afterward, never mutate sources or cross workspaces, and verify each pass."
 
 policy:
   allow_implicit_invocation: true

@@ -34,6 +34,7 @@ If `wiki/wiki-schema.md` does not exist, stop and offer `wiki-this`. Do not inve
 - Never hardcode page types, category folders, or hub-only paths. Read them from the active schema on every run.
 - Write only to paths the schema designates as wiki outputs. A source-root change may edit the schema only after user approval.
 - Do not silently delete wiki pages. Report stale or orphaned pages for review unless the schema explicitly provides an approved retirement procedure.
+- Never discover, infer, broaden, or add a source root. Use only roots explicitly declared in both the active schema and its coverage contract. If they are missing or disagree, stop.
 
 ## Required Inputs
 
@@ -43,10 +44,11 @@ Normally infer these from the invocation and workspace:
 2. `wiki/wiki-schema.md`.
 3. Declared source roots and exclusion rules.
 4. Existing `index.md`, `log.md`, and wiki pages.
-5. Requested scope: all detected changes, named sources, or source-root update.
-6. Any user permission already granted for a full-source-page exception on a detected historical group. Absent such permission, the mandatory mine-and-fold + light history default applies and is not an input to gather.
+5. Requested scope mode: `workspace-full`, `root-full`, `named-source`, or source-root update.
+6. The machine-readable coverage contract declared or referenced by the active schema. It supplies source roots, exclusions, nested-workspace markers, identity granularity, wiki provenance extraction, path comparison, and allowed skip reasons.
+7. The schema-declared structural unresolved-verification page and adjacent disposition marker, when present.
 
-Ask only when the requested ingest order, schema meaning, source-root change, or federation action is ambiguous. Batching is never inferred as approved.
+Routine synchronization is autonomous. Ask only when proceeding would require guessing a source root, crossing a workspace, exposing sensitive material, destructively replacing established policy, or choosing between materially contradictory schema meanings. Complete safe work first and report non-blocking concerns or recommendations afterward.
 
 ## Sync Workflow
 
@@ -64,66 +66,112 @@ Before wiki writes, capture a practical source-state baseline using available re
 
 This evidence is a guardrail, not permission to alter or normalize sources.
 
-### 3. Enumerate without crossing workspaces
+### 3. Select an explicit scope mode
+
+Every ingest run declares exactly one coverage scope before enumeration:
+
+- `workspace-full`: every eligible identity under every declared source root. Only this scope can support a claim that the entire workspace wiki is synchronized.
+- `root-full`: every eligible identity under one schema-declared root. It may claim only that named root is synchronized.
+- `named-source`: one or more explicit schema-derived source identities. It may claim only that named scope is synchronized and must never imply workspace-wide or root-wide coverage.
+
+Use `workspace-full` when the user invokes `wiki-sync`, says "sync," or otherwise requests an ordinary update without naming a narrower scope. Use `root-full` or `named-source` only when the user explicitly identifies that narrower scope. Never infer additional source roots while selecting scope.
+
+The active schema must declare or reference a machine-readable version-1 coverage contract following `references/coverage-reconciliation-contract.md`.
+
+**Autonomous compatibility bridge.** If the contract is missing but the schema already declares an explicit, unambiguous source-root list and enough identity/include/exclude/provenance meaning to mirror it exactly, create `wiki/coverage-contract.json`, add the schema reference, validate it, and continue the same run. This is a mechanical representation of already-declared policy, not permission to infer or change sources. For non-source mechanics the version-1 reference supplies deterministic defaults when the schema is silent: exact-case path comparison, canonical nested-workspace markers, and the reference's allowed skip reasons. Report those defaults afterward. If any source root, identity boundary, include/exclude scope, wiki path, or provenance field would need to be guessed, stop and report the exact ambiguity. Never claim deterministic coverage until the generated contract passes the helper.
+
+### 4. Enumerate without crossing workspaces
 
 - Walk every declared source root recursively at any depth.
 - Prune excluded paths and nested workspaces according to the host marker rule.
 - At minimum, treat descendant directories containing canonical agent-contract markers as separate workspaces unless the active schema says otherwise.
 - Do not ingest the wiki's own generated output as a source unless the schema deliberately declares that behavior.
+- Run `scripts/reconcile_wiki_sources.py inventory` against the resolved workspace and schema-declared contract. Treat exit `2` as an operational failure. Preserve the JSON inventory as the authoritative eligible-identity set for this checkpoint.
 
-### 4. Detect new or changed sources
+### 5. Classify every selected identity
 
 Use the evidence the schema makes available: source provenance in page metadata, existing page content, index entries, log history, filesystem metadata, hashes, or version-control history. Do not pretend that timestamps or log prose alone prove content equality.
 
-- New: no existing wiki provenance maps to the source.
-- Changed: reliable evidence shows source content changed after its last ingest, or comparison reveals material not represented by the current wiki pages.
-- Uncertain: evidence is insufficient. Put the source in a review set or ask the user whether to resynthesize it; never silently label it unchanged.
+- `represented-unchanged`: current wiki provenance maps to the identity and reliable evidence supports no material source change.
+- `new`: no current or previous wiki provenance maps to the identity.
+- `changed`: current provenance maps to the identity, or a moved/renamed identity explicitly names its stale `previous_paths`, and reliable evidence shows material change or path/lifecycle drift.
+- `uncertain`: evidence is insufficient. Put the identity in the mandatory resynthesis set and report it afterward; never silently label it unchanged and never interrupt a safe run merely to ask whether it should be reread.
+- `skipped`: the identity is deliberately omitted for a reason code explicitly allowed by the active coverage contract. Free-form or invented skip reasons are invalid.
 
-Build an ingest manifest covering every in-scope new, changed, and uncertain source. Never silently truncate the manifest. Source files remain untouched regardless of the detection outcome.
+Build a version-1 JSON manifest containing every identity selected by the scope, including represented-and-unchanged identities. Each identity appears exactly once. For moved or renamed sources, use `previous_paths` to reconcile stale provenance; a path mapping does not prove content equality, so preserve any content uncertainty separately.
 
-### 5. Confirm ingest order and batching
+Do not pretend that timestamps, log prose, or a prior "full sync" status alone prove unchanged content. Use hashes, version-control comparison, or direct semantic comparison when available. If reliable evidence is unavailable, classify the identity as `uncertain`.
 
-Before synthesis, show the manifest summary and the intended ingest order.
+### 6. Coverage Reconciliation Gate
 
-- For a large manifest or substantial rewrite, the agent may propose batches when that is likely to improve synthesis quality.
-- Batching requires explicit user confirmation of the batch plan before the first batch starts. Do not silently batch.
+After classification and before synthesis, run `scripts/reconcile_wiki_sources.py check` with the exact scope, `--phase before`, and `--claim none`. The helper is read-only and must remain generic; all workspace-specific meaning comes from the active coverage contract.
+
+The gate must prove:
+
+1. every selected eligible identity is classified exactly once;
+2. every `represented-unchanged` identity has current provenance;
+3. every `new` identity lacks current and previous provenance;
+4. every `changed` identity has current provenance or explicitly reconciled previous provenance;
+5. every skipped identity uses a schema-supported reason;
+6. stale provenance is either reconciled through `previous_paths` or reported as unexplained; and
+7. the requested status claim, when later made, matches the declared scope.
+
+Exit `1` means coverage or claim findings exist; fix the manifest or disclose and resolve the finding before synthesis. Exit `2` means validity is unknown because the contract, manifest, path, encoding, or runtime operation failed; stop. Never shrink the manifest to make the gate pass.
+
+An uncertainty or schema-supported skip is disclosed and processed conservatively in the same run. It prevents a synchronized status claim for that scope until resolved, but it does not by itself require a user checkpoint. Reserve `workspace-synced`, `root-synced`, and `scoped-synced` for their matching scopes with complete reconciliation and zero uncertain or skipped identities.
+
+### 7. Select autonomous ingest order and batching
+
+Select a deterministic ingest order and continue without a routine pre-write checkpoint. Preserve any user-specified order. Otherwise order by coverage-contract root order, then stable workspace-relative identity path. Keep the complete manifest inspectable in run evidence and report classification counts, every new/changed/uncertain/skipped identity, reconciled stale paths, execution order, and permitted claim after completion.
+
+- For a large manifest or substantial rewrite, the agent may use internal batches when that is likely to improve synthesis quality.
+- Internal batching must remain one uninterrupted invocation and must not request routine confirmation.
 - If the user requests a specific order, preserve it.
 - If the user requests one-shot ingestion, "everything at once," or equivalent, run one complete pass in that requested order. Do not replace it with batches.
-- Never use batching or one-shot execution to omit sources. Coverage must match the confirmed manifest.
-- Each confirmed batch is a separate pass: establish its own read-only source baseline, synthesize its complete assigned manifest slice, update navigation and log as the schema requires, then verify source immutability before the next batch begins.
+- Never use batching or one-shot execution to omit sources. Coverage must match the complete manifest.
+- Each internal batch is a separate verification slice: establish its own read-only source baseline, synthesize its complete assignment, update navigation and log as the schema requires, then verify source immutability before continuing automatically.
 
-For an ordinary small manifest, confirm the manifest/order as part of the normal sync checkpoint; do not manufacture unnecessary batches.
+For an ordinary small manifest, use one pass and continue directly.
 
-### 6. Apply history-aware treatment
+### 8. Apply history-aware treatment
 
 Inspect the manifest for any folder or coherent source group that is mostly a point-in-time historical record rather than durable reference knowledge. Session summaries, changelogs, migration logs, and backups are examples only; never hardcode detection to one folder name or artifact family. Detection stays context-driven and schema-driven; only the treatment applied after detection is fixed.
 
 **Mandatory default.** For every detected historical group, **mine-and-fold + light history is the compulsory, explicit default treatment.** Apply it directly. Do not pause, do not ask the user to choose, and do not treat full source pages as the fallback. This default is not advisory and an agent may not substitute its own preference for it.
 
-**The one exception — full source page, by permission only.** An agent may use normal ingestion with a full schema-defined source page for a historical group or item **only** when it has a specific, articulable, genuinely strong reason that the default would lose something the wiki needs. In that case it must:
+**Full-page recommendation after completion.** A sync never pauses to request a historical full-page exception. Even when the agent has a strong reason that a full page may be better, it first applies the mandatory light treatment, completes the run, and reports the exact item and reason afterward. Only a later explicit user instruction may convert that already-represented item to a full schema-defined page. The recommendation is advice, not pending sync work.
 
-1. Stop before writing that group.
-2. Name the exact group or item and state the specific reason a full source page is better for it.
-3. Wait for the user's explicit permission.
-4. Proceed with full source pages only if permission is granted. **If the user declines, or gives no clear agreement, apply the mandatory mine-and-fold + light history default immediately and continue the run without asking a follow-up question.**
-
-Reserve this escalation for genuine cases. Do not stop on every historical group, do not stop out of caution, and do not use the exception to reintroduce ask-every-time behavior. A run that raises no exception is the normal, correct run.
-
-Record the treatment applied per group; a granted exception may make different groups use different treatments.
+Record the light treatment applied per group and every post-run full-page recommendation.
 
 For a mine-and-fold + light history group:
 
 - Mine durable lessons, decisions, outcomes, what worked, and what failed, then fold them into the relevant knowledge pages declared by the active schema.
 - Create one light provenance page per historical item, carrying the schema's required metadata plus title, date, key decisions, what worked/failed, and links to affected knowledge pages or their schema-equivalent fields.
 - File those light pages under a dedicated history type/topic/folder declared by the active schema so they remain discoverable without dominating navigation.
-- If the schema does not declare a suitable history location or page format, show the exact schema amendment and wait for approval before using the treatment. This gate stays blocking even though the treatment itself is the mandatory default; a mandatory treatment never authorizes inventing a folder or taxonomy. Never hardcode a folder or taxonomy into the skill.
+- If the schema lacks a history location or page format and its existing taxonomy admits one unambiguous compatible location, add that minimal wiki-output declaration and continue. If competing locations would materially change the taxonomy, stop rather than guess. Never hardcode a workspace-specific folder into the skill.
 - Preserve coverage and provenance for every item. The treatment changes depth and filing, not whether an item is represented.
 
-This is separate from batching: a confirmed batch may contain ordinary and historical groups, but each historical group's treatment - the default, or a permitted exception - remains binding.
+This is separate from batching: every batch applies the same automatic light treatment.
 
-### 7. Synthesize according to the schema
+### 9. Maintain forward-only unresolved verification
 
-For each approved new or changed source:
+Use the structural page declared by the schema, normally `wiki/unresolved-verification.md`. If an existing schema lacks the declaration, add this compatible structural wiki-output declaration and create an empty page in the same run; this does not authorize source changes or legacy backfill.
+
+For each `new` or `changed` source actually read during this run:
+
+1. Determine whether it is a finalized durable artifact from its own status/lifecycle evidence and whether it carries a DEFINITION OF DONE, Verification Checklist, or equivalent verification checkboxes.
+2. Collect every unticked item (`- [ ]`) regardless of an ordinary explanation.
+3. Exclude only an item carrying the standardized adjacent disposition line `Verification disposition: intentionally left unchecked -- <reason>.` directly beneath or beside that exact checkbox.
+4. Replace that source's prior unresolved-page entries with its current unresolved set. A checked or dispositioned item therefore disappears on the next sync after the source changes.
+5. Record each remaining item with only its source artifact path, owning section, and checkbox text. The page is a discovery view; never put authoritative checkboxes on it and never edit the source while wearing the wiki-maintainer role.
+
+Preserve existing unresolved-page entries for `represented-unchanged` sources without reopening those sources solely for this feature. Do not scan or backfill any source already represented and unchanged when the feature is introduced. Sources first ingested after introduction, including every source in a new wiki's initial ingestion, are eligible because that ingestion is forward work.
+
+If no entries exist, retain the page with a short statement that no unresolved verification items have been recorded from forward ingestions.
+
+### 10. Synthesize according to the schema
+
+For each new, changed, or conservatively resynthesized uncertain source:
 
 1. Read the source.
 2. Create or update its provenance representation as the schema requires.
@@ -135,13 +183,13 @@ For each approved new or changed source:
 
 Never assume names such as source, entity, concept, or topic. Those are valid only when the active workspace schema declares them.
 
-### 8. Update navigation and log
+### 11. Update navigation and log
 
 - Rebuild or update the schema-declared index so every current wiki page appears once with the required summary and grouping.
 - Append exactly one sync entry in the schema's log format, summarizing processed, skipped, uncertain, and affected pages.
 - Preserve append-only log history.
 
-### 9. Apply federation rules
+### 12. Apply federation rules
 
 Read federation behavior from the schema.
 
@@ -150,12 +198,14 @@ Read federation behavior from the schema.
 - Refresh links by reading child wiki navigation/schema only; never ingest child source roots or duplicate child knowledge into the hub.
 - Do not create hub-to-child outbound links unless the schema and user approval allow them.
 
-### 10. Verify source immutability and report
+### 13. Reconcile again, verify source immutability, and report
 
 - Re-capture the source-state evidence used before the run.
 - Confirm no source was edited, moved, renamed, or deleted.
+- Re-run the helper with `--phase after` against a fresh inventory and the completed manifest. This catches an identity added, moved, renamed, or deleted after the first gate, requires new and changed identities to have current provenance, and requires every stale path to be repaired.
+- Run the matching status claim: `workspace-synced` for `workspace-full`, `root-synced` for `root-full`, or `scoped-synced` for `named-source`. Do not publish a broader status than the helper permits.
 - Review the wiki diff for schema compliance, valid citations, duplicate pages, index completeness, and one appended log entry.
-- Report processed sources, uncertain sources, created/updated pages, federation changes, and source-immutability evidence.
+- Report scope mode, eligible and classified counts, every status count, reconciled and unexplained stale provenance, processed and uncertain sources, unresolved-verification additions/removals, created/updated pages, internal batching, historical full-page recommendations, federation changes, the permitted synchronization claim, and source-immutability evidence.
 
 If any source changed, stop, report a hard failure, and do not conceal it by modifying the source again.
 
@@ -166,7 +216,7 @@ When the user says "update the sources for the wiki":
 1. Clarify whether they mean add/remove a declared source root or ingest new files already under a declared root.
 2. Inspect the proposed root read-only and check scope/nested-workspace risks.
 3. Show the exact schema change and consequences.
-4. Wait for approval before editing the source-root declaration.
+4. Require the user to explicitly name and authorize the exact source-root change before editing the declaration; never infer it from repository layout.
 5. Never move files into or out of a source root.
 6. Run the normal sync workflow after the schema change if approved.
 
@@ -183,13 +233,30 @@ Stop and report instead of claiming success if:
 - citations cannot be resolved to declared provenance;
 - duplicate pages are knowingly introduced;
 - a child source would be ingested into a hub wiki;
-- ingestion was batched without confirmation, truncated, or reordered against the user's instruction;
-- a detected historical group was given full schema-defined source pages without the agent stopping, naming the group, stating a specific strong reason, and receiving explicit user permission;
-- a detected historical group was given anything other than mine-and-fold + light history while no such permission was in force;
-- the user was asked to choose a treatment for a historical group, or the run paused on one, without a specific strong reason for a full source page being raised;
-- mine-and-fold + light history was applied while the active schema declared no suitable history location or page format and no schema amendment was approved;
+- ingestion was truncated or reordered against the user's instruction;
+- a routine manifest, batching, uncertainty, or historical-treatment checkpoint interrupted a safe run;
+- a detected historical group was given a full source page automatically instead of light treatment plus an optional post-run recommendation;
+- a detected historical group was given anything other than mine-and-fold plus light history without a later explicit user instruction;
+- mine-and-fold plus light history used a guessed or contradictory history location;
 - coverage or provenance was dropped for any historical item, rather than only its depth and filing being reduced;
-- history-aware behavior was hardcoded to a folder name, artifact family, page taxonomy, or output folder rather than driven by context and the schema.
+- history-aware behavior was hardcoded to a folder name, artifact family, page taxonomy, or output folder rather than driven by context and the schema;
+- the active schema does not declare or reference a valid machine-readable coverage contract after the compatibility bridge, or the bridge guessed any source meaning;
+- the schema and coverage contract disagree on source roots;
+- represented-and-unchanged sources were reopened solely to backfill unresolved verification;
+- an unresolved item with the exact adjacent disposition marker was re-listed;
+- an unresolved-page entry omitted its source path, owning section, or checkbox text;
+- any selected eligible identity is absent from the manifest, duplicated, or silently classified as unchanged;
+- the reconciliation helper exits `1` and its findings remain unresolved, or exits `2` and validity is unknown;
+- stale provenance remains unexplained by a current identity's `previous_paths`;
+- an uncertain or skipped identity is hidden from the user or included in a synchronized status claim;
+- a `named-source` or `root-full` run claims the entire workspace wiki is synchronized; or
+- the post-synthesis reconciliation is skipped, allowing source-state drift during the run to go undetected.
+
+## Coverage Helper Contract
+
+`scripts/reconcile_wiki_sources.py` and `references/coverage-reconciliation-contract.md` are required parts of this skill bundle. The script uses only the Python standard library, reads UTF-8, writes no files, emits JSON, and uses exit `0` for a clean inventory/check, `1` for coverage or claim findings, and `2` for operational failure.
+
+The helper deliberately does not decide semantic freshness. The agent supplies evidence-backed classifications; the helper proves that the selected eligible identity set, manifest, provenance, stale paths, and status claim reconcile without gaps. This separation prevents a generic tool from hardcoding one workspace's taxonomy or pretending that timestamps establish equality.
 
 ## Deterministic Markdown Table Aligner Integration
 
@@ -225,16 +292,23 @@ Keep `Content owner` for now. In Uzo's personal artifacts it normally resolves t
 
 ## Exact Model Attribution
 
-Whenever this skill writes a new model identity, appends a current-run model value, or defines a workflow that does either:
+Before this skill creates or materially edits the first first-party durable artifact in a session, invoke `exact-model-confirmation-gate`. The gate must finish before any new `Original writing LLM` or current-run Agent Change Log `Model` value is written.
 
-- Record the full model identity actually used when it is safely available from current runtime or session metadata. Use a specific identity such as `GPT-5.6 Sol`, `GPT-5.6 Terra`, or `Claude Opus 5`; a family-only label such as `GPT-5`, `Claude`, or `Codex Agent` is not an acceptable substitute.
-- Resolve identity in this order: current runtime or session metadata; a platform-provided current-model field; only then, when unavoidable, a field-minimized configuration lookup that returns the model field alone. Apply `tread-lightly` to any potentially sensitive configuration and never display, copy, search, diff, or log the whole configuration.
-- Keep the agent family and model identity separate. Never infer an exact model from an agent label, provider name, stale configuration, or model family.
-- Use `Not recorded` only when the exact identity genuinely cannot be established safely. Do not replace an available exact identity with `Not recorded` merely to avoid checking current runtime metadata.
-- Preserve append-only history. Never rewrite a historical provenance or change-log value solely to improve an old model label; add a truthful current correction entry when correction is required.
+- Reuse the gate's verified identity for later durable-artifact writes while the exact model context, acting agent, task or thread, and execution environment remain unchanged. Do not ask again during that stable session.
+- If authoritative current runtime or session evidence cannot establish the exact model, stop before the first write and ask the user once. Cache a valid answer only for the current stable session.
+- Invalidate prospectively when the user reports a model change or authoritative evidence shows that the model, agent, task or thread, or execution environment changed. Never rewrite historical provenance or change-log rows.
+- Keep reasoning effort, service tier, provider, model family, and agent family separate from exact identity. Reject labels such as `Medium`, `Priority`, `OpenAI`, `GPT-5`, and `Codex Agent` as substitutes for a full model identity.
+- Do not inspect configuration, environment data, credentials, logs, transcripts, or unrelated files by default. Only the gate's genuinely unavoidable file-backed branch may invoke `tread-lightly`, request one model field, and accept it only when it authoritatively identifies the current session. This skill does not gain a blanket `tread-lightly` dependency.
+- Use `Not recorded` only when no interactive user is available, the user cannot identify the model, or exact identity remains safely unresolvable after the permitted attempt.
 
-**Validation check:** For every model value newly written in the current run, accept a full exact identity and the honest `Not recorded` fallback, but reject known ambiguous family-only labels or agent-family substitutions. Confirm model discovery exposed only the required model field and that no historical row was rewritten.
+If `exact-model-confirmation-gate` is unavailable and no verified stable-session result already exists, fail closed before the artifact write rather than guessing, silently using `Not recorded`, or performing broader discovery.
+
+**Validation check:** Confirm the dependency is named in this skill and its README; the canonical caller block is byte-identical to `exact-model-confirmation-gate/references/canonical-caller-block.md`; first-write blocking, one-time confirmation, stable-session reuse, proactive change, context invalidation, identity separation, targeted lookup, unresolved fallback, and append-only history pass the shared deterministic suite; and no historical row was rewritten.
 
 ## Validation
 
-Report the resolved workspace, schema used, source roots, detection method, processed/uncertain sources, wiki outputs, federation actions, and before/after source-state result. State the confirmed ingest order, whether execution was one-shot or batched, every detected historical group with the treatment applied to it, and the per-pass immutability result. Name any group where the mandatory mine-and-fold + light history default was displaced by a permitted full-source-page exception, along with the reason given and the user's explicit permission, so a misjudged detection stays auditable after the run. State plainly whether the sync passed or failed.
+Run `python -X utf8 scripts/test_reconcile_wiki_sources.py` and require exit `0`. The regression suite must cover a source added after the last sync, renamed or moved provenance, unreliable timestamps, exact-case nested-workspace exclusions, historical-source provenance, a truncated manifest, a named-source run attempting a workspace-wide claim, semantic directory bundles, source-state drift during a run, stale provenance, and schema-supported skip reasons.
+
+Validate the complete folder-style skill with `quick_validate.py` in Python UTF-8 mode. Confirm the helper and contract reference are included in every synchronized copy and prove recursive byte parity against the local master.
+
+Report the resolved workspace, schema and coverage contract used or created, exact declared source roots, scope mode, detection method, eligible/classified/status counts, reconciled/unexplained stale provenance, processed/uncertain/skipped sources, unresolved-verification changes, wiki outputs, permitted synchronization claim, federation actions, and before/after source-state result. State ingest order, one-shot or internal-batch execution, every historical group receiving light treatment, every optional full-page recommendation, and per-pass immutability. State plainly whether the autonomous run passed or failed and surface non-blocking advice only after completed work.

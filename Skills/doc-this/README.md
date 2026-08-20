@@ -4,7 +4,8 @@ Creates or updates durable documentation in the nested Live Documentation tree (
 
 ## Related skills
 
-- None required. Sibling of the durable-artifact `-this` family (`plan-this`, `task-this`, `prompt-this`, `report-this`), each owning its own artifact type.
+- `terminology-this` calls this skill as the required owner for every Terminology document create or update.
+- Sibling of the durable-artifact `-this` family (`plan-this`, `task-this`, `prompt-this`, `report-this`), each owning its own artifact type.
 
 ## Optional artifact formats
 
@@ -12,3 +13,7 @@ Pair with `html-this` or `pdf-this` for HTML-only or PDF-only human-readable art
 ## Deterministic table dependency
 
 Adopt `markdown-table-aligner` with this skill. It supplies the deterministic final padding pass for file-based Markdown tables; the portable rule remains the content and fallback contract.
+
+## Exact model dependency
+
+- Requires `exact-model-confirmation-gate` before the first model-attributed durable-artifact write in each stable session.

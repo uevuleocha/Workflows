@@ -8,9 +8,12 @@ orchestrator-supplied phase choices.
 """
 
 import argparse
+import html
 import json
 import os
 import re
+import shutil
+import subprocess
 import sys
 import tempfile
 import time
@@ -18,10 +21,11 @@ from datetime import datetime
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-DEFAULT_MODEL = "gemini-3.6-flash"
-DEFAULT_FALLBACK_MODEL = "gemini-3.5-flash"
+DEFAULT_MODEL = "gemini-3.7-flash"
+DEFAULT_FALLBACK_MODEL = "gemini-3.6-flash"
 DEFAULT_TIER = "free"
 FREE_TIER_MODELS = frozenset({
+    "gemini-3.7-flash",
     "gemini-3.6-flash",
     "gemini-3.5-flash",
     "gemini-3.5-flash-lite",
@@ -114,11 +118,39 @@ PHASE_DEFS = {
 }
 
 
-def load_env_files() -> None:
+def env_file_candidates() -> tuple[Path, Path]:
+    """Return the two .env paths in their established lookup order."""
+    return Path.cwd() / ".env", Path(__file__).resolve().parent / ".env"
+
+
+def load_env_files() -> dict:
+    """Load discovered .env files and return secret-free discovery details."""
     from dotenv import load_dotenv
-    for candidate in (Path.cwd() / ".env", Path(__file__).resolve().parent / ".env"):
+    searched = env_file_candidates()
+    found = []
+    loaded = []
+    for candidate in searched:
         if candidate.is_file():
-            load_dotenv(candidate)
+            found.append(candidate)
+            if load_dotenv(candidate):
+                loaded.append(candidate)
+    return {"searched": searched, "found": tuple(found), "loaded": tuple(loaded)}
+
+
+def describe_env_search(discovery: dict) -> list[str]:
+    """Render secret-free .env discovery lines for setup diagnostics."""
+    found = set(discovery["found"])
+    lines = [
+        f"ENV SEARCH {index}: {candidate} (found: {'yes' if candidate in found else 'no'})"
+        for index, candidate in enumerate(discovery["searched"], start=1)
+    ]
+    if discovery["loaded"]:
+        lines.append(
+            "ENV LOADED: " + ", ".join(str(path) for path in discovery["loaded"])
+        )
+    else:
+        lines.append("ENV LOADED: none")
+    return lines
 
 
 def api_key_name(tier: str) -> str:
@@ -168,6 +200,7 @@ def resolve_model_policy(tier: str, requested_primary: str,
 
 def check_setup(tier: str = DEFAULT_TIER, verbose: bool = True) -> bool:
     ok = True
+    dotenv_available = True
     try:
         from google import genai  # noqa: F401
     except ImportError:
@@ -177,6 +210,7 @@ def check_setup(tier: str = DEFAULT_TIER, verbose: bool = True) -> bool:
     try:
         import dotenv  # noqa: F401
     except ImportError:
+        dotenv_available = False
         ok = False
         if verbose:
             print("MISSING: python-dotenv (pip install python-dotenv).")
@@ -189,8 +223,17 @@ def check_setup(tier: str = DEFAULT_TIER, verbose: bool = True) -> bool:
                 "MISSING: youtube-transcript-api "
                 "(pip install youtube-transcript-api)."
             )
-    if ok:
-        load_env_files()
+    discovery = {
+        "searched": env_file_candidates(),
+        "found": tuple(path for path in env_file_candidates() if path.is_file()),
+        "loaded": (),
+    }
+    if dotenv_available:
+        discovery = load_env_files()
+    if verbose:
+        for line in describe_env_search(discovery):
+            print(line)
+    if dotenv_available:
         key_name = api_key_name(tier)
         if os.environ.get(key_name):
             if verbose:
@@ -198,7 +241,9 @@ def check_setup(tier: str = DEFAULT_TIER, verbose: bool = True) -> bool:
         else:
             ok = False
             if verbose:
-                print(f"MISSING: {key_name} is not set.")
+                print(
+                    f"MISSING: {key_name} is not set after searching both .env paths."
+                )
     if verbose:
         print("Setup check passed. No API call was made." if ok else SETUP_TASK_HINT)
     return ok
@@ -365,8 +410,156 @@ def select_transcript_track(transcripts) -> object:
     return next(group[0] for group in groups if group)
 
 
-def fetch_transcript(url: str, api_factory=None) -> dict:
-    """Fetch one original caption track and return a failure-isolated result."""
+def resolve_ytdlp_executable() -> Path | None:
+    """Resolve optional yt-dlp from PATH or its bounded WinGet package roots."""
+    resolved = shutil.which("yt-dlp") or shutil.which("yt-dlp.exe")
+    if resolved:
+        return Path(resolved)
+    local_app_data = os.environ.get("LOCALAPPDATA")
+    if not local_app_data:
+        return None
+    packages = Path(local_app_data) / "Microsoft" / "WinGet" / "Packages"
+    if not packages.is_dir():
+        return None
+    candidates = sorted(
+        packages.glob("yt-dlp.yt-dlp_Microsoft.Winget.Source_*\\yt-dlp.exe")
+    )
+    return candidates[-1] if candidates else None
+
+
+def parse_vtt_timestamp(value: str) -> float:
+    """Convert a WebVTT timestamp into seconds."""
+    parts = value.strip().replace(",", ".").split(":")
+    if len(parts) == 2:
+        hours = 0
+        minutes, seconds = parts
+    elif len(parts) == 3:
+        hours, minutes, seconds = parts
+    else:
+        raise ValueError(f"invalid WebVTT timestamp: {value}")
+    return int(hours) * 3600 + int(minutes) * 60 + float(seconds)
+
+
+def _normalized_vtt_token(token: str) -> str:
+    return re.sub(r"[^\w]+", "", token, flags=re.UNICODE).casefold()
+
+
+def parse_vtt_captions(vtt_text: str) -> list[dict]:
+    """Strip WebVTT markup and collapse rolling-window caption duplication."""
+    lines = vtt_text.replace("\r\n", "\n").replace("\r", "\n").split("\n")
+    cues = []
+    index = 0
+    while index < len(lines):
+        line = lines[index].strip().lstrip("\ufeff")
+        if "-->" not in line:
+            index += 1
+            continue
+        start_text, remainder = line.split("-->", 1)
+        end_text = remainder.strip().split()[0]
+        start = parse_vtt_timestamp(start_text)
+        end = parse_vtt_timestamp(end_text)
+        index += 1
+        payload = []
+        while index < len(lines) and lines[index].strip():
+            cleaned = html.unescape(re.sub(r"<[^>]+>", "", lines[index])).strip()
+            if cleaned and cleaned not in payload:
+                payload.append(cleaned)
+            index += 1
+        text = re.sub(r"\s+", " ", " ".join(payload)).strip()
+        if text:
+            cues.append((start, max(0.0, end - start), text))
+
+    accumulated = []
+    snippets = []
+    for start, duration, text in cues:
+        original = text.split()
+        normalized = [_normalized_vtt_token(token) for token in original]
+        pairs = [(raw, norm) for raw, norm in zip(original, normalized) if norm]
+        if not pairs:
+            continue
+        original = [raw for raw, _ in pairs]
+        normalized = [norm for _, norm in pairs]
+        overlap = 0
+        maximum = min(len(accumulated), len(normalized))
+        for size in range(maximum, 0, -1):
+            if accumulated[-size:] == normalized[:size]:
+                overlap = size
+                break
+        novel_original = original[overlap:]
+        novel_normalized = normalized[overlap:]
+        if not novel_original:
+            continue
+        snippets.append({
+            "text": " ".join(novel_original),
+            "start": start,
+            "duration": duration,
+        })
+        accumulated.extend(novel_normalized)
+    return snippets
+
+
+def fetch_transcript_with_ytdlp(url: str, video_id: str, executable=None,
+                                runner=None) -> dict:
+    """Use optional yt-dlp, preferring manual English captions before auto."""
+    executable = Path(executable) if executable else resolve_ytdlp_executable()
+    if executable is None:
+        return {
+            "status": "failed", "video_id": video_id,
+            "reason": "yt-dlp executable was not found on PATH or in WinGet packages",
+            "snippets": [],
+        }
+    runner = runner or subprocess.run
+    fixture_root = Path.cwd() / "tmp"
+    fixture_root.mkdir(parents=True, exist_ok=True)
+    failures = []
+    with tempfile.TemporaryDirectory(
+            prefix="video-to-action-ytdlp-", dir=fixture_root) as temp:
+        output_dir = Path(temp)
+        for caption_kind, flag in (("manual", "--write-sub"),
+                                   ("auto-generated", "--write-auto-sub")):
+            command = [
+                str(executable), flag, "--skip-download", "--sub-lang", "en",
+                "--sub-format", "vtt", "--paths", str(output_dir),
+                "-o", "%(id)s.%(ext)s", url,
+            ]
+            completed = runner(
+                command, capture_output=True, text=True, encoding="utf-8",
+                errors="replace", timeout=120, check=False,
+            )
+            vtt_files = sorted(output_dir.glob("*.vtt"))
+            if completed.returncode == 0 and vtt_files:
+                snippets = parse_vtt_captions(
+                    vtt_files[0].read_text(encoding="utf-8")
+                )
+                if snippets:
+                    return {
+                        "status": "complete", "video_id": video_id,
+                        "language": "English", "language_code": "en",
+                        "is_generated": caption_kind == "auto-generated",
+                        "caption_kind": caption_kind,
+                        "retrieval_path": "yt-dlp",
+                        "snippets": snippets,
+                    }
+                failures.append(f"{caption_kind} VTT contained no usable captions")
+            else:
+                detail = re.sub(
+                    r"\s+", " ", (completed.stderr or completed.stdout or "").strip()
+                )[:300]
+                failures.append(
+                    f"{caption_kind} captions unavailable"
+                    + (f": {detail}" if detail else "")
+                )
+            for vtt_file in vtt_files:
+                vtt_file.unlink()
+    return {
+        "status": "failed", "video_id": video_id,
+        "reason": "; ".join(failures) or "yt-dlp produced no captions",
+        "snippets": [],
+    }
+
+
+def fetch_transcript(url: str, api_factory=None, ytdlp_fetcher=None) -> dict:
+    """Fetch captions through the primary API, then optional yt-dlp fallback."""
     video_id = parse_youtube_video_id(url)
     try:
         if api_factory is None:
@@ -391,6 +584,10 @@ def fetch_transcript(url: str, api_factory=None) -> dict:
             "language": track.language,
             "language_code": track.language_code,
             "is_generated": bool(track.is_generated),
+            "caption_kind": (
+                "auto-generated" if bool(track.is_generated) else "manual"
+            ),
+            "retrieval_path": "youtube-transcript-api",
             "snippets": snippets,
         }
     except Exception as exc:  # noqa: BLE001 - every caption failure is isolated
@@ -399,10 +596,28 @@ def fetch_transcript(url: str, api_factory=None) -> dict:
             "NoTranscriptAvailable", "LookupError",
         }
         status = "unavailable" if type(exc).__name__ in unavailable else "failed"
+        primary_reason = f"{type(exc).__name__}: {exc}"
+        ytdlp_fetcher = ytdlp_fetcher or fetch_transcript_with_ytdlp
+        try:
+            fallback = ytdlp_fetcher(url, video_id)
+        except Exception as fallback_exc:  # noqa: BLE001 - fallback is non-fatal
+            fallback = {
+                "status": "failed", "video_id": video_id,
+                "reason": f"{type(fallback_exc).__name__}: {fallback_exc}",
+                "snippets": [],
+            }
+        if fallback["status"] == "complete":
+            fallback["primary_failure_reason"] = primary_reason
+            return fallback
         return {
             "status": status,
             "video_id": video_id,
-            "reason": f"{type(exc).__name__}: {exc}",
+            "reason": (
+                f"youtube-transcript-api: {primary_reason}; "
+                f"yt-dlp fallback: {fallback.get('reason', 'no result')}"
+            ),
+            "primary_failure_reason": primary_reason,
+            "fallback_failure_reason": fallback.get("reason", "no result"),
             "snippets": [],
         }
 
@@ -430,6 +645,7 @@ def build_transcript_doc(title: str, url: str, result: dict) -> str:
         lines += [
             "- **Status:** Complete via automatic retrieval",
             "- **Automatic retrieval:** Complete",
+            f"- **Retrieval path:** {result['retrieval_path']}",
             f"- **Language:** {result['language']} ({result['language_code']})",
             f"- **Caption track:** {track_type}",
             "- **Manual source:** Not used", "",
@@ -439,6 +655,11 @@ def build_transcript_doc(title: str, url: str, result: dict) -> str:
             "errors, missing punctuation, absent speaker labels, and awkward breaks.",
             "", "## Transcript", "",
         ]
+        if result.get("primary_failure_reason"):
+            lines.insert(
+                10,
+                f"- **Primary retrieval failure:** {result['primary_failure_reason']}",
+            )
         for snippet in result["snippets"]:
             end = snippet["start"] + snippet["duration"]
             lines.append(
@@ -500,6 +721,24 @@ def complete_manual_transcript(transcript_path: Path, manual_path: Path) -> Path
     )
     transcript_path.write_text(completed.rstrip() + "\n", encoding="utf-8")
     return transcript_path
+
+
+def transcript_result_messages(result: dict, transcript_path: Path) -> list[str]:
+    """Return explicit terminal/chat handoff lines for transcript status."""
+    if result["status"] == "complete":
+        return [
+            "Transcript: complete via "
+            f"{result['retrieval_path']} ({result['caption_kind']} captions)."
+        ]
+    command = (
+        f'python "{Path(__file__).resolve()}" --complete-transcript '
+        f'"{transcript_path}" --manual-transcript-file '
+        '"<copied-transcript.txt>"'
+    )
+    return [
+        f"TRANSCRIPT FAILURE: {result['reason']}",
+        f"Retroactive completion command: {command}",
+    ]
 
 
 def inject_ground_truth(prompt: str, title: str, duration: str,
@@ -858,6 +1097,9 @@ def run_extraction(url: str, intent: str, requested_model: str,
         resolution, clip,
     )
     print(f"Saved: {report_path}")
+    for message in transcript_result_messages(
+            transcript_result, report_path.with_name("transcript.md")):
+        print(message)
     return 0 if results else 1
 
 def run_self_test() -> bool:
@@ -865,8 +1107,15 @@ def run_self_test() -> bool:
     fixture_root.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(dir=fixture_root) as temp:
         base = Path(temp)
-        assert DEFAULT_MODEL == "gemini-3.6-flash"
-        assert DEFAULT_FALLBACK_MODEL == "gemini-3.5-flash"
+        assert DEFAULT_MODEL == "gemini-3.7-flash"
+        assert DEFAULT_FALLBACK_MODEL == "gemini-3.6-flash"
+        env_a, env_b = base / "workspace.env", base / "skill.env"
+        env_lines = describe_env_search({
+            "searched": (env_a, env_b), "found": (env_a,), "loaded": (env_a,),
+        })
+        assert str(env_a) in env_lines[0] and "found: yes" in env_lines[0]
+        assert str(env_b) in env_lines[1] and "found: no" in env_lines[1]
+        assert str(env_a) in env_lines[2] and "ENV LOADED" in env_lines[2]
         assert normalize_duration("4:05") == "04:05"
         assert normalize_duration("1:02:03") == "01:02:03"
         for invalid in ("4", "4:5", "04:60", "1:60:00", "abc"):
@@ -906,8 +1155,8 @@ def run_self_test() -> bool:
         free_policy = resolve_model_policy(
             "free", DEFAULT_MODEL, DEFAULT_FALLBACK_MODEL
         )
-        assert free_policy["primary"] == "gemini-3.6-flash"
-        assert free_policy["fallback"] == "gemini-3.5-flash"
+        assert free_policy["primary"] == "gemini-3.7-flash"
+        assert free_policy["fallback"] == "gemini-3.6-flash"
         free_override = resolve_model_policy(
             "free", "gemini-paid-only", "gemini-other-paid"
         )
@@ -1051,6 +1300,8 @@ def run_self_test() -> bool:
         assert successful_transcript["status"] == "complete"
         assert successful_transcript["language_code"] == "es"
         assert not successful_transcript["is_generated"]
+        assert successful_transcript["retrieval_path"] == "youtube-transcript-api"
+        assert successful_transcript["caption_kind"] == "manual"
 
         class TranscriptsDisabled(Exception):
             pass
@@ -1059,8 +1310,17 @@ def run_self_test() -> bool:
             def list(self, video_id):
                 raise TranscriptsDisabled("captions disabled")
 
-        unavailable_transcript = fetch_transcript(url_forms[0], DisabledApi)
+        def absent_ytdlp(url, video_id):
+            return {
+                "status": "failed", "video_id": video_id,
+                "reason": "yt-dlp fixture absent", "snippets": [],
+            }
+
+        unavailable_transcript = fetch_transcript(
+            url_forms[0], DisabledApi, absent_ytdlp
+        )
         assert unavailable_transcript["status"] == "unavailable"
+        assert "yt-dlp fixture absent" in unavailable_transcript["reason"]
 
         class RequestBlocked(Exception):
             pass
@@ -1069,8 +1329,64 @@ def run_self_test() -> bool:
             def list(self, video_id):
                 raise RequestBlocked("request blocked")
 
-        blocked_transcript = fetch_transcript(url_forms[0], BlockedApi)
+        blocked_transcript = fetch_transcript(
+            url_forms[0], BlockedApi, absent_ytdlp
+        )
         assert blocked_transcript["status"] == "failed"
+
+        rolling_vtt = """WEBVTT
+Kind: captions
+Language: en
+
+00:00:00.000 --> 00:00:01.000 align:start position:0%
+<c>Hello</c>
+
+00:00:01.000 --> 00:00:02.000 align:start position:0%
+Hello world
+
+00:00:02.000 --> 00:00:03.000 align:start position:0%
+world again
+"""
+        parsed_rolling = parse_vtt_captions(rolling_vtt)
+        assert " ".join(item["text"] for item in parsed_rolling) == "Hello world again"
+
+        class FakeYtDlpResult:
+            def __init__(self, returncode=0, stdout="", stderr=""):
+                self.returncode = returncode
+                self.stdout = stdout
+                self.stderr = stderr
+
+        ytdlp_flags = []
+
+        def fake_ytdlp_runner(command, **kwargs):
+            del kwargs
+            flag = "--write-sub" if "--write-sub" in command else "--write-auto-sub"
+            ytdlp_flags.append(flag)
+            if flag == "--write-auto-sub":
+                target_dir = Path(command[command.index("--paths") + 1])
+                (target_dir / f"{expected_id}.en.vtt").write_text(
+                    rolling_vtt, encoding="utf-8"
+                )
+            return FakeYtDlpResult()
+
+        fallback_transcript = fetch_transcript(
+            url_forms[0], DisabledApi,
+            lambda transcript_url, video_id: fetch_transcript_with_ytdlp(
+                transcript_url, video_id, executable=base / "yt-dlp.exe",
+                runner=fake_ytdlp_runner,
+            ),
+        )
+        assert fallback_transcript["status"] == "complete"
+        assert fallback_transcript["retrieval_path"] == "yt-dlp"
+        assert fallback_transcript["caption_kind"] == "auto-generated"
+        assert ytdlp_flags == ["--write-sub", "--write-auto-sub"]
+        assert "TranscriptsDisabled" in fallback_transcript["primary_failure_reason"]
+        fallback_doc = build_transcript_doc(
+            "Fallback Fixture", url_forms[0], fallback_transcript
+        )
+        assert "Retrieval path:** yt-dlp" in fallback_doc
+        assert "Caption track:** Automatically generated" in fallback_doc
+        assert "Primary retrieval failure:** TranscriptsDisabled" in fallback_doc
 
         duration = "14:34"
         procedure_result = (
@@ -1145,6 +1461,12 @@ def run_self_test() -> bool:
         isolated_text = isolated_path.read_text(encoding="utf-8")
         assert "Deep Summary extraction failed; see Extraction Errors." in isolated_text
         assert "Not selected for this run." not in isolated_text
+        isolated_transcript = isolated_path.with_name("transcript.md").read_text(
+            encoding="utf-8"
+        )
+        assert "Manual recovery required" in isolated_transcript
+        assert "yt-dlp fallback: yt-dlp fixture absent" in isolated_transcript
+        assert "fixture technical" in isolated_text
 
         success_effective = build_effective_prompts(
             selected_phase_defs(True, False, False), "Success Fixture", duration
@@ -1190,10 +1512,10 @@ def run_self_test() -> bool:
         success_transcript = success_path.with_name("transcript.md").read_text(
             encoding="utf-8"
         )
-        assert "**Primary model:** gemini-3.6-flash" in success_text
-        assert "**Fallback model:** gemini-3.5-flash" in success_text
+        assert "**Primary model:** gemini-3.7-flash" in success_text
+        assert "**Fallback model:** gemini-3.6-flash" in success_text
         assert "fallback 1/1" in success_text
-        assert "procedure=gemini-3.5-flash" in success_text
+        assert "procedure=gemini-3.6-flash" in success_text
         assert "fallback 1/1" in success_prompts
         assert "## Procedure" in success_text and "## Detailed Summary" in success_text
         assert "\n### Overview\n" in success_text and "\n### Steps\n" in success_text
@@ -1203,7 +1525,14 @@ def run_self_test() -> bool:
         assert "\n### 🎭 FINAL ACT: Key Takeaways\n" in success_text
         assert "```markdown\n## Overview\n### 2.) Fenced child\n## Steps\n```" in success_text
         assert "Complete via automatic retrieval" in success_transcript
+        assert "Retrieval path:** youtube-transcript-api" in success_transcript
         assert "[00:00:00.080–00:00:01.580] Hola" in success_transcript
+        failure_messages = transcript_result_messages(
+            blocked_transcript, isolated_path.with_name("transcript.md")
+        )
+        assert failure_messages[0].startswith("TRANSCRIPT FAILURE:")
+        assert "--complete-transcript" in failure_messages[1]
+        assert "--manual-transcript-file" in failure_messages[1]
         duration_rule = (
             f"This video's exact total length is {duration}; use it verbatim as the "
             f"Length, and ensure every timestamp falls within 00:00–{duration}."
@@ -1222,7 +1551,8 @@ def run_self_test() -> bool:
     print(
         "Self-test passed: free-tier policy, bounded retry/fallback, phase "
         "selection and isolation, single-folder output, provenance, prompts, "
-        "URLs, headings, transcripts, and secret redaction."
+        "URLs, headings, env discovery, transcript fallback/reporting, and "
+        "secret redaction."
     )
     return True
 

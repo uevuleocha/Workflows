@@ -11,12 +11,14 @@ Stage, commit, and push one repository deterministically. When the repository is
 
 Run only for `/stage-commit-push`, `use stage-commit-push`, `stage commit push`, `stage, commit, and push`, or an equally explicit full-workflow request.
 
+An explicit invocation with an unambiguous scope authorizes the ordinary safe workflow end to end: pre-flight, scoped staging, commit-message drafting, commit, push, pushed-commit proof, and eligible pointer-only hub synchronization. Do not pause for routine approvals once the scope is known. Stop only for a missing required input or a safety condition named by this skill.
+
 ## Scope Modes
 
 1. **All:** stage the current repository with `git add -A`.
 2. **Particular:** stage only user-named paths with `git add -A -- <path>...`.
 
-If scope is ambiguous, ask before mutation. In Particular mode, an unnamed submodule pointer is never eligible for staging or synchronization.
+If scope is ambiguous, ask before mutation. In Particular mode, the named paths govern only the current repository's commit. Eligible pointer-only hub synchronization remains a separate automatic follow-up and does not expand that nested staging scope.
 
 ## Repository Determination
 
@@ -51,7 +53,7 @@ If the current repository is not a registered submodule, report success and stop
 
 Pointer synchronization is a second repository operation, never an implicit extension of the nested commit.
 
-### User gate
+### Default behavior
 
 Hub pointer synchronization is **ON by default** for nested repositories. Unless the user explicitly opts out during invocation (e.g., "no hub sync", "do not sync hub pointer", "nested only"), automatically proceed with hub pointer synchronization after nested push pre-flight/verification succeeds and eligibility gates pass. If the user explicitly opts out, skip hub pointer synchronization and report status as `declined by user`.
 
@@ -64,7 +66,6 @@ Proceed only if all are true:
 - the hub still tracks the exact named path as mode `160000`;
 - the hub worktree's submodule path resolves to the just-pushed nested repository;
 - `git status --porcelain=v2 -z` and a direct nested status check prove the nested worktree has no lowercase-`m` uncommitted-content condition;
-- in Particular mode, the user explicitly named or separately approved this submodule pointer;
 - the hub has an `origin`, branch, and upstream;
 - `git fetch origin` shows the hub remote is not ahead or diverged;
 - the user approved any pre-existing unpushed hub commits;
@@ -120,6 +121,7 @@ Hub pointer synchronization (ALWAYS REPORT LOUDLY):
 - Confirm the nested staged list matched scope and the commit carried the correct executing-platform trailer.
 - Confirm the nested commit is reachable from the upstream before hub mutation.
 - Confirm auto hub pointer synchronization defaults to ON unless explicitly opted out by the user.
+- Confirm Particular mode applies its named-path scope only to the current repository and does not require a second approval for eligible pointer-only hub synchronization.
 - Confirm hub pointer synchronization status is always reported loudly.
 - Confirm the hub commit, when made, changes exactly one `160000` gitlink.
 - Confirm scoped mode never stages an unnamed pointer.
@@ -127,5 +129,4 @@ Hub pointer synchronization (ALWAYS REPORT LOUDLY):
 - Confirm remote-ahead, diverged, pre-existing-commit, and unrelated-staged-change gates were respected independently in both repositories.
 - Confirm the portable Markdown Table Alignment section remains present.
 
-When updating this skill, run the folder-style skill validator with Python UTF-8 mode and test two-repository behavior only in disposable repositories.
-s.
+When updating this skill, run the folder-style skill validator with Python UTF-8 mode and run `python -B -X utf8 scripts/test_autonomy.py`. The test uses only disposable repositories under the workspace `tmp/` folder and removes its fixture afterward.

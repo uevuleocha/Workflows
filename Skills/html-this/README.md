@@ -7,3 +7,7 @@ Creates, converts, inspects, and verifies polished self-contained HTML durable a
 - Pairs with `pdf-this` and shares its durable-format protocol.
 - May be co-invoked with durable-artifact creators and lifecycle finalizers.
 - Uses the host PDF runtime (`pypdf` and Poppler) for PDF-to-HTML conversion.
+
+## Exact model dependency
+
+- Requires `exact-model-confirmation-gate` before the first model-attributed durable-artifact write in each stable session.

@@ -8,12 +8,16 @@ Explicit invocation runs in one pass: the skill infers the required values, save
 
 Other skills call `session-summary` as a mandatory closing step. If you adopt any of these, adopt `session-summary` too:
 
-| Skill | How it uses `session-summary` |
-|---|---|
-| `claude-workspace-chat-migration` | Hard — closes both workflows with a handoff/report summary (`## Session Summary Integration`) |
-| `codex-workspace-chat-migration` | Hard — same, Codex-scoped |
-| `antigravity-workspace-chat-migration` | Hard — same, Antigravity-scoped |
-| `finalize-session` | Hard — required child; the wrapper runs `session-name` + `session-summary` in one pass and may pass Subject, Topic, summary number, and Directory overrides |
+| Skill                                  | Use                                         |
+| -------------------------------------- | ------------------------------------------- |
+| `claude-workspace-chat-migration`      | Handoff summary -> see note [Claude]        |
+| `codex-workspace-chat-migration`       | Codex-scoped handoff summary                |
+| `antigravity-workspace-chat-migration` | Antigravity-scoped handoff summary          |
+| `finalize-session`                     | Combined closing run -> see note [Finalize] |
+
+Note [Claude]: Hard dependency that closes both workflows with a handoff/report summary through `## Session Summary Integration`.
+
+Note [Finalize]: Hard child dependency. The wrapper runs `session-name` and `session-summary` in one pass and may pass Subject, Topic, summary number, and Directory overrides.
 
 `finalize-session` is the convenience caller for combined chat-naming plus durable recap. It is a thin orchestrator and owns none of this skill's logic — `session-summary` keeps full ownership of inference, safe numbering, ACTS structure, provenance, clarification rights, and the completed-values receipt. Direct `session-summary` invocation is unchanged and never routes through the wrapper.
 
@@ -37,3 +41,7 @@ Pair with `html-this` or `pdf-this` for HTML-only or PDF-only human-readable art
 ## Deterministic table dependency
 
 Adopt `markdown-table-aligner` with this skill. It supplies the deterministic final padding pass for file-based Markdown tables; the portable rule remains the content and fallback contract.
+
+## Exact model dependency
+
+- Requires `exact-model-confirmation-gate` before the first model-attributed durable-artifact write in each stable session.

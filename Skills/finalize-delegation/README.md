@@ -8,13 +8,13 @@ It is the closing half of a lifecycle that `delegate-this` opens. On its own it 
 
 This skill is meaningless in isolation, which is why this README exists — the house rule is that a skill entangled with other skills carries a README naming them.
 
-| Skill               | Relationship                                                    |
-|---------------------|-----------------------------------------------------------------|
-| `delegate-this`     | Creates the `_dispatched` record this skill closes              |
-| `finalize-plan`     | Prompts the user to run this skill when it closes a parent plan |
-| `finalize-task`     | Prompts the user to run this skill when it closes a parent task |
-| `plan-this`      | Authors the parent plan carrying the `Delegation` pointer       |
-| `task-this`      | Authors the parent task carrying the `Delegation` pointer       |
+| Skill           | Relationship                                                    |
+| --------------- | --------------------------------------------------------------- |
+| `delegate-this` | Creates the `_dispatched` record this skill closes              |
+| `finalize-plan` | Prompts the user to run this skill when it closes a parent plan |
+| `finalize-task` | Prompts the user to run this skill when it closes a parent task |
+| `plan-this`     | Authors the parent plan carrying the `Delegation` pointer       |
+| `task-this`     | Authors the parent task carrying the `Delegation` pointer       |
 
 The dependency direction is strict and one-way. `delegate-this` calls the plan/task skills; the plan/task skills never call it. `finalize-plan` and `finalize-task` **prompt** for this skill but never invoke it and never touch a delegation file. Adopt `finalize-delegation` alongside `delegate-this`, or neither.
 
@@ -54,3 +54,7 @@ Pairs with `html-this` and `pdf-this` so every existing format sibling is finali
 ## Deterministic table dependency
 
 Adopt `markdown-table-aligner` with this skill. It supplies the deterministic final padding pass for file-based Markdown tables; the portable rule remains the content and fallback contract.
+
+## Exact model dependency
+
+- Requires `exact-model-confirmation-gate` before the first model-attributed durable-artifact write in each stable session.

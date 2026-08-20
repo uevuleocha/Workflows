@@ -1,0 +1,8 @@
+interface:
+  display_name: "Terminology This"
+  short_description: "Create or extend three-pass terminology references"
+  default_prompt: "Use $terminology-this to create a Terminology document or add terms to the obvious existing subject reference."
+
+policy:
+  allow_implicit_invocation: true
+

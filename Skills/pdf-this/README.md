@@ -7,3 +7,7 @@ Creates, converts, reads, inspects, verifies, fills, and flattens professional P
 - Pairs with `html-this` and shares its durable-format protocol.
 - May be co-invoked with durable-artifact creators and lifecycle finalizers.
 - Uses the host PDF/document runtime, Poppler, and a browser renderer.
+
+## Exact model dependency
+
+- Requires `exact-model-confirmation-gate` before the first model-attributed durable-artifact write in each stable session.

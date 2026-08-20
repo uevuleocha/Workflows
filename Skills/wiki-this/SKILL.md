@@ -23,7 +23,7 @@ Treat these as direct invocation:
 - `set up a wiki here`
 - `initialize the workspace wiki`
 
-If `wiki/wiki-schema.md` already exists, do not overwrite it. Explain that the workspace already has a wiki and offer `wiki-sync` instead. If only part of the scaffold exists, inventory it and propose a repair; do not silently replace it.
+If `wiki/wiki-schema.md` already exists, do not overwrite it. Explain that the workspace already has a wiki and continue through `wiki-sync` instead. If only part of the scaffold exists, inventory it and repair missing compatible pieces autonomously; stop only when repair would overwrite or contradict established policy.
 
 ## Non-Negotiable Boundaries
 
@@ -33,20 +33,27 @@ If `wiki/wiki-schema.md` already exists, do not overwrite it. Explain that the w
 - Create no `CLAUDE.md`, `AGENTS.md`, or other workspace marker inside `wiki/`.
 - Do not assume a universal taxonomy. Page types, folders, and formats must be chosen for this workspace and recorded in its schema.
 - Never descend into a nested workspace while inspecting candidate sources.
+- **Never infer source roots.** The user must identify every source root explicitly. Workspace inspection may validate named roots, but it may not nominate, add, broaden, or substitute a source root.
 
 ## Required Inputs
 
-Infer what is safe, then ask only for decisions that materially shape the wiki:
+The source-root list is the one compulsory user decision. The invocation must explicitly name the existing workspace-relative paths that feed the wiki. If it does not, ask exactly one focused question and stop before inspecting candidate content or writing:
+
+```text
+Which existing workspace-relative folders should be the wiki's source roots?
+I will not infer or add source roots. Once you name them, setup can continue autonomously.
+```
+
+After the source roots are supplied, infer the remaining safe design choices and report them after execution rather than pausing for routine approval:
 
 1. Current workspace root.
-2. Source roots: existing workspace-relative paths that feed the wiki.
-3. Wiki purpose and primary readers.
-4. Context-appropriate page types/categories and their page formats. Among them, a history location and light-history page format, since `wiki-sync` files light history pages there by mandatory default. Treat it as one of the page types you propose, not as a separate question to put to the user.
-5. Federation relationship, if this workspace belongs to a larger wiki system.
-6. Whether `wiki/` should be tracked or ignored under wiki-follows-sources.
-7. Whether to run an initial `wiki-sync` after setup or stop at the scaffold.
+2. Wiki purpose and primary readers from the workspace contract and named sources.
+3. Context-appropriate page types, folders, and formats, including a light-history location and format.
+4. No federation by default unless the user or workspace contract explicitly declares one.
+5. Track or ignore `wiki/` through the existing wiki-follows-sources rule.
+6. Run the initial full `wiki-sync` by default unless the user explicitly requests scaffold-only setup.
 
-Source roots and taxonomy require user confirmation before files are written. Never infer consent to make source directories or reorganize existing material.
+Do not create, move, or reorganize source directories. The user's named roots authorize reading those exact roots for wiki setup; they do not authorize inventing another root.
 
 ## Setup Workflow
 
@@ -56,39 +63,39 @@ Source roots and taxonomy require user confirmation before files are written. Ne
 - Read its canonical contract and relevant structural documentation.
 - Check for an existing `wiki/`, `wiki/wiki-schema.md`, root `CLAUDE.md`, and root `AGENTS.md`.
 - Identify nested workspaces by the host workspace's marker rule. At minimum, treat child directories containing canonical agent-contract markers as separate workspaces and exclude their contents from source inspection.
-- Inspect only enough candidate material to propose source roots and taxonomy.
+- Validate only the user-named source roots. Inspect enough material inside those exact roots to derive purpose, taxonomy, identity granularity, and page formats; never inspect candidate paths in order to discover additional roots.
 - When the established Hub `wiki/wiki-schema.md` is available through the workspace context or as a user-provided reference, read it as a starter example to adapt. Copy its operating concerns, not its workspace-specific roots, taxonomy, folders, or paths. If it is unavailable, do not invent a Hub path or make setup depend on it.
 
-### 2. Propose the wiki design
+### 2. Derive the autonomous wiki design
 
-Present a compact checkpoint containing:
+After explicit source roots are known, derive and execute a compact design without another routine checkpoint. Record in the schema and report afterward:
 
-- confirmed workspace root;
-- proposed workspace-relative source-root list;
-- proposed page types/categories, folders, and page formats;
-- within them, the proposed history location and light-history page format, named explicitly so the user approves it rather than inheriting it silently. Say plainly what it is for: `wiki-sync` applies mine-and-fold + light history to historical source groups by mandatory default and must have a declared place to file them, otherwise the first sync stops to request a schema amendment;
-- proposed `wiki/` tree containing `wiki-schema.md`, `index.md`, and `log.md`;
-- exact pointer lines to add to root `CLAUDE.md` and `AGENTS.md`;
-- whether to track or ignore `wiki/` under the wiki-follows-sources rule: when sources are published, publish the wiki; when sources are intentionally ignored/private, normally ignore the wiki too. Present the choice without forcing a default;
-- federation behavior, if applicable;
-- whether the first sync is included and, if so, the requested ingest scope and order. Any proposed batching must be confirmed by the user first.
+- confirmed workspace root and the exact user-supplied source-root list;
+- context-appropriate page types, folders, and page formats;
+- a light-history location and page format for `wiki-sync`'s automatic historical treatment;
+- the structural `wiki/unresolved-verification.md` page and its forward-only rules;
+- the `wiki/coverage-contract.json` path and version-1 coverage meanings;
+- the `wiki/` tree containing `wiki-schema.md`, `coverage-contract.json`, `unresolved-verification.md`, `index.md`, and `log.md`;
+- exact pointer lines added to root `CLAUDE.md` and `AGENTS.md` when those files exist;
+- track/ignore behavior derived from wiki-follows-sources; and
+- no federation unless explicitly declared.
 
 Derive page types from context. A software wiki, research wiki, book wiki, and business wiki may need different taxonomies. Reuse an established taxonomy only when it fits; never force one merely because another workspace uses it.
 
-Use the Hub schema only as an adaptable example of a complete rulebook. The new workspace's approved needs remain authoritative.
-
-Wait for explicit approval or revisions before creating or editing files.
+Use the Hub schema only as an adaptable example of a complete rulebook. The current workspace and the user's explicit source-root list remain authoritative. If a non-source design choice is merely debatable, choose the smallest compatible default, complete the setup, and report the choice afterward. Stop only when competing interpretations would cause material data exposure, workspace crossing, destructive replacement, or a contradictory schema.
 
 ### 3. Create the scaffold
 
-After approval:
-
 1. Create `wiki/` at the current workspace root.
-2. Create `wiki/wiki-schema.md`, `wiki/index.md`, and `wiki/log.md`.
-3. Create only the category folders declared by the approved schema, including the approved history location.
-4. Add the approved short wiki pointer to root `CLAUDE.md` and `AGENTS.md`. If one is absent, follow the project contract: do not invent a replacement marker or create a contract file without approval.
+2. Create `wiki/wiki-schema.md`, `wiki/coverage-contract.json`, `wiki/unresolved-verification.md`, `wiki/index.md`, and `wiki/log.md`.
+3. Create only the category folders declared by the derived schema, including its history location.
+4. Add the short wiki pointer to root `CLAUDE.md` and `AGENTS.md`. If one is absent, do not invent a replacement marker or create a contract file.
 5. Append an `init` entry to `log.md` using the schema's log convention.
-6. Apply the user's approved wiki-follows-sources choice to `.gitignore` only when that file and edit are inside the authorized workspace scope. Preserve unrelated ignore rules.
+6. Apply wiki-follows-sources to `.gitignore` only when that file and edit are inside the authorized workspace scope. Preserve unrelated ignore rules.
+
+`coverage-contract.json` is machine-consumed and carries no agent provenance. It must mirror the schema's exact user-supplied roots, exclusions, nested-workspace markers, identity granularity, wiki path, page globs, structural-page exclusions, provenance field, and path-case policy using version `1`. The schema must name it as the authoritative machine-readable coverage contract.
+
+`unresolved-verification.md` is a structural generated view, not a source of truth and not a checklist the user ticks. Its schema declaration must say that `wiki-sync` maintains it only from new or changed finalized durable artifacts processed after the feature exists. Each entry carries the source artifact path, the owning section, and the unticked item text. An empty page states that no unresolved items have been recorded from forward ingestions.
 
 The schema is the single source of truth for:
 
@@ -96,29 +103,30 @@ The schema is the single source of truth for:
 - read-only role rules;
 - workspace scoping and nested-workspace exclusions;
 - taxonomy, folder mapping, naming, page formats, and citation rules;
-- the history location and light-history page format that `wiki-sync`'s mandatory mine-and-fold + light history default requires. Propose one as part of the taxonomy for user approval on every setup, because without it `wiki-sync` must stop on first contact with a historical group and request a schema amendment. Derive its name and shape from this workspace's approved taxonomy; do not copy a folder name from another workspace;
+- the history location and light-history page format that `wiki-sync`'s mandatory mine-and-fold plus light-history default requires. Derive one from the current workspace's taxonomy and report it afterward; do not copy a folder name from another workspace;
 - index and log conventions;
 - federation rules;
+- the machine-readable version-1 coverage contract path and meanings;
+- the structural unresolved-verification page, forward-only intake rule, and standardized adjacent disposition marker;
 - sync, query, and lint behavior supported by this wiki.
 
 ### 4. Verify setup
 
 - Confirm all created paths are inside the current workspace.
 - Confirm every source path is unchanged.
-- Confirm the schema contains the approved source roots and taxonomy.
-- Confirm the schema declares a history location and light-history page format, so `wiki-sync`'s mandatory default is runnable. If the user declined one, report that first sync will stop on any historical group and request a schema amendment.
+- Confirm the schema and coverage contract contain exactly the user-supplied source roots and compatible identity rules.
+- Confirm the schema declares a history location and light-history page format so `wiki-sync`'s mandatory default is runnable without another checkpoint.
+- Confirm the schema declares `unresolved-verification.md`, the page exists, and the coverage contract excludes it from ordinary knowledge-page provenance scanning.
 - Confirm `index.md` and `log.md` match the schema.
 - Confirm root pointer lines resolve to `wiki/wiki-schema.md`.
 - Confirm no workspace marker exists inside `wiki/`.
 - Report created files and any deferred decisions.
 
-### 5. Optional first sync
+### 5. Initial sync
 
-If the user approved an initial sync, invoke `wiki-sync` as a separate operation after setup verification. Pass through the user's requested ingest scope and order exactly.
+Unless the user explicitly requested scaffold-only setup, invoke `wiki-sync` as a separate operation in the same invocation after setup verification. Default to `workspace-full`; preserve any narrower scope or ingest order the user supplied. Internal batching may be selected for quality, but it must remain uninterrupted and must not request a routine checkpoint.
 
-If the discovered ingest manifest is large, `wiki-sync` may propose batches for quality, but must show the batch plan and receive confirmation before batching. If the user requests one-shot ingestion, everything at once, or a specific order, follow that instruction; do not substitute agent-selected batches. Each confirmed batch is a separate sync pass with its own source-immutability check.
-
-During the optional first sync, `wiki-sync` detects any source group that appears mostly historical and applies **mine-and-fold + light history** to it as its mandatory default, without asking. That treatment is `wiki-sync`'s contract, not this skill's; do not restate it, weaken it, or reintroduce a per-group approval step here. `wiki-sync` stops for permission only when it has a specific strong reason to give a historical group full source pages instead. Never hardcode detection to summaries or another folder name, and never invent a history folder outside the approved schema.
+During the initial sync, `wiki-sync` detects historical groups and applies **mine-and-fold + light history** without asking. If it believes a full page would be better, it still completes light treatment and reports the recommendation afterward; only a later explicit user instruction may convert that item. Never hardcode detection to summaries or another folder name, and never invent a history folder outside the schema.
 
 Otherwise stop and hand off with the exact next step.
 
@@ -127,15 +135,16 @@ Otherwise stop and hand off with the exact next step.
 Stop and report instead of claiming success if:
 
 - a source was changed, moved, renamed, or deleted;
-- the workspace root or source-root list is ambiguous;
+- the workspace root is ambiguous or the user did not explicitly identify the source roots;
 - an existing schema would be overwritten;
-- taxonomy was imposed without user approval;
+- the user-supplied roots do not exist, escape the workspace, conflict with each other, or cannot be represented without guessing;
+- taxonomy cannot be derived without a material contradiction or unsafe exposure;
 - a nested workspace would be traversed;
 - a marker file would be placed inside `wiki/`;
 - setup created or required an Obsidian vault;
-- ingest was silently batched, truncated, or reordered against the user's instruction;
-- the approved schema declares no history location or light-history page format, so `wiki-sync`'s mandatory mine-and-fold default cannot run on first sync without a later schema amendment;
-- a per-group approval step for historical treatment was reintroduced, contradicting `wiki-sync`'s mandatory default.
+- ingest was truncated or reordered against the user's instruction;
+- the completed scaffold lacks the version-1 coverage contract, unresolved-verification declaration, history location, or light-history page format;
+- a routine design, manifest, batching, or historical-treatment approval checkpoint was introduced after the user supplied the roots.
 
 ## Deterministic Markdown Table Aligner Integration
 
@@ -171,16 +180,19 @@ Keep `Content owner` for now. In Uzo's personal artifacts it normally resolves t
 
 ## Exact Model Attribution
 
-Whenever this skill writes a new model identity, appends a current-run model value, or defines a workflow that does either:
+Before this skill creates or materially edits the first first-party durable artifact in a session, invoke `exact-model-confirmation-gate`. The gate must finish before any new `Original writing LLM` or current-run Agent Change Log `Model` value is written.
 
-- Record the full model identity actually used when it is safely available from current runtime or session metadata. Use a specific identity such as `GPT-5.6 Sol`, `GPT-5.6 Terra`, or `Claude Opus 5`; a family-only label such as `GPT-5`, `Claude`, or `Codex Agent` is not an acceptable substitute.
-- Resolve identity in this order: current runtime or session metadata; a platform-provided current-model field; only then, when unavoidable, a field-minimized configuration lookup that returns the model field alone. Apply `tread-lightly` to any potentially sensitive configuration and never display, copy, search, diff, or log the whole configuration.
-- Keep the agent family and model identity separate. Never infer an exact model from an agent label, provider name, stale configuration, or model family.
-- Use `Not recorded` only when the exact identity genuinely cannot be established safely. Do not replace an available exact identity with `Not recorded` merely to avoid checking current runtime metadata.
-- Preserve append-only history. Never rewrite a historical provenance or change-log value solely to improve an old model label; add a truthful current correction entry when correction is required.
+- Reuse the gate's verified identity for later durable-artifact writes while the exact model context, acting agent, task or thread, and execution environment remain unchanged. Do not ask again during that stable session.
+- If authoritative current runtime or session evidence cannot establish the exact model, stop before the first write and ask the user once. Cache a valid answer only for the current stable session.
+- Invalidate prospectively when the user reports a model change or authoritative evidence shows that the model, agent, task or thread, or execution environment changed. Never rewrite historical provenance or change-log rows.
+- Keep reasoning effort, service tier, provider, model family, and agent family separate from exact identity. Reject labels such as `Medium`, `Priority`, `OpenAI`, `GPT-5`, and `Codex Agent` as substitutes for a full model identity.
+- Do not inspect configuration, environment data, credentials, logs, transcripts, or unrelated files by default. Only the gate's genuinely unavoidable file-backed branch may invoke `tread-lightly`, request one model field, and accept it only when it authoritatively identifies the current session. This skill does not gain a blanket `tread-lightly` dependency.
+- Use `Not recorded` only when no interactive user is available, the user cannot identify the model, or exact identity remains safely unresolvable after the permitted attempt.
 
-**Validation check:** For every model value newly written in the current run, accept a full exact identity and the honest `Not recorded` fallback, but reject known ambiguous family-only labels or agent-family substitutions. Confirm model discovery exposed only the required model field and that no historical row was rewritten.
+If `exact-model-confirmation-gate` is unavailable and no verified stable-session result already exists, fail closed before the artifact write rather than guessing, silently using `Not recorded`, or performing broader discovery.
+
+**Validation check:** Confirm the dependency is named in this skill and its README; the canonical caller block is byte-identical to `exact-model-confirmation-gate/references/canonical-caller-block.md`; first-write blocking, one-time confirmation, stable-session reuse, proactive change, context invalidation, identity separation, targeted lookup, unresolved fallback, and append-only history pass the shared deterministic suite; and no historical row was rewritten.
 
 ## Validation
 
-Report the resolved workspace root, approved source roots, created scaffold, pointer status, source-immutability evidence, and whether `wiki-sync` is next. Also report the wiki-follows-sources choice, any approved initial-sync order or batching decision, whether the schema declares a history location and light-history page format, and every historical group `wiki-sync` handled during first sync with the treatment it applied.
+Report the resolved workspace root, exact user-supplied source roots, derived taxonomy, created scaffold, coverage-contract path, unresolved-verification path, pointer status, wiki-follows-sources choice, source-immutability evidence, and initial-sync result. State any autonomous assumptions and post-run recommendations without turning them into retroactive approval requests.

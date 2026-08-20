@@ -19,3 +19,7 @@ Pairs with `html-this` and `pdf-this` so every existing format sibling is finali
 ## Deterministic table dependency
 
 Adopt `markdown-table-aligner` with this skill. It supplies the deterministic final padding pass for file-based Markdown tables; the portable rule remains the content and fallback contract.
+
+## Exact model dependency
+
+- Requires `exact-model-confirmation-gate` before the first model-attributed durable-artifact write in each stable session.

@@ -1,0 +1,7 @@
+interface:
+  display_name: "Exact Model Confirmation Gate"
+  short_description: "Confirm exact model before durable writes"
+  default_prompt: "Use $exact-model-confirmation-gate to establish the exact current model before a durable-artifact write."
+
+policy:
+  allow_implicit_invocation: true

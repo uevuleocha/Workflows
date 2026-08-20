@@ -1,8 +1,8 @@
 # North Star
 
-`north-star` creates or reopens a durable `IN PROGRESS` artifact under `Archive/Live/North Stars/<Subject>/`, embeds a full Prompt Contract, and pursues it in Full or Batch Mode. Every artifact compulsorily places the two-column Agent Provenance table immediately after lifecycle, keeps the helper-owned Agent Change Log as the final human-readable section, and keeps Base64 machine state absolutely last. A Full run permanently becomes Batch when another iteration is known or before pursuit 2. Every pursued turn is one helper-timed ledger entry; provisional fallback timing remains a disclosed safety net. The selected-star footer is compulsory through the successful finalization response.
+`north-star` creates or reopens a durable `IN PROGRESS` artifact under `Archive/Live/North Stars/<Subject>/`, embeds a full Prompt Contract, and pursues it in Full or Batch Mode. Immediately testable DoD items remain blocking; checks that genuinely require later live use or an external event live in a separate helper-owned Deferred Real-World Verification checklist and never block finalization. Every artifact compulsorily places the two-column Agent Provenance table immediately after lifecycle, keeps the helper-owned Agent Change Log as the final human-readable section, and keeps Base64 machine state absolutely last. A Full run permanently becomes Batch when another iteration is known or before pursuit 2. Every pursued turn is one helper-timed ledger entry; provisional fallback timing remains a disclosed safety net. The selected-star footer is compulsory through the successful finalization response.
 
-When GOAL, DoD, CONSTRAINTS, FORMAT, and FAILURE review are proven, `finalize-north-star` closes the current pursuit, changes the lifecycle to `FINALIZED`, moves the same numbered artifact to Historical, and emits the finalized-turn star footer.
+When GOAL, in-pass DoD, CONSTRAINTS, FORMAT, and FAILURE review are proven, `finalize-north-star` closes the current pursuit, preserves any unticked deferred real-world items without treating them as gates, changes the lifecycle to `FINALIZED`, moves the same numbered artifact to Historical, and emits the finalized-turn star footer.
 
 ## Related skills
 
@@ -14,3 +14,7 @@ When GOAL, DoD, CONSTRAINTS, FORMAT, and FAILURE review are proven, `finalize-no
 ## Optional artifact formats
 
 Pair with `html-this` or `pdf-this` for HTML-only or PDF-only human-readable artifacts while this skill retains content and workflow ownership.
+
+## Exact model dependency
+
+- Requires `exact-model-confirmation-gate` before the first model-attributed durable-artifact write in each stable session.

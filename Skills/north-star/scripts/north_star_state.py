@@ -124,6 +124,7 @@ def normalize_state(state):
         state["prompt_contract"]={"goal":state.get("objective", ""),"constraints":state.get("constraints",[])+state.get("boundaries",[]),"format":[],"definition_of_done":state.get("verification",[]),"failure":state.get("stop_when",[])}
         state["definition_of_done_complete"]=state.get("verification_complete",[])
     state.setdefault("definition_of_done_complete",[]); state.setdefault("failure_active",[]); state.setdefault("contract_review",None)
+    state.setdefault("deferred_real_world_verification",[]); state.setdefault("deferred_real_world_verification_complete",[])
     created_day=str(state.get("started_at",""))[:10] or "Not recorded"
     state.setdefault("provenance",{"content_owner":"Uzo","original_writing_agent":"Not recorded","original_writing_llm":"Not recorded","created":created_day,"artifact_role":"Durable North Star pursuit record"})
     state["provenance"].setdefault("original_writing_llm","Not recorded")
@@ -139,7 +140,7 @@ def normalize_state(state):
         row.setdefault("descriptor","Feedback"); row.setdefault("body","Not recorded")
         clean_feedback.append(row)
     state["feedback"]=clean_feedback
-    state["schema_version"]=7
+    state["schema_version"]=8
     for key in ("inactivity_threshold_seconds","inactive_excluded_total_seconds","inactivity_exclusions","paused_total_seconds","active_duration_seconds"):
         state.pop(key,None)
 
@@ -282,12 +283,14 @@ def render_block(state):
     pc=contract(state); completed=set(state.get("definition_of_done_complete",[])); dod=pc.get("definition_of_done",[]); active_failures=set(state.get("failure_active",[]))
     checklist=[f"- [{'x' if i in completed else ' '}] {item}" for i,item in enumerate(dod,1)] or ["- [ ] No Definition of Done criteria recorded"]
     failures=[f"- [{'!' if i in active_failures else ' '}] {item}" for i,item in enumerate(pc.get("failure",[]),1)] or ["- none recorded"]
+    deferred=state.get("deferred_real_world_verification",[]); deferred_complete=set(state.get("deferred_real_world_verification_complete",[]))
+    deferred_lines=(["","#### Deferred Real-World Verification","",*[f"- [{'x' if i in deferred_complete else ' '}] {item}" for i,item in enumerate(deferred,1)]]) if deferred else []
     rows=pursuit_table(state)
     active=state.get("active_pursuit")
     active_label=(f"Pursuit {active['number']} open since {active['started_at']}" if active else "None")
     prov=state.get("provisional")
     prov_label=(f"Open since {prov['started_at']}" if prov else "None")
-    lines=[RUN_BEGIN.format(run_id=state["run_id"]),f"### {state['indicator']} North Star Run `{state['run_id']}`","",f"- **Mode:** `north-star`",f"- **Status:** {status}",f"- **Indicator:** {state['indicator']} (`{state['indicator_index']}`)",f"- **Initial run mode:** {str(state['initial_mode']).title()}",f"- **Current run mode:** {str(state['current_mode']).title()}",f"- **Started:** {state['started_at']}",f"- **Finished:** {state.get('finished_at') or chr(0x2014)}",f"- **Formal pause:** {'Yes' if state.get('status')=='paused' else 'No'}",f"- **Open pursuit:** {active_label}",f"- **Provisional timer:** {prov_label}",f"- **Completed pursuits:** {len(state['pursuits'])}",f"- **Grand total active pursuit time:** {human_duration(total_seconds(state))}",f"- **Current batch:** {state.get('current_batch') or 'Not recorded'}",f"- **Next action:** {state.get('next_action') or 'Not recorded'}","","#### Pursuit","",state.get("pursuit") or "Not recorded.","","#### Prompt Contract","","##### GOAL","",pc["goal"],"","##### CONSTRAINTS","",*markdown_lines(pc["constraints"]),"","##### FORMAT","",*markdown_lines(pc["format"]),"","##### DEFINITION OF DONE","",*checklist,"","##### FAILURE","",*failures,"","#### Mode Transition History","",*markdown_lines([f"{x['at']}: {x['from'].title()} -> {x['to'].title()} — {x['reason']}" for x in state.get("mode_transitions",[])]),"","#### Active Pursuit Log","",*rows,"","#### Evidence","",*markdown_lines(state.get("evidence",[])),"","#### Checkpoint Notes","",*markdown_lines(state.get("notes",[])),"",*feedback_section_lines(state),"",*change_log_lines(state),"",f"{STATE_PREFIX}{encode_state(state)}{STATE_SUFFIX}",RUN_END]
+    lines=[RUN_BEGIN.format(run_id=state["run_id"]),f"### {state['indicator']} North Star Run `{state['run_id']}`","",f"- **Mode:** `north-star`",f"- **Status:** {status}",f"- **Indicator:** {state['indicator']} (`{state['indicator_index']}`)",f"- **Initial run mode:** {str(state['initial_mode']).title()}",f"- **Current run mode:** {str(state['current_mode']).title()}",f"- **Started:** {state['started_at']}",f"- **Finished:** {state.get('finished_at') or chr(0x2014)}",f"- **Formal pause:** {'Yes' if state.get('status')=='paused' else 'No'}",f"- **Open pursuit:** {active_label}",f"- **Provisional timer:** {prov_label}",f"- **Completed pursuits:** {len(state['pursuits'])}",f"- **Grand total active pursuit time:** {human_duration(total_seconds(state))}",f"- **Current batch:** {state.get('current_batch') or 'Not recorded'}",f"- **Next action:** {state.get('next_action') or 'Not recorded'}","","#### Pursuit","",state.get("pursuit") or "Not recorded.","","#### Prompt Contract","","##### GOAL","",pc["goal"],"","##### CONSTRAINTS","",*markdown_lines(pc["constraints"]),"","##### FORMAT","",*markdown_lines(pc["format"]),"","##### DEFINITION OF DONE","",*checklist,"","##### FAILURE","",*failures,*deferred_lines,"","#### Mode Transition History","",*markdown_lines([f"{x['at']}: {x['from'].title()} -> {x['to'].title()} — {x['reason']}" for x in state.get("mode_transitions",[])]),"","#### Active Pursuit Log","",*rows,"","#### Evidence","",*markdown_lines(state.get("evidence",[])),"","#### Checkpoint Notes","",*markdown_lines(state.get("notes",[])),"",*feedback_section_lines(state),"",*change_log_lines(state),"",f"{STATE_PREFIX}{encode_state(state)}{STATE_SUFFIX}",RUN_END]
     return "\n".join(lines)
 
 def append_run(text,block,state):
@@ -346,7 +349,9 @@ def command_init(args):
     complete=set(args.verify_complete or []); maximum=len(args.definition_of_done or [])
     if any(i<1 or i>maximum for i in complete): raise NorthStarError("Definition of Done index is outside the checklist.")
     writing_llm=validate_exact_model_identity(getattr(args,"writing_llm",None) or "Not recorded")
-    state={"schema_version":7,"run_id":make_run_id(started),"pursuit":(args.pursuit or "").strip(),"initial_mode":args.mode,"current_mode":args.mode,"mode_transitions":[],"prompt_contract":{"goal":args.goal.strip(),"constraints":args.constraint or [],"format":args.format or [],"definition_of_done":args.definition_of_done or [],"failure":args.failure or []},"definition_of_done_complete":sorted(complete),"failure_active":[],"contract_review":None,"provenance":{"content_owner":args.content_owner,"original_writing_agent":args.writing_agent,"original_writing_llm":writing_llm,"created":started.date().isoformat(),"artifact_role":args.artifact_role},"change_log":[{"date":started.strftime("%Y-%m-%d-%H:%M:%S"),"agent":args.writing_agent,"model":writing_llm,"action":"Created the North Star artifact.","scope":"Initial authoring"}],"indicator_index":idx,"indicator":INDICATORS[idx],"status":"in_progress","started_at":iso(started),"finished_at":None,"current_batch":args.batch or "Activation","next_action":args.next_action or "Begin pursuit","evidence":args.evidence or [],"notes":args.note or [],"pursuits":[],"active_pursuit":None,"provisional":None,"pursuit_corrections":[],"reopen_count":0,"pursuit_ledger_migrated":True}
+    deferred=args.deferred_verification or []; deferred_complete=set(args.deferred_verify_complete or [])
+    if any(i<1 or i>len(deferred) for i in deferred_complete): raise NorthStarError("Deferred Real-World Verification index is outside the checklist.")
+    state={"schema_version":8,"run_id":make_run_id(started),"pursuit":(args.pursuit or "").strip(),"initial_mode":args.mode,"current_mode":args.mode,"mode_transitions":[],"prompt_contract":{"goal":args.goal.strip(),"constraints":args.constraint or [],"format":args.format or [],"definition_of_done":args.definition_of_done or [],"failure":args.failure or []},"definition_of_done_complete":sorted(complete),"deferred_real_world_verification":deferred,"deferred_real_world_verification_complete":sorted(deferred_complete),"failure_active":[],"contract_review":None,"provenance":{"content_owner":args.content_owner,"original_writing_agent":args.writing_agent,"original_writing_llm":writing_llm,"created":started.date().isoformat(),"artifact_role":args.artifact_role},"change_log":[{"date":started.strftime("%Y-%m-%d-%H:%M:%S"),"agent":args.writing_agent,"model":writing_llm,"action":"Created the North Star artifact.","scope":"Initial authoring"}],"indicator_index":idx,"indicator":INDICATORS[idx],"status":"in_progress","started_at":iso(started),"finished_at":None,"current_batch":args.batch or "Activation","next_action":args.next_action or "Begin pursuit","evidence":args.evidence or [],"notes":args.note or [],"pursuits":[],"active_pursuit":None,"provisional":None,"pursuit_corrections":[],"reopen_count":0,"pursuit_ledger_migrated":True}
     save_context(path,append_run(text,render_block(state),state),newline,bom); return state
 
 def command_create(args):
@@ -451,6 +456,11 @@ def command_checkpoint(args):
             if i<1 or i>maximum: raise NorthStarError(f"Definition of Done index {i} is outside 1..{maximum}.")
             complete.add(i)
         state["definition_of_done_complete"]=sorted(complete)
+        deferred_complete=set(state.get("deferred_real_world_verification_complete",[])); deferred_maximum=len(state.get("deferred_real_world_verification",[]))
+        for i in args.deferred_verify_complete or []:
+            if i<1 or i>deferred_maximum: raise NorthStarError(f"Deferred Real-World Verification index {i} is outside 1..{deferred_maximum}.")
+            deferred_complete.add(i)
+        state["deferred_real_world_verification_complete"]=sorted(deferred_complete)
         if args.clear_failures:
             state["failure_active"]=[]
         elif args.failure_active is not None:
@@ -467,6 +477,7 @@ def command_refine(args):
         if args.constraint is not None: pc["constraints"]=args.constraint; material=True
         if args.format is not None: pc["format"]=args.format; material=True
         if args.definition_of_done is not None: pc["definition_of_done"]=args.definition_of_done; state["definition_of_done_complete"]=[]; material=True
+        if args.deferred_verification is not None: state["deferred_real_world_verification"]=args.deferred_verification; state["deferred_real_world_verification_complete"]=[]; material=True
         if args.failure is not None: pc["failure"]=args.failure; state["failure_active"]=[]; material=True
         if material and state.get("pursuits"): transition_to_batch(state,"The North Star Prompt Contract was materially refined after pursuit work began.")
         complete=set(state.get("definition_of_done_complete",[])); maximum=len(pc.get("definition_of_done",[]))
@@ -474,6 +485,11 @@ def command_refine(args):
             if i<1 or i>maximum: raise NorthStarError(f"Definition of Done index {i} is outside 1..{maximum}.")
             complete.add(i)
         state["definition_of_done_complete"]=sorted(complete); state["prompt_contract"]=pc
+        deferred_complete=set(state.get("deferred_real_world_verification_complete",[])); deferred_maximum=len(state.get("deferred_real_world_verification",[]))
+        for i in args.deferred_verify_complete or []:
+            if i<1 or i>deferred_maximum: raise NorthStarError(f"Deferred Real-World Verification index {i} is outside 1..{deferred_maximum}.")
+            deferred_complete.add(i)
+        state["deferred_real_world_verification_complete"]=sorted(deferred_complete)
         if args.batch: state["current_batch"]=args.batch
         if args.next_action: state["next_action"]=args.next_action
         if getattr(args,"writing_llm",None):
@@ -522,7 +538,7 @@ def command_reopen(args):
     run=select_run(runs,args.run_id,allow_terminal=True); state=dict(run["state"]); normalize_state(state)
     if state.get("active_pursuit"): raise NorthStarError("Terminal artifact unexpectedly has an open pursuit.")
     current=now_local(); state["status"]="in_progress"; state["finished_at"]=None; state["reopen_count"]=int(state.get("reopen_count",0))+1; transition_to_batch(state,"A terminal North Star was reopened for another iteration."); state["current_batch"]=args.batch or "Reopened"; state["next_action"]=args.next_action or "Start the next pursuit."; state.setdefault("notes",[]).append(f"Reopened on {current.date().isoformat()}; existing pursuit ledger preserved.")
-    append_change(state,args.acting_agent,"Reopened the terminal North Star for another Batch iteration.")
+    append_change(state,args.acting_agent,"Reopened the terminal North Star for another Batch iteration.",getattr(args,"acting_llm",None))
     updated=rewrite_header(replace_run(text,run,state),"IN PROGRESS",current); live=archive/"Live"/"North Stars"/subject.name; live.mkdir(parents=True,exist_ok=True); stem=re.sub(r"_(?:finalized|ended)\.md$","_in_progress.md",path.name); target=live/stem; exclusive_write(target,updated,newline,bom)
     try: path.unlink()
     except OSError:
@@ -543,6 +559,11 @@ def terminal(args,status):
             if i<1 or i>maximum: raise NorthStarError(f"Definition of Done index {i} is outside 1..{maximum}.")
             complete.add(i)
         state["definition_of_done_complete"]=sorted(complete); missing=sorted(set(range(1,maximum+1))-complete)
+        deferred_complete=set(state.get("deferred_real_world_verification_complete",[])); deferred_maximum=len(state.get("deferred_real_world_verification",[]))
+        for i in getattr(args,"deferred_verify_complete",None) or []:
+            if i<1 or i>deferred_maximum: raise NorthStarError(f"Deferred Real-World Verification index {i} is outside 1..{deferred_maximum}.")
+            deferred_complete.add(i)
+        state["deferred_real_world_verification_complete"]=sorted(deferred_complete)
         if not pc.get("definition_of_done"): raise NorthStarError("A North Star needs Definition of Done criteria to finalize.")
         if missing: raise NorthStarError("Cannot finalize; unchecked Definition of Done items: "+", ".join(map(str,missing)))
         if state.get("failure_active"): raise NorthStarError("Cannot finalize; active Failure conditions: "+", ".join(map(str,state["failure_active"])))
@@ -553,7 +574,7 @@ def terminal(args,status):
     current=now_local(); state["status"]=status; state["finished_at"]=iso(current); state["current_batch"]="Finalized" if status=="finalized" else "Ended"; state["next_action"]="None \u2014 North Star finalized." if status=="finalized" else "None \u2014 North Star ended."
     if getattr(args,"evidence",None): state["evidence"]=state.get("evidence",[])+args.evidence
     if getattr(args,"note",None): state.setdefault("notes",[]).append(args.note)
-    append_change(state,args.acting_agent,"Finalized the North Star and moved it to Historical." if status=="finalized" else "Ended the North Star and moved it to Historical.")
+    append_change(state,args.acting_agent,"Finalized the North Star and moved it to Historical." if status=="finalized" else "Ended the North Star and moved it to Historical.",getattr(args,"acting_llm",None))
     updated=rewrite_header(replace_run(text,run,state),"FINALIZED" if status=="finalized" else "ENDED",current); hist=archive/"Historical"/"North Stars"/subject.name; hist.mkdir(parents=True,exist_ok=True); suffix="_finalized.md" if status=="finalized" else "_ended.md"; target=hist/(path.name[:-len("_in_progress.md")]+suffix); exclusive_write(target,updated,newline,bom)
     try: path.unlink()
     except OSError:
@@ -597,7 +618,9 @@ def command_format_receipt(args):
         else: raise NorthStarError("A mode footer is unavailable for this North Star status.")
     elif rtype == "prompt-contract":
         pc=contract(state)
-        print("GOAL: "+pc["goal"]+"\n\nCONSTRAINTS:\n"+"\n".join(f"- {x}" for x in pc["constraints"])+"\n\nFORMAT:\n"+"\n".join(f"- {x}" for x in pc["format"])+"\n\nDEFINITION OF DONE:\n"+"\n".join(f"- {x}" for x in pc["definition_of_done"])+"\n\nFAILURE:\n"+"\n".join(f"- {x}" for x in pc["failure"]))
+        deferred=state.get("deferred_real_world_verification",[])
+        deferred_text=("\n\nDEFERRED REAL-WORLD VERIFICATION:\n"+"\n".join(f"- {x}" for x in deferred)) if deferred else ""
+        print("GOAL: "+pc["goal"]+"\n\nCONSTRAINTS:\n"+"\n".join(f"- {x}" for x in pc["constraints"])+"\n\nFORMAT:\n"+"\n".join(f"- {x}" for x in pc["format"])+"\n\nDEFINITION OF DONE:\n"+"\n".join(f"- {x}" for x in pc["definition_of_done"])+"\n\nFAILURE:\n"+"\n".join(f"- {x}" for x in pc["failure"])+deferred_text)
     elif rtype == "finalizer-receipt":
         if state.get("status") not in ("finalized", "reached"):
             raise NorthStarError("North Star is not finalized.")
@@ -636,7 +659,7 @@ def print_result(state,as_json=False):
 def add_common(p): p.add_argument("--artifact",required=True); p.add_argument("--run-id")
 def add_actor(p): p.add_argument("--acting-agent",required=True); p.add_argument("--acting-llm")
 def init_args(p):
-    p.add_argument("--writing-agent",required=True); p.add_argument("--writing-llm"); p.add_argument("--content-owner",default="Uzo"); p.add_argument("--artifact-role",default="Durable North Star pursuit record"); p.add_argument("--goal",required=True); p.add_argument("--pursuit"); p.add_argument("--mode",choices=("full","batch"),default="full"); p.add_argument("--definition-of-done",action="append"); p.add_argument("--verify-complete",type=int,action="append"); p.add_argument("--constraint",action="append"); p.add_argument("--format",action="append"); p.add_argument("--failure",action="append"); p.add_argument("--batch"); p.add_argument("--next-action"); p.add_argument("--started-at"); p.add_argument("--evidence",action="append"); p.add_argument("--note",action="append"); p.add_argument("--indicator-index",type=int,choices=range(len(INDICATORS)),metavar="0..7")
+    p.add_argument("--writing-agent",required=True); p.add_argument("--writing-llm"); p.add_argument("--content-owner",default="Uzo"); p.add_argument("--artifact-role",default="Durable North Star pursuit record"); p.add_argument("--goal",required=True); p.add_argument("--pursuit"); p.add_argument("--mode",choices=("full","batch"),default="full"); p.add_argument("--definition-of-done",action="append"); p.add_argument("--verify-complete",type=int,action="append"); p.add_argument("--deferred-verification",action="append"); p.add_argument("--deferred-verify-complete",type=int,action="append"); p.add_argument("--constraint",action="append"); p.add_argument("--format",action="append"); p.add_argument("--failure",action="append"); p.add_argument("--batch"); p.add_argument("--next-action"); p.add_argument("--started-at"); p.add_argument("--evidence",action="append"); p.add_argument("--note",action="append"); p.add_argument("--indicator-index",type=int,choices=range(len(INDICATORS)),metavar="0..7")
 def build_parser():
     parser=argparse.ArgumentParser(description="Maintain artifact-backed North Star state and per-turn pursuit timing."); subs=parser.add_subparsers(dest="command",required=True)
     p=subs.add_parser("create"); p.add_argument("--workspace-root",required=True); p.add_argument("--subject",required=True); p.add_argument("--topic",required=True); init_args(p); p.set_defaults(handler=command_create)
@@ -648,14 +671,14 @@ def build_parser():
     p=subs.add_parser("provisional-start"); add_common(p); p.add_argument("--started-at"); p.set_defaults(handler=command_provisional_start)
     p=subs.add_parser("provisional-discard"); add_common(p); p.set_defaults(handler=command_provisional_discard)
     p=subs.add_parser("provisional-commit"); add_common(p); add_actor(p); p.add_argument("--summary",required=True); p.add_argument("--batch"); p.add_argument("--ended-at"); p.set_defaults(handler=command_provisional_commit)
-    p=subs.add_parser("checkpoint"); add_common(p); add_actor(p); p.add_argument("--batch"); p.add_argument("--next-action"); p.add_argument("--note"); p.add_argument("--another-iteration"); p.add_argument("--verify-complete",type=int,action="append"); p.add_argument("--failure-active",type=int,action="append"); p.add_argument("--clear-failures",action="store_true"); p.set_defaults(handler=command_checkpoint)
-    p=subs.add_parser("refine"); add_common(p); add_actor(p); p.add_argument("--writing-llm"); p.add_argument("--goal"); p.add_argument("--pursuit"); p.add_argument("--constraint",action="append"); p.add_argument("--format",action="append"); p.add_argument("--definition-of-done",action="append"); p.add_argument("--failure",action="append"); p.add_argument("--verify-complete",type=int,action="append"); p.add_argument("--batch"); p.add_argument("--next-action"); p.add_argument("--note"); p.set_defaults(handler=command_refine)
+    p=subs.add_parser("checkpoint"); add_common(p); add_actor(p); p.add_argument("--batch"); p.add_argument("--next-action"); p.add_argument("--note"); p.add_argument("--another-iteration"); p.add_argument("--verify-complete",type=int,action="append"); p.add_argument("--deferred-verify-complete",type=int,action="append"); p.add_argument("--failure-active",type=int,action="append"); p.add_argument("--clear-failures",action="store_true"); p.set_defaults(handler=command_checkpoint)
+    p=subs.add_parser("refine"); add_common(p); add_actor(p); p.add_argument("--writing-llm"); p.add_argument("--goal"); p.add_argument("--pursuit"); p.add_argument("--constraint",action="append"); p.add_argument("--format",action="append"); p.add_argument("--definition-of-done",action="append"); p.add_argument("--deferred-verification",action="append"); p.add_argument("--failure",action="append"); p.add_argument("--verify-complete",type=int,action="append"); p.add_argument("--deferred-verify-complete",type=int,action="append"); p.add_argument("--batch"); p.add_argument("--next-action"); p.add_argument("--note"); p.set_defaults(handler=command_refine)
     p=subs.add_parser("feedback-add"); add_common(p); add_actor(p); p.add_argument("--descriptor",required=True); p.add_argument("--body",required=True); p.set_defaults(handler=command_feedback_add)
     p=subs.add_parser("pause"); add_common(p); add_actor(p); p.add_argument("--reason"); p.set_defaults(handler=command_pause)
     p=subs.add_parser("resume"); add_common(p); add_actor(p); p.set_defaults(handler=command_resume)
     p=subs.add_parser("recover"); add_common(p); add_actor(p); p.add_argument("--interrupted-at"); p.add_argument("--note"); p.set_defaults(handler=command_recover)
     p=subs.add_parser("finish"); add_common(p); p.add_argument("--result",choices=("reached","ended"),required=True); p.add_argument("--evidence",action="append"); p.add_argument("--note"); p.set_defaults(handler=command_finish)
-    p=subs.add_parser("finalize"); add_common(p); add_actor(p); p.add_argument("--evidence",action="append"); p.add_argument("--note"); p.add_argument("--verify-complete",type=int,action="append"); p.add_argument("--constraints-verified",action="store_true"); p.add_argument("--format-verified",action="store_true"); p.add_argument("--failure-reviewed",action="store_true"); p.set_defaults(handler=command_finalize)
+    p=subs.add_parser("finalize"); add_common(p); add_actor(p); p.add_argument("--evidence",action="append"); p.add_argument("--note"); p.add_argument("--verify-complete",type=int,action="append"); p.add_argument("--deferred-verify-complete",type=int,action="append"); p.add_argument("--constraints-verified",action="store_true"); p.add_argument("--format-verified",action="store_true"); p.add_argument("--failure-reviewed",action="store_true"); p.set_defaults(handler=command_finalize)
     p=subs.add_parser("end"); add_common(p); add_actor(p); p.add_argument("--note"); p.set_defaults(handler=command_end)
     p=subs.add_parser("status"); add_common(p); p.add_argument("--json",action="store_true"); p.set_defaults(handler=command_status)
     p=subs.add_parser("format-receipt"); add_common(p); p.add_argument("--type",required=True,choices=("timing-statement","fallback-disclosure","mode-footer","prompt-contract","finalizer-receipt")); p.add_argument("--subject",help="Required for finalizer-receipt"); p.set_defaults(handler=command_format_receipt)

@@ -1,7 +1,7 @@
 interface:
   display_name: "Video to Action"
   short_description: "Create free-tier video reports with bounded fallback"
-  default_prompt: "Use /video-to-action with the public URL, exact title, exact duration, and any requested optional phases. Default to free tier with Gemini 3.6 Flash, reuse supplied choices, and let the helper handle bounded Gemini 3.5 Flash fallback and one-folder provenance."
+  default_prompt: "Use /video-to-action with the public URL, exact title, exact duration, and any requested optional phases. Default to free tier with Gemini 3.7 Flash, reuse supplied choices, and let the helper handle bounded Gemini 3.6 Flash fallback and one-folder provenance."
 
 policy:
   allow_implicit_invocation: false

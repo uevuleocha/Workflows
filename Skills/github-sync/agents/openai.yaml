@@ -1,0 +1,7 @@
+interface:
+  display_name: "GitHub Sync"
+  short_description: "Diff, stage, commit, push, and sync the hub pointer"
+  default_prompt: "Use $github-sync with my All or Particular scope. Run $git-diff first, then $stage-commit-push continuously, preserving safety gates and automatic eligible hub-pointer synchronization."
+
+policy:
+  allow_implicit_invocation: false

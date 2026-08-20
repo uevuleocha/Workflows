@@ -1,0 +1,7 @@
+interface:
+  display_name: "GitHub Involvement"
+  short_description: "Track and maintain GitHub involvements"
+  default_prompt: "Use $github-involvement to check tracked GitHub items (active and passive) for updates, report changes, move closed items to Done, and run a bounded retroactive sweep of active involvements. It never files anything."
+
+policy:
+  allow_implicit_invocation: true

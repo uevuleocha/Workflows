@@ -8,3 +8,7 @@ Creates or updates official manifests - durable, numbered lists of things to be 
 - Calls `markdown-table-aligner` on Markdown manifests and exact Markdown source packets before handoff or serialization.
 - Pairs with `session-summary` (same always-historical Archive placement model).
 - Called by all five `*-workspace-chat-migration` skills to create and update migration manifests.
+
+## Exact model dependency
+
+- Requires `exact-model-confirmation-gate` before the first model-attributed durable-artifact write in each stable session.

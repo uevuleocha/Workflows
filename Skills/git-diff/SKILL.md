@@ -135,7 +135,7 @@ Nothing staged or committed — this was read-only.
 - On submodule fixtures, verify clean, pointer-drift, dirty-content, combined, and uninitialized states where available.
 - Confirm the Pointers table appears for clean submodule-bearing repositories.
 
-When updating this skill, run the folder-style skill validator with Python UTF-8 mode and validate behavior only in disposable repositories.
+When updating this skill, run the folder-style skill validator with Python UTF-8 mode and run `python -B -X utf8 scripts/test_git_diff_behavior.py`. The test uses only disposable repositories under the workspace `tmp/` folder and removes its fixture afterward.
 
 ## Markdown Table Alignment
 

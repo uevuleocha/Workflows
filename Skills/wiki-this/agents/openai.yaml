@@ -1,8 +1,7 @@
 interface:
   display_name: "Wiki This"
   short_description: "Set up a schema-driven workspace wiki"
-  default_prompt: "Use $wiki-this to scaffold a schema-driven Markdown wiki, adapting the Hub schema only as an example. Confirm roots, taxonomy, track/ignore treatment, and first-sync order or batching. Propose a history location and light-history page format, since wiki-sync applies mine-and-fold plus light history to historical groups by mandatory default. Never mutate sources or create an Obsidian vault."
+  default_prompt: "Use $wiki-this to create and initially sync a schema-driven Markdown wiki. Require the user to explicitly name every source root and never infer one. After roots are supplied, autonomously create the schema, version-1 coverage contract, unresolved-verification page, history treatment, navigation, log, and safe wiki-follows-sources behavior; stop only for materially unsafe ambiguity. Never mutate sources or create an Obsidian vault."
 
 policy:
   allow_implicit_invocation: true
-

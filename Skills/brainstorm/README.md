@@ -12,3 +12,7 @@ Uzo's capture-first Brainstorming mode explores ideas warmly, interviews one dec
 ## Optional artifact formats
 
 Pair with `html-this` or `pdf-this` for HTML-only or PDF-only human-readable artifacts while this skill retains content and workflow ownership.
+
+## Exact model dependency
+
+- Requires `exact-model-confirmation-gate` before the first model-attributed durable-artifact write in each stable session.

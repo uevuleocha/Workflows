@@ -4,13 +4,15 @@
 
 ## Core State
 
-Every schema-7 run records:
+Every schema-8 run records:
 
 - `initial_mode`: `full` or `batch`.
 - `current_mode`: `full` or `batch`.
 - `mode_transitions`: dated, reasoned, permanent Full-to-Batch changes.
 - `prompt_contract`: `goal`, `constraints`, `format`, `definition_of_done`, and `failure`.
 - `definition_of_done_complete`: evidence-supported DoD indexes.
+- `deferred_real_world_verification`: optional later-use checks, each written with its future trigger and required evidence.
+- `deferred_real_world_verification_complete`: deferred indexes whose future evidence has actually arrived; these indexes never gate finalization.
 - `failure_active`: currently active Failure indexes.
 - `contract_review`: final evidence review of Constraints, Format, Failure, and DoD.
 - `provenance`: mandatory Content owner, immutable Original writing agent, immutable Original writing LLM, Created date, and Artifact role values for the canonical five-row Field/Value table immediately after lifecycle.
@@ -35,6 +37,7 @@ python -X utf8 "<skill-dir>/scripts/north_star_state.py" create \
   --constraint "<constraint>" \
   --format "<required deliverable or output shape>" \
   --definition-of-done "<evidence-backed completion item>" \
+  --deferred-verification "<future trigger and required evidence>" \
   --failure "<invalid outcome or thing to avoid>"
 ```
 
@@ -83,7 +86,8 @@ python -X utf8 "<skill-dir>/scripts/north_star_state.py" checkpoint \
   --batch "<current batch>" \
   --next-action "<next action>" \
   --note "<evidence note>" \
-  --verify-complete 1
+  --verify-complete 1 \
+  --deferred-verify-complete 1
 
 python -X utf8 "<skill-dir>/scripts/north_star_state.py" checkpoint \
   --artifact "<live-path>" \
@@ -97,11 +101,12 @@ python -X utf8 "<skill-dir>/scripts/north_star_state.py" refine \
   --constraint "<current constraint>" \
   --format "<current format>" \
   --definition-of-done "<current DoD item>" \
+  --deferred-verification "<future trigger and required evidence>" \
   --failure "<current Failure condition>" \
   --note "<reason>"
 ```
 
-A checkpoint may mark supported DoD items, set `--failure-active <N>`, or clear resolved failure state with `--clear-failures`. Evidence-only checkpointing does not rewrite the Prompt Contract. Supplying any contract field to `refine` is a material replacement of that field; replacing DoD or Failure resets the corresponding completion or active indexes. Material refinement after pursuit work begins changes Full to Batch.
+A checkpoint may mark supported in-pass DoD items, mark a deferred item only after its future evidence arrives, set `--failure-active <N>`, or clear resolved failure state with `--clear-failures`. Evidence-only checkpointing does not rewrite the Prompt Contract. Supplying any contract field or `--deferred-verification` to `refine` is a material replacement of that field; replacing DoD, deferred verification, or Failure resets the corresponding completion or active indexes. Material refinement after pursuit work begins changes Full to Batch.
 
 ## Feedback Section
 
@@ -191,7 +196,7 @@ python -X utf8 "<skill-dir>/scripts/north_star_state.py" end \
   --artifact "<live-path>" --acting-agent "<truthful agent family>" --note "<why it ended>"
 ```
 
-Finalization refuses open timing, missing DoD items, active Failure conditions, or absent Constraints, Format, or Failure review. It records `contract_review`, moves the same number from Live to Historical without overwrite, and adds no pursuit timing. `end` archives abandonment without claiming success. The retired `finish` command cannot bypass these gates.
+Finalization refuses open timing, missing in-pass DoD items, active Failure conditions, or absent Constraints, Format, or Failure review. Unticked deferred real-world items are preserved but never inspected as closure gates. It records `contract_review`, moves the same number from Live to Historical without overwrite, and adds no pursuit timing. `end` archives abandonment without claiming success. The retired `finish` command cannot bypass these gates.
 
 ## Terminal Storage Invariant
 
@@ -208,4 +213,4 @@ Nothing may follow the managed block. Saves validate the complete lifecycle → 
 
 ## Legacy Timing Tolerance
 
-The existing pre-ledger timing normalization remains only to read earlier frozen timing safely. This upgrade does not rewrite historical North Stars, provide a bulk mode/contract migration command, or require historical artifacts to adopt the new schema.
+The existing pre-ledger timing normalization remains only to read earlier frozen timing safely. Schema-6 and schema-7 artifacts gain an empty deferred-verification state on their next helper mutation. This upgrade does not rewrite historical North Stars, provide a bulk mode/contract migration command, or require historical artifacts to adopt the new schema.

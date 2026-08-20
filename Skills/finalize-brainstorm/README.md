@@ -9,3 +9,7 @@ Evidence-first lifecycle partner for `brainstorm`. It closes one exact active `_
 ## Optional artifact formats
 
 Pairs with `html-this` and `pdf-this` so every existing format sibling is finalized together without changing the owning lifecycle gate.
+
+## Exact model dependency
+
+- Requires `exact-model-confirmation-gate` before the first model-attributed durable-artifact write in each stable session.

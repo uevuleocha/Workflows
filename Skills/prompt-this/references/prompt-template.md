@@ -60,14 +60,19 @@ done-criteria, and the failure conditions the moment it opens this file.>
 ## Verification Checklist
 
 - [ ] The consuming agent verified every required deliverable.
-- [ ] The Prompt Contract's DEFINITION OF DONE is satisfied or explicitly deferred
-      with user approval.
+- [ ] Every in-pass Prompt Contract DEFINITION OF DONE item is satisfied.
 - [ ] No FAILURE condition remains active.
 - [ ] Relevant tests, validators, inspections, or manual checks are recorded.
 
 ## Checklist Tick Discipline
 
 **Checklist Tick Discipline.** The executing agent ticks every DEFINITION OF DONE and Verification Checklist box its own evidence supports, in the same pass, and states the evidence for each. Leave a box unticked only when the claim is false, unevidenced, or ambiguous — and say which and why. An unticked box means "not done," never "done but awaiting someone else's confirmation." Independent verification re-checks the ticks; it does not supply them. A tick asserts what this pass did and evidenced; it does not assert that the result is proven correct in later production use.
+
+## Deferred Real-World Verification
+
+<Optional. Include only for checks that genuinely require later live use, elapsed time,
+user adoption, or an external event. Every item states its future trigger and required
+evidence. Unticked items here never block finalization.>
 
 ## Notes
 
@@ -115,7 +120,7 @@ A compact prompt uses the same path, the same `N.)` numbering, and the same life
 - use the minimal Prompt Contract (GOAL + DEFINITION OF DONE + FAILURE), and
 - omit `## Notes`.
 
-That is all. **`## Notes` is the only section a compact prompt may drop.** Recognizability and lifecycle pointers do not disappear merely because the payload is short.
+That is all. **`## Notes` is the only core section a compact prompt may drop.** The optional `## Deferred Real-World Verification` section is added only when genuine later-use evidence exists. Recognizability and lifecycle pointers do not disappear merely because the payload is short.
 
 ---
 
@@ -128,6 +133,6 @@ Status: EXECUTED ✅ — created <YYYY-MM-DD>, finalized <YYYY-MM-DD>.
 Prompt lifecycle: EXECUTED on <YYYY-MM-DD>. <Past-tense summary.>
 ```
 
-promotes `## Prompt Contract` to `## Prompt Contract ✅ Complete` once every DEFINITION OF DONE item is met or explicitly deferred, adds a dated note under `## Notes`, and moves the file to the Historical Subject folder with `N.)` and the Topic unchanged, renaming only the suffix `_pending` → `_executed`.
+promotes `## Prompt Contract` to `## Prompt Contract ✅ Complete` once every in-pass DEFINITION OF DONE item is met, preserves any unticked `## Deferred Real-World Verification` items as explicitly non-blocking follow-up evidence, adds a dated note under `## Notes`, and moves the file to the Historical Subject folder with `N.)` and the Topic unchanged, renaming only the suffix `_pending` → `_executed`.
 
 The `## Prompt` payload itself is **never rewritten**. It is the historical record of what was asked.

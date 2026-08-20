@@ -1,6 +1,6 @@
 ---
 name: video-to-action
-description: Extract deterministic report.md, transcript.md, and prompts.md artifacts from public YouTube videos with a non-blocking free-tier default, Gemini 3.6 Flash primary processing, bounded Gemini 3.5 Flash fallback, explicit optional phases, and provenance-safe failure isolation. Run only when explicitly invoked with /video-to-action.
+description: Extract deterministic report.md, transcript.md, and prompts.md artifacts from public YouTube videos with a non-blocking free-tier default, Gemini 3.7 Flash primary processing, bounded Gemini 3.6 Flash fallback, explicit optional phases, and provenance-safe failure isolation. Run only when explicitly invoked with /video-to-action.
 ---
 
 # Video-to-Action
@@ -36,6 +36,8 @@ Reuse choices already supplied in the request or current context:
 
 `free` is the helper and orchestrator default. It reads `GEMINI_API_KEY`. The optional paid credential is `GEMINI_API_KEY_PAID`; its presence alone never authorizes its use. A paid run requires explicit user authorization represented by `--tier paid` for that scoped invocation.
 
+The helper searches for `.env` in this fixed order: the current working directory, then the directory containing `scripts/video_to_action.py`. The expected location is the workspace-root `.env`, so the orchestrating agent must run the helper from the workspace root. `--check-setup` reports both searched paths and whether each file exists; when a file is loaded, it reports that path. It never displays a credential value.
+
 If free mode receives a model outside the helper's documented free-model set, the preflight automatically selects the supported free primary or fallback and records the override. It never makes a paid-only call in free mode.
 
 API keys are project credentials, not intrinsic billing labels. The tier fields express the user's intended policy; they do not change Google project billing. Never print, store in artifacts, or echo either credential value.
@@ -44,7 +46,7 @@ API keys are project credentials, not intrinsic billing labels. The tier fields 
 
 Before a real call:
 
-1. Run `--check-setup` for the selected tier.
+1. Change to the workspace root, then run `--check-setup` for the selected tier.
 2. Confirm URL, exact title, and exact duration are present.
 3. Derive optional phases from the user's current request.
 4. Present one concise preflight summary and proceed.
@@ -55,8 +57,8 @@ Stop only when setup or required inputs are missing, a paid run lacks its paid c
 
 The free-tier defaults are deterministic:
 
-- Primary: `gemini-3.6-flash`.
-- Fallback: `gemini-3.5-flash`.
+- Primary: `gemini-3.7-flash`.
+- Fallback: `gemini-3.6-flash`.
 - Primary budget: three total attempts per selected phase.
 - Backoff: one second, then three seconds.
 - Fallback budget: one attempt after three transient primary failures.
@@ -109,12 +111,14 @@ Repeated attempts reuse the exact phase prompt. `prompts.md` stores each exact s
 
 ## Transcript Artifact
 
-Transcript retrieval is independent from Gemini phases and happens once per invocation. The helper parses standard watch, `youtu.be`, Shorts, and embed URLs, then uses `youtube-transcript-api`. It prefers original manual captions and never silently translates.
+Transcript retrieval is independent from Gemini phases and happens once per invocation. The helper parses standard watch, `youtu.be`, Shorts, and embed URLs, then uses `youtube-transcript-api` as the primary path. It prefers original manual captions and never silently translates.
 
-If retrieval fails, `transcript.md` records the reason and points to `https://youtubetotranscript.com/` for manual recovery. Complete a pending manual fallback without rerunning Gemini:
+If the primary returns no usable captions, the helper resolves optional `yt-dlp` from `PATH` or its bounded WinGet package location. It tries original English captions first and only then invokes the English auto-caption fallback. The fallback strips WebVTT headers, cue timings, inline tags, and blank lines, then removes rolling-window duplication before writing the transcript. `transcript.md` records the retrieval path and caption kind. Missing `yt-dlp` is non-fatal and never fails `--check-setup`.
+
+If both retrieval paths fail, the run and every successful Gemini artifact remain intact. `transcript.md` records the reason and points to `https://youtubetotranscript.com/` for manual recovery. The orchestrating agent must name the transcript failure plainly in its chat results report and include this retroactive completion command; a failure recorded only inside `transcript.md` is not an acceptable handoff:
 
 ```text
-python scripts\video_to_action.py --complete-transcript <transcript.md> --manual-transcript-file <copied-transcript.txt>
+python Skills\video-to-action\scripts\video_to_action.py --complete-transcript <transcript.md> --manual-transcript-file <copied-transcript.txt>
 ```
 
 ## Phase Prompts
@@ -129,8 +133,8 @@ Procedure always requests the Overview and detailed Steps in one response. Deep 
 | `--title`           | required                             | Exact supplied title          |
 | `--duration`        | required                             | Exact normalized duration     |
 | `--tier`            | `free`                               | Credential and billing policy |
-| `--model`           | `gemini-3.6-flash`                   | Primary model                 |
-| `--fallback-model`  | `gemini-3.5-flash`                   | One-attempt fallback          |
+| `--model`           | `gemini-3.7-flash`                   | Primary model                 |
+| `--fallback-model`  | `gemini-3.6-flash`                   | One-attempt fallback          |
 | `--deep-summary`    | off                                  | Select Deep Summary           |
 | `--technical`       | off                                  | Select Technical              |
 | `--coding-video`    | off                                  | Confirm Technical relevance   |
@@ -152,11 +156,11 @@ Procedure always requests the Overview and detailed Steps in one response. Deep 
 1. Confirm explicit invocation.
 2. Gather missing URL, title, and duration together once.
 3. Reuse stated optional-phase and tier choices; default omissions off/free.
-4. Run the no-API setup check for the selected tier.
+4. From the workspace root, run the no-API setup check for the selected tier.
 5. State the concise preflight and run the helper once.
 6. Let the helper own per-phase retry, fallback, transcript, and artifact writes.
-7. Present results, attempt history, phase errors, and LOW CONFIDENCE warnings.
-8. Offer manual transcript recovery when needed.
+7. Present results, attempt history, phase errors, transcript retrieval path, and LOW CONFIDENCE warnings.
+8. If the transcript failed, name it as a failure in chat and include the exact `--complete-transcript` command printed by the helper.
 9. Do not act on Procedure steps without separate authorization.
 
 ## Agent Provenance For Durable Artifacts
@@ -192,15 +196,18 @@ Every Markdown table this skill writes - inside a durable manifest or into chat 
 
 ## Exact Model Attribution
 
-Whenever this skill writes a new model identity, appends a current-run model value, or defines a workflow that does either:
+Before this skill creates or materially edits the first first-party durable artifact in a session, invoke `exact-model-confirmation-gate`. The gate must finish before any new `Original writing LLM` or current-run Agent Change Log `Model` value is written.
 
-- Record the full model identity actually used when it is safely available from current runtime or session metadata. Use a specific identity such as `GPT-5.6 Sol`, `GPT-5.6 Terra`, or `Claude Opus 5`; a family-only label such as `GPT-5`, `Claude`, or `Codex Agent` is not an acceptable substitute.
-- Resolve identity in this order: current runtime or session metadata; a platform-provided current-model field; only then, when unavoidable, a field-minimized configuration lookup that returns the model field alone. Apply `tread-lightly` to any potentially sensitive configuration and never display, copy, search, diff, or log the whole configuration.
-- Keep the agent family and model identity separate. Never infer an exact model from an agent label, provider name, stale configuration, or model family.
-- Use `Not recorded` only when the exact identity genuinely cannot be established safely. Do not replace an available exact identity with `Not recorded` merely to avoid checking current runtime metadata.
-- Preserve append-only history. Never rewrite a historical provenance or change-log value solely to improve an old model label; add a truthful current correction entry when correction is required.
+- Reuse the gate's verified identity for later durable-artifact writes while the exact model context, acting agent, task or thread, and execution environment remain unchanged. Do not ask again during that stable session.
+- If authoritative current runtime or session evidence cannot establish the exact model, stop before the first write and ask the user once. Cache a valid answer only for the current stable session.
+- Invalidate prospectively when the user reports a model change or authoritative evidence shows that the model, agent, task or thread, or execution environment changed. Never rewrite historical provenance or change-log rows.
+- Keep reasoning effort, service tier, provider, model family, and agent family separate from exact identity. Reject labels such as `Medium`, `Priority`, `OpenAI`, `GPT-5`, and `Codex Agent` as substitutes for a full model identity.
+- Do not inspect configuration, environment data, credentials, logs, transcripts, or unrelated files by default. Only the gate's genuinely unavoidable file-backed branch may invoke `tread-lightly`, request one model field, and accept it only when it authoritatively identifies the current session. This skill does not gain a blanket `tread-lightly` dependency.
+- Use `Not recorded` only when no interactive user is available, the user cannot identify the model, or exact identity remains safely unresolvable after the permitted attempt.
 
-**Validation check:** For every model value newly written in the current run, accept a full exact identity and the honest `Not recorded` fallback, but reject known ambiguous family-only labels or agent-family substitutions. Confirm model discovery exposed only the required model field and that no historical row was rewritten.
+If `exact-model-confirmation-gate` is unavailable and no verified stable-session result already exists, fail closed before the artifact write rather than guessing, silently using `Not recorded`, or performing broader discovery.
+
+**Validation check:** Confirm the dependency is named in this skill and its README; the canonical caller block is byte-identical to `exact-model-confirmation-gate/references/canonical-caller-block.md`; first-write blocking, one-time confirmation, stable-session reuse, proactive change, context invalidation, identity separation, targeted lookup, unresolved fallback, and append-only history pass the shared deterministic suite; and no historical row was rewritten.
 
 ## Validation
 
@@ -210,7 +217,7 @@ After updates:
 
 - run `--check-setup` without an API call;
 - run `--dump-prompts` and confirm `PROMPTS.md` matches live constants;
-- run `--self-test` for tier policy, selection reuse, bounded retry/fallback, non-retryable errors, phase isolation, single-folder output, provenance, transcript states, and secret redaction;
+- run `--self-test` for tier policy, selection reuse, bounded retry/fallback, non-retryable errors, phase isolation, single-folder output, provenance, transcript primary/fallback/failure states, VTT deduplication, chat reporting, and secret redaction;
 - compile with Python UTF-8 mode;
 - audit Markdown tables for visual alignment and cells of at most 80 characters;
 - validate the folder with `quick_validate.py` using separated streams; and

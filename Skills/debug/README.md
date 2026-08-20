@@ -9,3 +9,7 @@ Command-triggered Debug mode (#UzzysBugsBeGone): structured bug intake, a confir
 ## Deterministic table dependency
 
 Adopt `markdown-table-aligner` with this skill. It supplies the deterministic final padding pass for file-based Markdown tables; the portable rule remains the content and fallback contract.
+
+## Exact model dependency
+
+- Requires `exact-model-confirmation-gate` before the first model-attributed durable-artifact write in each stable session.

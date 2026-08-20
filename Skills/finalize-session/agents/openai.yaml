@@ -1,7 +1,7 @@
 interface:
   display_name: "Finalize Session"
-  short_description: "Run session-name and session-summary in one pass"
-  default_prompt: "Use $finalize-session to name and summarize this chat; my chat-session identifier is <N>."
+  short_description: "Name, reconcile, summarize, and clean up"
+  default_prompt: "Use $finalize-session to name this chat, reconcile concrete session evidence against this workspace's unresolved-verification page, include any resulting source edits in the new summary, then offer temporary-file cleanup; my chat-session identifier is <N>."
 
 policy:
   allow_implicit_invocation: true

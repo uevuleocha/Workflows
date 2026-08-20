@@ -1,0 +1,7 @@
+interface:
+  display_name: "Idea This"
+  short_description: "Capture and work a numbered idea in the workspace idea inbox"
+  default_prompt: "Use $idea-this to capture an idea or work an idea named by number."
+
+policy:
+  allow_implicit_invocation: true

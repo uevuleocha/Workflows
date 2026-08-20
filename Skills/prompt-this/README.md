@@ -4,21 +4,21 @@
 
 It is the third member of a family:
 
-| Artifact | Create / update | Finalize          | Lifecycle          |
-|----------|-----------------|-------------------|--------------------|
-| Plan     | `plan-this`  | `finalize-plan`   | active → finalized |
-| Task     | `task-this`  | `finalize-task`   | pending → done     |
-| Prompt   | `prompt-this`   | `finalize-prompt` | pending → executed |
+| Artifact | Create / update | Finalize          | Lifecycle           |
+| -------- | --------------- | ----------------- | ------------------- |
+| Plan     | `plan-this`     | `finalize-plan`   | active -> finalized |
+| Task     | `task-this`     | `finalize-task`   | pending -> done     |
+| Prompt   | `prompt-this`   | `finalize-prompt` | pending -> executed |
 
 ## Calls Other Skills
 
 **This skill depends on another skill.** That is why this README exists — the house rule is that any skill which calls other skills carries a README naming what it calls, so an adopter knows what else to bring along.
 
-| Skill              | When it is called                          | If unavailable                                      |
-|--------------------|--------------------------------------------|-----------------------------------------------------|
-| `prompt-contracts` | On **every** create and update             | Pause, warn, author inline only if the user says so |
-| `markdown-table-aligner` | Before Markdown handoff or serialization | Pause; manual fallback needs user approval          |
-| `finalize-prompt`  | Never called — the user runs it separately | Tell the user; the prompt stays `PENDING`           |
+| Skill                    | Called for              | If unavailable                   |
+| ------------------------ | ----------------------- | -------------------------------- |
+| `prompt-contracts`       | Every create and update | Pause; inline only with approval |
+| `markdown-table-aligner` | Markdown handoff        | Manual fallback needs approval   |
+| `finalize-prompt`        | User-run finalization   | Prompt stays `PENDING`           |
 
 `prompt-this` calls `prompt-contracts`. It does **not** call `finalize-prompt` — that skill is the user's to run, and it is the only thing that may close a prompt.
 
@@ -30,7 +30,7 @@ If you adopt `prompt-this`, adopt `prompt-contracts`, `markdown-table-aligner`, 
 
 The point of the fixed structure: *if you wake up one day and see a markdown file in front of you, you can tell your prompt skill made it.*
 
-Every prompt carries the same `Status:` / `Prompt lifecycle:` header lines and the same set of headings — `## What This Prompt Is`, `## Prompt`, `## Context`, `## Instructions`, `## Prompt Contract`, `## Verification Checklist`. The canonical shape lives in `references/prompt-template.md`, and agents reuse it rather than reconstructing headings from memory.
+Every prompt carries the same `Status:` / `Prompt lifecycle:` header lines and the same core headings — `## What This Prompt Is`, `## Prompt`, `## Context`, `## Instructions`, `## Prompt Contract`, `## Verification Checklist`. When later live use or an external event is genuinely required, the prompt adds a separate optional `## Deferred Real-World Verification` checklist; those items never block finalization. The canonical shape lives in `references/prompt-template.md`, and agents reuse it rather than reconstructing headings from memory.
 
 **Four sections, four distinct jobs.** `## Prompt` is what you run. `## Instructions` is how you run it. `## Prompt Contract` is what success and failure mean. `## Verification Checklist` is how success was actually evidenced. The contract *defines* success; the checklist *records* it. Neither substitutes for the other.
 
@@ -84,3 +84,7 @@ folders before creating the first prompt. Do not assume the original maintainer'
 ## Optional artifact formats
 
 Pair with `html-this` or `pdf-this` for HTML-only or PDF-only human-readable artifacts while this skill retains content and workflow ownership.
+
+## Exact model dependency
+
+- Requires `exact-model-confirmation-gate` before the first model-attributed durable-artifact write in each stable session.

@@ -21,3 +21,7 @@ Read this README and SKILL.md. This skill depends on `session-summary` and ships
 ## Optional artifact formats
 
 Pair with `html-this` or `pdf-this` for HTML-only or PDF-only manifests, handoffs, and feedback summaries while this skill retains migration ownership.
+
+## Exact model dependency
+
+- Requires `exact-model-confirmation-gate` before the first model-attributed durable-artifact write in each stable session.

@@ -1,0 +1,7 @@
+interface:
+  display_name: "Finalize Idea"
+  short_description: "Move a completed idea to Finalized Ideas.md"
+  default_prompt: "Use $finalize-idea to finalize an idea named by number."
+
+policy:
+  allow_implicit_invocation: true

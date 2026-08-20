@@ -80,7 +80,7 @@ Finalization is evidence-based. Before closing:
 1. Run the helper's `status --json` command.
 2. Confirm the selected run is `in_progress` or `paused`.
 3. Confirm the Prompt Contract GOAL is reached.
-4. Verify every DEFINITION OF DONE item from direct user confirmation, current-session evidence, or durable recorded evidence. Mark an unchecked item complete only when that evidence supports it; never tick unsupported work.
+4. Verify every in-pass DEFINITION OF DONE item from direct user confirmation, current-session evidence, or durable recorded evidence. Mark an unchecked in-pass item complete only when that evidence supports it; never tick unsupported work. Preserve `## Deferred Real-World Verification` items without treating them as closure gates.
 5. Confirm every CONSTRAINT was respected and every required FORMAT deliverable exists in the required shape.
 6. Review every FAILURE condition and confirm none is active. A bad result means at least one Failure condition occurred; it cannot be finalized.
 7. Confirm any substantive standalone pursuit was closed with `pursuit-stop` (precise) or `provisional-commit` (disclosed fallback), or that same-pass finalization is using the parent's already-closed pursuit; in every case, confirm `active_pursuit` is `null` and `provisional` is `null`, and no duplicate or manufactured pursuit was added.
@@ -119,7 +119,7 @@ python -X utf8 "<north-star-dir>/scripts/north_star_state.py" finalize \
 
 The helper must:
 
-- refuse finalization while timing is open, a DoD item is unchecked, a Failure condition is active, or Constraints, Format, or Failure review is unverified;
+- refuse finalization while timing is open, an in-pass DoD item is unchecked, a Failure condition is active, or Constraints, Format, or Failure review is unverified; an unticked `## Deferred Real-World Verification` item is not a refusal condition;
 - change the run status and visible header to `FINALIZED`;
 - preserve the Subject, Topic, complete `N.)` prefix, ledger, and corrections;
 - rename only `_in_progress.md` to `_finalized.md`;
@@ -214,7 +214,16 @@ An HTML-only or PDF-only North Star remains in that format; do not manufacture M
 
 **Checklist Tick Discipline.** The executing agent ticks every DEFINITION OF DONE and Verification Checklist box its own evidence supports, in the same pass, and states the evidence for each. Leave a box unticked only when the claim is false, unevidenced, or ambiguous — and say which and why. An unticked box means "not done," never "done but awaiting someone else's confirmation." Independent verification re-checks the ticks; it does not supply them. A tick asserts what this pass did and evidenced; it does not assert that the result is proven correct in later production use.
 
-As a finalizer, read an unticked box as **not done**. Never treat a blank box as "done, the executor was being cautious," and never supply the executor's ticks to make an artifact look complete. Where a box is unticked but its evidence is plainly present, report the discrepancy to the user rather than silently resolving it in either direction.
+As a finalizer, read an unticked **in-pass** box as **not done**. Never treat a blank in-pass box as "done, the executor was being cautious," and never supply the executor's ticks to make an artifact look complete. Where an in-pass box is unticked but its evidence is plainly present, report the discrepancy to the user rather than silently resolving it in either direction. Unticked items under `## Deferred Real-World Verification` are explicitly non-blocking: preserve and report them, but do not refuse or delay finalization because they await later use or an external event.
+
+## In-Pass And Deferred Real-World Verification
+
+**In-Pass And Deferred Real-World Verification.** Classify every verification item before saving or finalizing an artifact:
+
+- **In-Pass Verification:** evidence the executing agent can produce safely in the current pass, including deterministic tests, fixtures, simulations, and mock scenarios. These items remain blocking completion criteria and follow Checklist Tick Discipline.
+- **Deferred Real-World Verification:** evidence that genuinely requires later live use, elapsed time, user adoption, or an external event. Put only these items in a separate `## Deferred Real-World Verification` checklist. They are non-blocking for finalization and may remain unticked after all in-pass completion criteria are met. State the future trigger and evidence required for each item.
+
+Never defer an item the current agent can safely verify now merely to claim completion. Omit the deferred section when no genuine deferred item exists.
 
 ## No Invented Sync Constraints
 
@@ -232,19 +241,23 @@ Like rule 2, this binds the authoring agent and is never emitted as artifact tex
 
 ## Exact Model Attribution
 
-Whenever this skill writes a new model identity, appends a current-run model value, or defines a workflow that does either:
+Before this skill creates or materially edits the first first-party durable artifact in a session, invoke `exact-model-confirmation-gate`. The gate must finish before any new `Original writing LLM` or current-run Agent Change Log `Model` value is written.
 
-- Record the full model identity actually used when it is safely available from current runtime or session metadata. Use a specific identity such as `GPT-5.6 Sol`, `GPT-5.6 Terra`, or `Claude Opus 5`; a family-only label such as `GPT-5`, `Claude`, or `Codex Agent` is not an acceptable substitute.
-- Resolve identity in this order: current runtime or session metadata; a platform-provided current-model field; only then, when unavoidable, a field-minimized configuration lookup that returns the model field alone. Apply `tread-lightly` to any potentially sensitive configuration and never display, copy, search, diff, or log the whole configuration.
-- Keep the agent family and model identity separate. Never infer an exact model from an agent label, provider name, stale configuration, or model family.
-- Use `Not recorded` only when the exact identity genuinely cannot be established safely. Do not replace an available exact identity with `Not recorded` merely to avoid checking current runtime metadata.
-- Preserve append-only history. Never rewrite a historical provenance or change-log value solely to improve an old model label; add a truthful current correction entry when correction is required.
+- Reuse the gate's verified identity for later durable-artifact writes while the exact model context, acting agent, task or thread, and execution environment remain unchanged. Do not ask again during that stable session.
+- If authoritative current runtime or session evidence cannot establish the exact model, stop before the first write and ask the user once. Cache a valid answer only for the current stable session.
+- Invalidate prospectively when the user reports a model change or authoritative evidence shows that the model, agent, task or thread, or execution environment changed. Never rewrite historical provenance or change-log rows.
+- Keep reasoning effort, service tier, provider, model family, and agent family separate from exact identity. Reject labels such as `Medium`, `Priority`, `OpenAI`, `GPT-5`, and `Codex Agent` as substitutes for a full model identity.
+- Do not inspect configuration, environment data, credentials, logs, transcripts, or unrelated files by default. Only the gate's genuinely unavoidable file-backed branch may invoke `tread-lightly`, request one model field, and accept it only when it authoritatively identifies the current session. This skill does not gain a blanket `tread-lightly` dependency.
+- Use `Not recorded` only when no interactive user is available, the user cannot identify the model, or exact identity remains safely unresolvable after the permitted attempt.
 
-**Validation check:** For every model value newly written in the current run, accept a full exact identity and the honest `Not recorded` fallback, but reject known ambiguous family-only labels or agent-family substitutions. Confirm model discovery exposed only the required model field and that no historical row was rewritten.
+If `exact-model-confirmation-gate` is unavailable and no verified stable-session result already exists, fail closed before the artifact write rather than guessing, silently using `Not recorded`, or performing broader discovery.
+
+**Validation check:** Confirm the dependency is named in this skill and its README; the canonical caller block is byte-identical to `exact-model-confirmation-gate/references/canonical-caller-block.md`; first-write blocking, one-time confirmation, stable-session reuse, proactive change, context invalidation, identity separation, targeted lookup, unresolved fallback, and append-only history pass the shared deterministic suite; and no historical row was rewritten.
 
 ## Validation
 
 - confirm the `## Checklist Tick Discipline` section is present and its rule text is unmodified;
+- confirm the `## In-Pass And Deferred Real-World Verification` section is present; unticked in-pass items still block closure, while unticked `## Deferred Real-World Verification` items are preserved and reported without blocking finalization;
 - confirm the `## No Invented Sync Constraints` section is present, and that a produced artifact contains **no** invented sync constraint in its DEFINITION OF DONE, Verification Checklist, CONSTRAINTS, or FAILURE sections;
 - confirm the `## Non-Blocking Wiki And Git Items` section is present with its carve-out, and that a produced artifact contains **no** wiki-sync, push, `stage-commit-push`, or pointer-bump completion criterion;
 
@@ -252,7 +265,7 @@ When creating or updating this skill:
 
 - validate it with `quick_validate.py` in Python UTF-8 mode;
 - smoke-test successful finalization of a fully verified North Star;
-- confirm an unchecked DoD item, active Failure condition, and unverified Constraints or Format each block finalization;
+- confirm an unchecked in-pass DoD item, active Failure condition, and unverified Constraints or Format each block finalization, while an unticked `## Deferred Real-World Verification` item does not;
 - confirm the number, Topic, Subject, indicator, timing, and evidence survive;
 - confirm a Historical collision blocks without overwriting;
 - confirm the Live source disappears only after a successful move; and

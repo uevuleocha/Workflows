@@ -40,7 +40,8 @@ Before substantive execution call `prompt-contracts` in embedded caller mode and
 - GOAL from the desired outcome;
 - CONSTRAINTS from scope and safety boundaries;
 - FORMAT from the required deliverables and output shape;
-- DEFINITION OF DONE as concrete evidence-backed checks;
+- DEFINITION OF DONE as concrete evidence-backed checks the executing agent can complete in-pass;
+- DEFERRED REAL-WORLD VERIFICATION as a separate optional checklist only for evidence that genuinely requires later live use, elapsed time, user adoption, or an external event;
 - FAILURE from invalid outcomes, blockers, and things to avoid;
 - pursuit approach and run mode; and
 - Subject and Topic for the durable artifact.
@@ -123,6 +124,7 @@ python -X utf8 "<skill-dir>/scripts/north_star_state.py" create \
   --pursuit "<approach>" \
   --mode full \
   --definition-of-done "<required check>" \
+  --deferred-verification "<future trigger and required evidence>" \
   --constraint "<constraint>" \
   --format "<required deliverable or output shape>" \
   --failure "<invalid outcome or thing to avoid>"
@@ -181,7 +183,7 @@ Pursuit timing is compulsory whenever an agent actually advances an `IN PROGRESS
 2. **Start authoritative pursuit when work begins.** Call `pursuit-start` at the moment the agent begins North Star work in that turn, before reading, editing, testing, deciding, or otherwise acting for the objective.
 3. **Keep unrelated work outside.** Work before the start or after the stop that does not advance the North Star must not enter its pursuit duration.
 4. **Observe, act, and verify** only within authorization and boundaries.
-5. **Checkpoint** the current batch, next action, notes, newly proven DoD items, and any active or cleared Failure conditions. If another iteration is already known after pursuit 1, pass `--another-iteration "<reason>"` so Full changes to Batch immediately.
+5. **Checkpoint** the current batch, next action, notes, newly proven in-pass DoD items, any deferred items whose future evidence has actually arrived, and any active or cleared Failure conditions. If another iteration is already known after pursuit 1, pass `--another-iteration "<reason>"` so Full changes to Batch immediately.
 6. **Stop when pursuit actually ends.** Call `pursuit-stop` as soon as North Star work ends in that turn, even if unrelated conversation or work follows before the final response. `pursuit-stop` discards the provisional timer automatically — authoritative timing wins.
 7. **Report exactly once** using the values returned by `pursuit-stop` (precise timing) or `provisional-commit` (disclosed fallback), and the preserved statement shape.
 
@@ -219,6 +221,7 @@ python -X utf8 "<skill-dir>/scripts/north_star_state.py" refine \
   --constraint "<current constraint>" \
   --format "<current required format>" \
   --definition-of-done "<current required check>" \
+  --deferred-verification "<future trigger and required evidence>" \
   --failure "<current failure condition>" \
   --verify-complete 1 \
   --batch "<current batch>" \
@@ -329,14 +332,14 @@ Use the helper commands documented in `references/state-helper.md`:
 After interruption, inspect actual workspace state and reverify uncertain work. Never blindly repeat destructive or non-idempotent actions.
 ## Deliberate Finalization
 
-When every Prompt Contract completion gate has evidence:
+When every in-pass Prompt Contract completion gate has evidence:
 
 - In a Full Mode, fully authorized pass, invoke `finalize-north-star` immediately when that skill is available and no user review gate remains. This is the **same-turn finalization** case: per **Active Pursuit Time Reporting**, the final active pursuit time is reported exactly once, in the final completion receipt — do not also emit a pre-finalization timing line in the same response.
 - In Batch Mode, or when the user requested a review before closure, leave the artifact `IN PROGRESS` and hand off the exact finalization command. This is the **objective-met, finalization deferred** case: report the current cumulative active pursuit time in the ready-to-finalize handoff now, and let `finalize-north-star` report the final duration later in its receipt.
 - If completion evidence is ambiguous, do not invoke the finalizer.
 - If `finalize-north-star` is unavailable, leave the artifact live and tell the user to install or load it. Never finalize or move the file manually.
 
-`finalize-north-star` verifies GOAL, every DoD item, CONSTRAINTS, FORMAT, and FAILURE review from evidence, marks only supported DoD items complete, changes the lifecycle to `FINALIZED`, and moves the file to the matching Historical subject folder without changing its number. It owns the final completion receipt and successful-finalization footer.
+`finalize-north-star` verifies GOAL, every in-pass DoD item, CONSTRAINTS, FORMAT, and FAILURE review from evidence, marks only supported in-pass DoD items complete, preserves any unticked Deferred Real-World Verification items as non-blocking follow-up evidence, changes the lifecycle to `FINALIZED`, and moves the file to the matching Historical subject folder without changing its number. It owns the final completion receipt and successful-finalization footer.
 
 ## Lifecycle
 
@@ -391,23 +394,42 @@ This skill owns the North Star objective, checklist, permanent number, encoded s
 
 On checkpoint, refine, pause, resume, recover, reopen, or end, recover the embedded native source when necessary, apply the helper operation, and regenerate every existing same-stem format sibling as one atomic artifact set. Deduplicate siblings during number scans. This section overrides `.md`-only examples only for co-invoked serialization; every encoded-state and lifecycle gate remains mandatory.
 
+## Checklist Tick Discipline
+
+**Checklist Tick Discipline.** The executing agent ticks every DEFINITION OF DONE and Verification Checklist box its own evidence supports, in the same pass, and states the evidence for each. Leave a box unticked only when the claim is false, unevidenced, or ambiguous — and say which and why. An unticked box means "not done," never "done but awaiting someone else's confirmation." Independent verification re-checks the ticks; it does not supply them. A tick asserts what this pass did and evidenced; it does not assert that the result is proven correct in later production use.
+
+## In-Pass And Deferred Real-World Verification
+
+**In-Pass And Deferred Real-World Verification.** Classify every verification item before saving or finalizing an artifact:
+
+- **In-Pass Verification:** evidence the executing agent can produce safely in the current pass, including deterministic tests, fixtures, simulations, and mock scenarios. These items remain blocking completion criteria and follow Checklist Tick Discipline.
+- **Deferred Real-World Verification:** evidence that genuinely requires later live use, elapsed time, user adoption, or an external event. Put only these items in the helper-owned `#### Deferred Real-World Verification` checklist. They are non-blocking for finalization and may remain unticked after all in-pass completion criteria are met. State the future trigger and evidence required for each item.
+
+Never defer an item the current agent can safely verify now merely to claim completion. Omit the deferred section when no genuine deferred item exists. Use `--deferred-verification` on create or refine and `--deferred-verify-complete <N>` only when its later evidence actually arrives; never hand-edit helper-owned state.
+
 ## Exact Model Attribution
 
-Whenever this skill writes a new model identity, appends a current-run model value, or defines a workflow that does either:
+Before this skill creates or materially edits the first first-party durable artifact in a session, invoke `exact-model-confirmation-gate`. The gate must finish before any new `Original writing LLM` or current-run Agent Change Log `Model` value is written.
 
-- Record the full model identity actually used when it is safely available from current runtime or session metadata. Use a specific identity such as `GPT-5.6 Sol`, `GPT-5.6 Terra`, or `Claude Opus 5`; a family-only label such as `GPT-5`, `Claude`, or `Codex Agent` is not an acceptable substitute.
-- Resolve identity in this order: current runtime or session metadata; a platform-provided current-model field; only then, when unavoidable, a field-minimized configuration lookup that returns the model field alone. Apply `tread-lightly` to any potentially sensitive configuration and never display, copy, search, diff, or log the whole configuration.
-- Keep the agent family and model identity separate. Never infer an exact model from an agent label, provider name, stale configuration, or model family.
-- Use `Not recorded` only when the exact identity genuinely cannot be established safely. Do not replace an available exact identity with `Not recorded` merely to avoid checking current runtime metadata.
-- Preserve append-only history. Never rewrite a historical provenance or change-log value solely to improve an old model label; add a truthful current correction entry when correction is required.
+- Reuse the gate's verified identity for later durable-artifact writes while the exact model context, acting agent, task or thread, and execution environment remain unchanged. Do not ask again during that stable session.
+- If authoritative current runtime or session evidence cannot establish the exact model, stop before the first write and ask the user once. Cache a valid answer only for the current stable session.
+- Invalidate prospectively when the user reports a model change or authoritative evidence shows that the model, agent, task or thread, or execution environment changed. Never rewrite historical provenance or change-log rows.
+- Keep reasoning effort, service tier, provider, model family, and agent family separate from exact identity. Reject labels such as `Medium`, `Priority`, `OpenAI`, `GPT-5`, and `Codex Agent` as substitutes for a full model identity.
+- Do not inspect configuration, environment data, credentials, logs, transcripts, or unrelated files by default. Only the gate's genuinely unavoidable file-backed branch may invoke `tread-lightly`, request one model field, and accept it only when it authoritatively identifies the current session. This skill does not gain a blanket `tread-lightly` dependency.
+- Use `Not recorded` only when no interactive user is available, the user cannot identify the model, or exact identity remains safely unresolvable after the permitted attempt.
 
-**Validation check:** For every model value newly written in the current run, accept a full exact identity and the honest `Not recorded` fallback, but reject known ambiguous family-only labels or agent-family substitutions. Confirm model discovery exposed only the required model field and that no historical row was rewritten.
+If `exact-model-confirmation-gate` is unavailable and no verified stable-session result already exists, fail closed before the artifact write rather than guessing, silently using `Not recorded`, or performing broader discovery.
+
+**Validation check:** Confirm the dependency is named in this skill and its README; the canonical caller block is byte-identical to `exact-model-confirmation-gate/references/canonical-caller-block.md`; first-write blocking, one-time confirmation, stable-session reuse, proactive change, context invalidation, identity separation, targeted lookup, unresolved fallback, and append-only history pass the shared deterministic suite; and no historical row was rewritten.
 
 ## Validation
 
 When creating or updating this skill:
 
 - validate with `quick_validate.py` in Python UTF-8 mode;
+- confirm the `## Checklist Tick Discipline` section remains present;
+- confirm the `## In-Pass And Deferred Real-World Verification` section is present and its helper-owned deferred checklist remains non-blocking;
+- confirm a North Star with all in-pass DoD items proven finalizes successfully while an unticked helper-owned Deferred Real-World Verification item remains preserved;
 - smoke-test creation under Live with combined Live/Historical numbering;
 - smoke-test stable indicator reuse, refinement, checkpointing, pause/resume, recovery, status, ending, and a second independent run;
 - confirm an unchecked DoD item, active Failure condition, unverified Format or Constraints, and an open pursuit each block finalization;
@@ -417,7 +439,7 @@ When creating or updating this skill:
 - confirm provenance immediately follows lifecycle, uses the Field/Value table with all five canonical rows in order including `Original writing LLM`, and remains above every other North Star section;
 - confirm the Feedback Section exists exactly once, sits immediately above the change log, renders numbered `### Feedback N` subsections, and accepts entries from any acting agent through `feedback-add`;
 - confirm the Agent Change Log renders the five columns `Date and Time`, `Agent`, `Model`, `Action`, `Scope`, that new rows carry clock-read `YYYY-MM-DD-HH:mm:ss` timestamps, and that pre-migration date-only rows keep `Not recorded` in `Model` rather than being backfilled;
-- confirm a legacy schema-6 artifact migrates in place on its next mutation without losing pursuits, corrections, or terminal state;
+- confirm a legacy schema-6 or schema-7 artifact migrates in place on its next mutation without losing pursuits, corrections, terminal state, or the default empty deferred-verification state;
 - confirm Agent Change Log is the final human-readable section, Base64 state is last, and material mutations without `--acting-agent` are refused without changing the file.
 
 When updating pursuit timing, reporting, or footer enforcement, additionally prove all of the following:

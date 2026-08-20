@@ -1,0 +1,7 @@
+interface:
+  display_name: "Buzz Channel Description"
+  short_description: "Generate paste-ready Buzz channel descriptions"
+  default_prompt: "Use $buzz-channel-description to generate the description text for a Buzz channel: one continuous line, Part 1 workspace routing block plus Part 2 channel purpose, with a mandatory character count against the 500-character cap. Tighten Part 2, never Part 1, on over-length. Never calls the Buzz CLI."
+
+policy:
+  allow_implicit_invocation: true

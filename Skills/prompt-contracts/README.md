@@ -1,18 +1,18 @@
 # Prompt Contracts — Adoption Guide
 
-Defines a 5-part engineering spec (GOAL / CONSTRAINTS / FORMAT / DEFINITION OF DONE / FAILURE) before implementation so "done" has zero ambiguity. On its own it delivers the contract in chat and writes no standalone contract file.
+Defines a 5-part engineering spec (GOAL / CONSTRAINTS / FORMAT / DEFINITION OF DONE / FAILURE) before implementation so "done" has zero ambiguity. Immediately testable evidence stays in the blocking Definition of Done; evidence that genuinely requires later use or an external event is separated into a non-blocking Deferred Real-World Verification checklist. On its own this skill delivers the contract in chat and writes no standalone contract file.
 
 ## Depended on by
 
 Other skills call `prompt-contracts` as a mandatory or verifying step. If you adopt any of these, adopt `prompt-contracts` too:
 
-| Skill                 | How it uses `prompt-contracts`                                           |
-|-----------------------|---------------------------------------------------------------------------|
-| `plan-this`           | Hard - embeds a contract in every plan.                                  |
-| `task-this`           | Hard - embeds a contract in every task.                                  |
-| `north-star`          | Hard - embeds without approval; chat display is opt-in.                  |
-| `finalize-plan`       | Soft - verifies the embedded contract before finalizing.                 |
-| `finalize-task`       | Soft - verifies the embedded contract before finalizing.                 |
+| Skill           | How it uses `prompt-contracts`                           |
+| --------------- | -------------------------------------------------------- |
+| `plan-this`     | Hard - embeds a contract in every plan.                  |
+| `task-this`     | Hard - embeds a contract in every task.                  |
+| `north-star`    | Hard - embeds without approval; chat display is opt-in.  |
+| `finalize-plan` | Soft - verifies the embedded contract before finalizing. |
+| `finalize-task` | Soft - verifies the embedded contract before finalizing. |
 
 When invoked by `plan-this` or `task-this`, the calling skill embeds the contract into that plan/task artifact under a `## Prompt Contract` section. `prompt-contracts` itself still writes no standalone contract file.
 

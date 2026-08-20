@@ -39,11 +39,11 @@ Hermes is routed by **capability, trust, and tools**, not a fixed provider label
 
 **This skill depends on other skills.** That is why this README exists — the house rule is that any skill which calls other skills carries a README naming what it calls, so an adopter knows what else to bring along.
 
-| Skill                 | When it is called                           | If unavailable                                      |
-|-----------------------|---------------------------------------------|-----------------------------------------------------|
-| `plan-this`        | To author a parent or mini **plan**         | Pause, warn, author inline only if the user says so |
-| `task-this`        | To author a parent or mini **task**         | Pause, warn, author inline only if the user says so |
-| `finalize-delegation` | To close the record when work is integrated | Stop. Leave `_dispatched`; install and run it       |
+| Skill                 | Called for              | If unavailable                     |
+| --------------------- | ----------------------- | ---------------------------------- |
+| `plan-this`           | Parent or mini plan     | Pause; inline only with approval   |
+| `task-this`           | Parent or mini task     | Pause; inline only with approval   |
+| `finalize-delegation` | Integrated-work closure | Leave `_dispatched`; install skill |
 
 **There is no manual lifecycle fallback.** If `finalize-delegation` is unavailable, the record stays `_dispatched` exactly where it is. Install or load the skill — from the local master, or by re-running `global-sync` — and then run it. Never move, rename, or otherwise close a delegation record by hand: doing so skips the return-and-integration verification and the parent-pointer repair, which is precisely how records get orphaned.
 
@@ -104,3 +104,7 @@ Pair with `html-this` or `pdf-this` for HTML-only or PDF-only human-readable art
 ## Deterministic table dependency
 
 Adopt `markdown-table-aligner` with this skill. It supplies the deterministic final padding pass for file-based Markdown tables; the portable rule remains the content and fallback contract.
+
+## Exact model dependency
+
+- Requires `exact-model-confirmation-gate` before the first model-attributed durable-artifact write in each stable session.

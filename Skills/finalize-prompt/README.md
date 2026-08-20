@@ -9,9 +9,9 @@ It is the closing half of a lifecycle that `prompt-this` opens. On its own it do
 This skill is meaningless in isolation, which is why this README exists — the house rule is that a skill entangled with other skills carries a README naming them.
 
 | Skill              | Relationship                                               |
-|--------------------|------------------------------------------------------------|
+| ------------------ | ---------------------------------------------------------- |
 | `prompt-this`      | Creates the pending prompt this skill closes               |
-| `prompt-this`      | Also owns **reopen** — Historical back to Live             |
+| `prompt-this`      | Also owns **reopen** - Historical back to Live             |
 | `prompt-contracts` | Authors the contract this skill checks as the closing gate |
 
 The dependency direction is strict and one-way. `prompt-this` calls `prompt-contracts`; neither calls this skill. **You run `finalize-prompt` yourself**, when the work the prompt asked for is actually done.
@@ -66,3 +66,7 @@ Pairs with `html-this` and `pdf-this` so every existing format sibling is finali
 ## Deterministic table dependency
 
 Adopt `markdown-table-aligner` with this skill. It supplies the deterministic final padding pass for file-based Markdown tables; the portable rule remains the content and fallback contract.
+
+## Exact model dependency
+
+- Requires `exact-model-confirmation-gate` before the first model-attributed durable-artifact write in each stable session.

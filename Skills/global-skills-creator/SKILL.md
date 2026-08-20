@@ -258,6 +258,12 @@ The rule to carry:
 - **A `Feedback Section` sits immediately above the change log** in any artifact that carries a DEFINITION OF DONE, a Verification Checklist, or checkboxes an executing agent later ticks. It is present and empty by default, and carries append-only numbered `### Feedback N - date - agent - descriptor` subsections. It is the cross-agent channel: an orchestrator, a verifier, and an implementer all write there and each reads what the others left, without sharing a session or a platform.
 - **A skill that creates no first-party durable artifacts is exempt.** Never inject provenance into product source code, third-party files, databases, generated caches, skill definitions, schema-sensitive or machine-consumed files, or other operational files unless their schema explicitly supports it.
 
+### Required Exact-Model Confirmation Gate
+
+Every new or materially updated model-writing skill must be classified as direct, delegated, governance, or exempt. Direct and delegated durable-artifact writers must carry the canonical `## Exact Model Attribution` caller block from `exact-model-confirmation-gate/references/canonical-caller-block.md` byte-for-byte and name `exact-model-confirmation-gate` in their README. Governance skills must require the same adoption for future carriers. Exempt skills must not receive the block as boilerplate.
+
+Ship `exact-model-confirmation-gate` with any model-writing skill that depends on it. Do not duplicate its session-cache implementation inside each caller and do not add blanket `tread-lightly` dependencies; the shared gate owns the optional protected lookup branch.
+
 Always validate folder-style skills with the `quick_validate.py` script that ships with your skill-creator install, running Python in UTF-8 mode (`-X utf8`).
 
 Run this validator for:
@@ -345,6 +351,15 @@ After creating or updating a skill, report:
 
 **Checklist Tick Discipline.** The executing agent ticks every DEFINITION OF DONE and Verification Checklist box its own evidence supports, in the same pass, and states the evidence for each. Leave a box unticked only when the claim is false, unevidenced, or ambiguous — and say which and why. An unticked box means "not done," never "done but awaiting someone else's confirmation." Independent verification re-checks the ticks; it does not supply them. A tick asserts what this pass did and evidenced; it does not assert that the result is proven correct in later production use.
 
+## In-Pass And Deferred Real-World Verification
+
+**In-Pass And Deferred Real-World Verification.** Classify every verification item before saving or finalizing an artifact:
+
+- **In-Pass Verification:** evidence the executing agent can produce safely in the current pass, including deterministic tests, fixtures, simulations, and mock scenarios. These items remain blocking completion criteria and follow Checklist Tick Discipline.
+- **Deferred Real-World Verification:** evidence that genuinely requires later live use, elapsed time, user adoption, or an external event. Put only these items in a separate `## Deferred Real-World Verification` checklist. They are non-blocking for finalization and may remain unticked after all in-pass completion criteria are met. State the future trigger and evidence required for each item.
+
+Never defer an item the current agent can safely verify now merely to claim completion. Omit the deferred section when no genuine deferred item exists.
+
 ## No Invented Sync Constraints
 
 **No Invented Sync Constraints.** Do not write "local master only," "no global sync in this pass," or any equivalent prohibition into a DEFINITION OF DONE item, Verification Checklist item, CONSTRAINT, FAILURE condition, or instruction unless the user asked for it. Sync authority belongs to the user and is granted at execution time, not predicted at authoring time. When the user later authorizes same-pass sync, an invented constraint turns a correct action into a permanently false checklist item that must be waived. If sequencing genuinely matters, express it as a default the user can override — "stop at the verified local master unless the user authorizes same-pass sync" — never as a completion criterion or failure condition.
@@ -375,20 +390,25 @@ Every Markdown table this skill writes - inside a durable manifest or into chat 
 
 ## Exact Model Attribution
 
-Whenever this skill writes a new model identity, appends a current-run model value, or defines a workflow that does either:
+Before this skill creates or materially edits the first first-party durable artifact in a session, invoke `exact-model-confirmation-gate`. The gate must finish before any new `Original writing LLM` or current-run Agent Change Log `Model` value is written.
 
-- Record the full model identity actually used when it is safely available from current runtime or session metadata. Use a specific identity such as `GPT-5.6 Sol`, `GPT-5.6 Terra`, or `Claude Opus 5`; a family-only label such as `GPT-5`, `Claude`, or `Codex Agent` is not an acceptable substitute.
-- Resolve identity in this order: current runtime or session metadata; a platform-provided current-model field; only then, when unavoidable, a field-minimized configuration lookup that returns the model field alone. Apply `tread-lightly` to any potentially sensitive configuration and never display, copy, search, diff, or log the whole configuration.
-- Keep the agent family and model identity separate. Never infer an exact model from an agent label, provider name, stale configuration, or model family.
-- Use `Not recorded` only when the exact identity genuinely cannot be established safely. Do not replace an available exact identity with `Not recorded` merely to avoid checking current runtime metadata.
-- Preserve append-only history. Never rewrite a historical provenance or change-log value solely to improve an old model label; add a truthful current correction entry when correction is required.
+- Reuse the gate's verified identity for later durable-artifact writes while the exact model context, acting agent, task or thread, and execution environment remain unchanged. Do not ask again during that stable session.
+- If authoritative current runtime or session evidence cannot establish the exact model, stop before the first write and ask the user once. Cache a valid answer only for the current stable session.
+- Invalidate prospectively when the user reports a model change or authoritative evidence shows that the model, agent, task or thread, or execution environment changed. Never rewrite historical provenance or change-log rows.
+- Keep reasoning effort, service tier, provider, model family, and agent family separate from exact identity. Reject labels such as `Medium`, `Priority`, `OpenAI`, `GPT-5`, and `Codex Agent` as substitutes for a full model identity.
+- Do not inspect configuration, environment data, credentials, logs, transcripts, or unrelated files by default. Only the gate's genuinely unavoidable file-backed branch may invoke `tread-lightly`, request one model field, and accept it only when it authoritatively identifies the current session. This skill does not gain a blanket `tread-lightly` dependency.
+- Use `Not recorded` only when no interactive user is available, the user cannot identify the model, or exact identity remains safely unresolvable after the permitted attempt.
 
-**Validation check:** For every model value newly written in the current run, accept a full exact identity and the honest `Not recorded` fallback, but reject known ambiguous family-only labels or agent-family substitutions. Confirm model discovery exposed only the required model field and that no historical row was rewritten.
+If `exact-model-confirmation-gate` is unavailable and no verified stable-session result already exists, fail closed before the artifact write rather than guessing, silently using `Not recorded`, or performing broader discovery.
+
+**Validation check:** Confirm the dependency is named in this skill and its README; the canonical caller block is byte-identical to `exact-model-confirmation-gate/references/canonical-caller-block.md`; first-write blocking, one-time confirmation, stable-session reuse, proactive change, context invalidation, identity separation, targeted lookup, unresolved fallback, and append-only history pass the shared deterministic suite; and no historical row was rewritten.
 
 ## Validation
 
 - confirm the `## Checklist Tick Discipline` section is present and its rule text is unmodified;
+- confirm the `## In-Pass And Deferred Real-World Verification` section is present and every newly created or materially updated checklist-authoring or finalizing skill carries the same classification and non-blocking deferred-verification behavior;
 - confirm the `## No Invented Sync Constraints` section is present, and that a produced artifact contains **no** invented sync constraint in its DEFINITION OF DONE, Verification Checklist, CONSTRAINTS, or FAILURE sections;
 - confirm the `## Non-Blocking Wiki And Git Items` section is present with its carve-out, and that a produced artifact contains **no** wiki-sync, push, `stage-commit-push`, or pointer-bump completion criterion;
 - confirm any newly created artifact-authoring skill requires the five-row Agent Provenance table, the five-column Agent Change Log, and a `## Feedback Section` above it;
-- confirm every newly created or updated model-writing skill is classified as direct, delegated, or exempt; direct and delegated carriers must include the canonical `## Exact Model Attribution` block verbatim and its validation check;- confirm the `## Markdown Table Alignment` section and its validation check are present, and that every table this skill wrote is visually pipe-aligned with cells at 80 characters or fewer and ASCII-only glyphs inside cells;
+- confirm every newly created or updated model-writing skill is classified as direct, delegated, governance, or exempt; direct and delegated carriers must include the canonical `## Exact Model Attribution` block verbatim, name `exact-model-confirmation-gate` in the README, and pass its shared carrier validator;
+- confirm the `## Markdown Table Alignment` section and its validation check are present, and that every table this skill wrote is visually pipe-aligned with cells at 80 characters or fewer and ASCII-only glyphs inside cells;

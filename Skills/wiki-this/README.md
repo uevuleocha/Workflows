@@ -1,11 +1,15 @@
 # Wiki This
 
-Sets up a schema-driven plain-Markdown wiki in the current workspace. It helps the user choose source roots and a context-appropriate taxonomy, creates the wiki scaffold, and adds root contract pointers without touching source files or creating an Obsidian vault. It adapts the established Hub schema as an example, surfaces the wiki-follows-sources track/ignore choice, and confirms any proposed batching before an optional first sync. It also proposes a history location and light-history page format as part of the taxonomy, because `wiki-sync` applies mine-and-fold plus light history to detected historical groups as its mandatory default and needs somewhere declared to file them.
+Sets up a schema-driven plain-Markdown wiki in the current workspace. The user must explicitly name every source root; the skill never infers one. Once those roots are known, it autonomously creates the schema, version-1 coverage contract, unresolved-verification page, history format, navigation, log, workspace pointers, and initial full sync unless scaffold-only setup was requested.
 
 ## Related skills
 
 - `wiki-sync` — maintains and ingests an existing schema-governed wiki.
+
 ## Deterministic table dependency
 
 Adopt `markdown-table-aligner` with this skill. It supplies the deterministic final padding pass for file-based Markdown tables; the portable rule remains the content and fallback contract.
 
+## Exact model dependency
+
+- Requires `exact-model-confirmation-gate` before the first model-attributed durable-artifact write in each stable session.

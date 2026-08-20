@@ -87,11 +87,11 @@ def pursuit_stop(art, summary):
 def do_pause(art, reason="test"): return run("pause","--artifact",str(art),"--reason",reason)
 def do_resume(art): return run("resume","--artifact",str(art))
 def do_recover(art, note="test"): return run("recover","--artifact",str(art),"--note",note)
-def do_end(art, note="test"): return run("end","--artifact",str(art),"--note",note)
+def do_end(art, note="test"): return run("end","--artifact",str(art),"--note",note,"--acting-llm","GPT-5.6 Sol")
 def do_finalize(art, evidence="test", note="test"):
-    return run("finalize","--artifact",str(art),"--evidence",evidence,"--note",note,"--verify-complete","1","--verify-complete","2","--constraints-verified","--format-verified","--failure-reviewed")
+    return run("finalize","--artifact",str(art),"--evidence",evidence,"--note",note,"--verify-complete","1","--verify-complete","2","--constraints-verified","--format-verified","--failure-reviewed","--acting-llm","GPT-5.6 Sol")
 def do_reopen(art, phase="Reopened", next_action="Continue"):
-    return run("reopen","--artifact",str(art),"--batch",phase,"--next-action",next_action)
+    return run("reopen","--artifact",str(art),"--batch",phase,"--next-action",next_action,"--acting-llm","GPT-5.6 Sol")
 def do_checkpoint(art, idx):
     return run("checkpoint","--artifact",str(art),"--verify-complete",str(idx),"--note","checked")
 def do_remove(art, number, reason="wrong"):
@@ -225,6 +225,7 @@ def test10():
     assert len(finalized) == 1
     s2 = status_json(finalized[0])
     assert s2 and len(s2["pursuits"]) == before
+    assert s2["change_log"][-1]["model"] == "GPT-5.6 Sol"
 
 @test("11. Same-pass finalization after fallback pursuit: row reused, disclosed")
 def test11():
@@ -255,6 +256,7 @@ def test12():
     s_r = status_json(reopened[0])
     assert s_r["status"] == "in_progress"
     assert s_r["grand_total_seconds"] == before_total
+    assert s_r["change_log"][-1]["model"] == "GPT-5.6 Sol"
     pursuit_start(reopened[0], "Reopened work"); pursuit_stop(reopened[0], "Reopened work done")
     s2 = status_json(reopened[0])
     assert s2["pursuits"][-1]["number"] == len(s_before["pursuits"]) + 1
@@ -326,6 +328,7 @@ def test17():
     hist = WORKSPACE / "Archive" / "Historical" / "North Stars" / "Terminal"
     ended = list(hist.glob("*_ended.md"))
     assert ended
+    assert status_json(ended[0])["change_log"][-1]["model"] == "GPT-5.6 Sol"
     proc = run("provisional-start","--artifact",str(ended[0]), expect_ok=False)
     assert proc is not None and proc.returncode != 0
 
@@ -669,6 +672,31 @@ def test40():
     assert fallback is not None
     assert status_json(artifact_path("UnknownModel", "Unknown Model"))["provenance"]["original_writing_llm"] == "Not recorded"
 
+@test("41. Deferred real-world verification never blocks North Star finalization")
+def test41():
+    created = run(
+        "create", "--workspace-root", str(WORKSPACE), "--subject", "DeferredGate",
+        "--topic", "Deferred Gate", "--writing-agent", "Codex Agent",
+        "--writing-llm", "GPT-5.6 Sol", "--goal", "Verify deferred gate",
+        "--pursuit", "Test", "--mode", "batch", "--constraint", "Stay in scope",
+        "--format", "Produce result", "--definition-of-done", "Immediate check 1",
+        "--definition-of-done", "Immediate check 2", "--deferred-verification",
+        "After 30 days of live use, inspect adoption evidence.", "--failure", "Unsupported completion",
+    )
+    assert created is not None
+    art = artifact_path("DeferredGate", "Deferred Gate")
+    text = art.read_text(encoding="utf-8")
+    assert "#### Deferred Real-World Verification" in text
+    assert "- [ ] After 30 days of live use, inspect adoption evidence." in text
+    pursuit_start(art, "Immediate verification"); pursuit_stop(art, "Immediate verification done")
+    do_checkpoint(art, 1); do_checkpoint(art, 2)
+    do_finalize(art, "All in-pass evidence complete")
+    final = list((WORKSPACE / "Archive" / "Historical" / "North Stars" / "DeferredGate").glob("*_finalized.md"))[0]
+    state = status_json(final)
+    assert state["status"] == "finalized"
+    assert state["deferred_real_world_verification_complete"] == []
+    assert "- [ ] After 30 days of live use, inspect adoption evidence." in final.read_text(encoding="utf-8")
+
 # ══════════════════════════════════════════════════════════════════════
 # MAIN
 # ══════════════════════════════════════════════════════════════════════
@@ -710,11 +738,11 @@ def main():
     test16(); test17(); test18(); test19(); test20()
     test21(); test22(); test23(); test24(); test25(); test26()
     test27(); test28(); test29(); test30(); test31(); test32(); test33()
-    test34(); test35(); test36(); test37(); test38(); test39(); test40()
+    test34(); test35(); test36(); test37(); test38(); test39(); test40(); test41()
 
     print(f"\n{'='*60}")
     print(f"Results: {PASS}/{TOTAL} subprocess checks passed, {FAIL} failed")
-    print(f"Named test cases: 40")
+    print(f"Named test cases: 41")
     teardown()
     return 0 if FAIL == 0 else 1
 

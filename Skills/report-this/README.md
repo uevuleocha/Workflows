@@ -15,8 +15,12 @@ Reports intentionally have no top workflow header. A dismissible footer at the b
 
 Mode A uses `references/mode-a-template.md`; Mode B uses `references/mode-b-template.md`; both use `references/dismissible-footer.md`.
 
-`report-this` can also stage send-ready copies of existing reports — stripped of the dismissible footer, Agent Provenance, and Agent Change Log — into `tmp\<subject>-reports-send-ready\` for external delivery. `finalize-report` deletes those copies when the reports are finalized.
+`report-this` can also stage send-ready copies of existing reports — stripped of the dismissible footer, Agent Provenance, Feedback Section, and Agent Change Log — into `tmp\<subject>-reports-send-ready\` for external delivery. `finalize-report` deletes those copies when the reports are finalized.
 
 ## Optional artifact formats
 
 Pair with `html-this` or `pdf-this` for HTML-only or PDF-only human-readable artifacts while this skill retains content and workflow ownership.
+
+## Exact model dependency
+
+- Requires `exact-model-confirmation-gate` before the first model-attributed durable-artifact write in each stable session.
