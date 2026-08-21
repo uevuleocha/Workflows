@@ -1,9 +1,10 @@
 # Session Name
 
-Suggests exactly eight grounded, naturally varied chat-session labels: four focused foundation options led by Outcome, Artifact/Tool, Method, and Headline Result, followed by four adaptive syntheses that may carry richer integrated detail. The host and its character budget are established before drafting, and every complete label is counted mechanically before anything is emitted. On Antigravity/Gemini, every complete label is at most 70 characters including any prefix to prevent silent UI truncation; Hermes retains its 100-character hard cap including any prefix. Both caps are absolute and the full budget is usable — a label at exactly the cap passes, and one character over is a failure. On capped hosts the four synthesis options integrate more densely rather than more lengthily, so richness never pushes a label past the ceiling. On other hosts (Claude, Codex, zCode), 240 characters excluding any prefix is the default maximum; a user can simply ask for longer names in the initial request or afterward, without supplying a new maximum, and the agent may reasonably exceed 240. Selection and the opt-in `N.)` prefix are permanently optional and non-blocking, and the skill never renames a chat or creates an artifact.
+Suggests exactly eight directly generated, context-rich chat-session labels grounded in the session's narrative center, meaningful change, outcome, distinguishing context, and strongest evidence. It ranks the strongest overall name first, avoids fixed option slots and hidden candidate pools, never defaults to a `From X to Y` opening, and gives substantial sessions earned detail instead of shallow milestone reshuffling.
+
+Host ceilings remain unchanged and are measured mechanically: Antigravity/Gemini allows 70 characters including any prefix, Hermes allows 100 including any prefix, and Claude/Codex/zCode use a 240-character default excluding the optional prefix. Selection remains optional, and the skill never renames a chat or creates an artifact.
 
 ## Related skills
 
-- `finalize-session` — the convenience caller for combined name-plus-summary closure; it runs `session-name` and `session-summary` in one pass and supplies the chat-session identifier as this skill's verbatim `N.)` prefix. It is a thin orchestrator and owns none of the naming logic. Standalone `session-name` invocation is unchanged and never routes through the wrapper.
-- `session-summary` — an independent durable recap that may follow session naming; neither workflow depends on a reported selection.
-- `plan-this`, `task-this`, `prompt-this`, and `report-this` — own durable artifact naming; `session-name` labels only the chat session.
+- `finalize-session` - supplies the session identifier and combines naming with the independent summary workflow.
+- `session-summary` - writes the durable recap; neither skill waits for a reported selection.

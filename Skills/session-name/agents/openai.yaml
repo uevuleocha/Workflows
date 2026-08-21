@@ -1,7 +1,7 @@
 interface:
   display_name: "Session Name"
-  short_description: "Suggest eight naturally varied session names"
-  default_prompt: "Use $session-name to suggest eight grounded, naturally varied names for this chat without waiting for my selection; establish the host cap first and mechanically count every complete label before emitting, and if I ask for longer names, expand them without asking me for a character maximum."
+  short_description: "Suggest eight direct, context-rich session names"
+  default_prompt: "Use $session-name to suggest exactly eight directly generated, context-rich names grounded in this chat's narrative center, meaningful change, outcome, distinguishing context, and strongest evidence; rank the best overall name first, use no hidden candidate pool or fixed option slots, never default to a From-X-to-Y opening, and mechanically enforce the current host ceiling."
 
 policy:
   allow_implicit_invocation: true

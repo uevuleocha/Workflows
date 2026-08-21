@@ -163,28 +163,13 @@ Procedure always requests the Overview and detailed Steps in one response. Deep 
 8. If the transcript failed, name it as a failure in chat and include the exact `--complete-transcript` command printed by the helper.
 9. Do not act on Procedure steps without separate authorization.
 
-## Agent Provenance For Durable Artifacts
-
-This skill applies the workspace's first-party durable-artifact provenance rule to human-readable report, transcript, and prompt artifacts without altering exact captured prompt or transcript content.
-
-For every in-scope artifact:
-
-- place an `## Agent Provenance` section immediately after the artifact's opening block -- its title, status, and lifecycle lines -- carrying `Content owner`, `Original writing agent`, `Original writing LLM`, `Created`, and `Artifact role`, in that order;
-- record `Original writing LLM` as the model that produced the artifact, kept distinct from the agent family that performed the write; use `Not recorded` when the model is genuinely unknown, and never infer it from the agent label or backfill it later;
-- use a stable truthful agent-family label such as `Codex Agent`, `Claude Agent`, `Antigravity Agent`, `Hermes Agent`, or `zCode Agent`;
-- keep the original writing-agent entry immutable;
-- keep an append-only `## Agent Change Log` as the last section, or immediately above any section the artifact already reserves for the last position, rendered as a five-column `Date and Time | Agent | Model | Action | Scope` table with one row per material edit;
-- stamp every change-log row `YYYY-MM-DD-HH:mm:ss` on a 24-hour clock, read from the machine clock and never estimated; leave historical date-only rows exactly as written rather than backfilling them, because a log carrying both shapes is correct and the boundary between them is itself information;
-- if a legacy artifact lacks reliable creator evidence, use `Not recorded` rather than guessing, then log the current agent's actual change; and
-- treat copying or global synchronization as transport, not authorship.
-
-Keep `Content owner` for now. In Uzo's personal artifacts it normally resolves to `Uzo`; do not confuse content ownership with the agent that performed the filesystem write. Do not inject provenance into product source, third-party files, databases, generated caches, skill definitions, schema-sensitive or machine-consumed files, or other operational files unless their schema explicitly supports it.
-
 ## Durable Artifact Format Handling
 
 This skill owns video retrieval, provenance, phase isolation, prompts, transcript content, report content, run-folder naming, and its deterministic helper. When co-invoked with `html-this` or `pdf-this`, the helper may write native intermediates only under an approved temporary path; convert `report.md`, `transcript.md`, and `prompts.md` to the requested format and leave only their `.html` or `.pdf` equivalents in the durable run folder. Keep `latest.json` and machine state native.
 
 Repeated-attempt and exact-prompt provenance must survive conversion. Treat same-stem variants as one logical artifact. This section overrides the three `.md` durable-output examples only during a co-invoked format run.
+
+The helper writes run artifacts deterministically, so they carry no Agent Provenance or Agent Change Log at creation; an agent that later materially edits a run artifact by hand may append an Agent Change Log row for that edit.
 
 ## Markdown Table Alignment
 
@@ -212,6 +197,7 @@ If `exact-model-confirmation-gate` is unavailable and no verified stable-session
 ## Validation
 
 - confirm the `## Markdown Table Alignment` section and its validation check are present, and that every table this skill wrote is visually pipe-aligned with cells at 80 characters or fewer and ASCII-only glyphs inside cells;
+- confirm `## Exact Model Attribution` remains byte-identical to the canonical caller block: `validate_carriers.py` requires it across the carrier set, and it still gates agent hand-edits of run artifacts;
 
 After updates:
 
