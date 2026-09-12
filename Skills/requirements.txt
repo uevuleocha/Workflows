@@ -1,0 +1,15 @@
+# Third-party runtime dependencies for Workflows Skills helper scripts.
+# Restore all at once from the workspace root:
+#   python -m pip install -r Skills/requirements.txt
+# Always use `python -m pip` (never bare `pip`) so packages install into the
+# same interpreter that runs the helpers.
+# Import name differs from install name for: dotenv -> python-dotenv,
+# google.genai -> google-genai, youtube_transcript_api -> youtube-transcript-api.
+wcwidth>=0.2.14  # markdown-table-aligner; needs Unicode 17.0.0 tables, first shipped in 0.2.14 (2025-09-22)
+python-dotenv    # model-chat, video-to-action (.env loading)
+google-genai     # video-to-action (Gemini API)
+youtube-transcript-api  # video-to-action (caption retrieval)
+pypdf            # html-this (PDF input), pdf-this (read/write/forms)
+reportlab        # pdf-this (semantic PDF layout)
+anthropic        # model-chat (Anthropic API)
+blackboxprotobuf # antigravity-workspace-chat-migration (protobuf blobs)
