@@ -25,7 +25,7 @@ def reject(text: str, needle: str, source: str) -> None:
 
 def measured_length(label: str, prefix: str, host: str) -> int:
     full = f"{prefix}{label}"
-    if host in {"antigravity", "hermes"}:
+    if host in {"codex", "antigravity", "hermes"}:
         return len(full)
     if host == "general":
         return len(label)
@@ -33,7 +33,7 @@ def measured_length(label: str, prefix: str, host: str) -> int:
 
 
 def fits(label: str, prefix: str, host: str) -> bool:
-    caps = {"antigravity": 70, "hermes": 100, "general": 240}
+    caps = {"codex": 60, "antigravity": 70, "hermes": 100, "general": 240}
     return measured_length(label, prefix, host) <= caps[host]
 
 
@@ -47,9 +47,10 @@ def check_contract_text() -> None:
         "Do not default to an opening shaped as `From X to Y`",
         "Subject plus meaning",
         "Earned detail",
+        "Codex: 60 characters including any optional prefix",
         "Antigravity/Gemini: 70 characters including any optional prefix",
         "Hermes: 100 characters including any optional prefix",
-        "Claude/Codex/zCode: 240 characters by default, excluding any optional prefix",
+        "Claude/zCode: 240 characters by default, excluding any optional prefix",
     ]
     for needle in required_skill:
         require(SKILL, needle, "SKILL.md")
@@ -81,10 +82,13 @@ def check_contract_text() -> None:
 def check_cap_accounting() -> None:
     prefix = "48.) "
 
+    exact_codex = "C" * (60 - len(prefix))
     exact_antigravity = "A" * (70 - len(prefix))
     exact_hermes = "H" * (100 - len(prefix))
     exact_general = "G" * 240
 
+    assert fits(exact_codex, prefix, "codex")
+    assert not fits(exact_codex + "C", prefix, "codex")
     assert fits(exact_antigravity, prefix, "antigravity")
     assert not fits(exact_antigravity + "A", prefix, "antigravity")
     assert fits(exact_hermes, prefix, "hermes")
@@ -92,6 +96,8 @@ def check_cap_accounting() -> None:
     assert fits(exact_general, prefix, "general")
     assert not fits(exact_general + "G", prefix, "general")
 
+    if measured_length(exact_codex, prefix, "codex") != 60:
+        raise AssertionError("Codex accounting must include the optional prefix")
     if measured_length(exact_general, prefix, "general") != 240:
         raise AssertionError("General-host accounting must exclude the optional prefix")
     if measured_length(exact_antigravity, prefix, "antigravity") != 70:
@@ -100,6 +106,16 @@ def check_cap_accounting() -> None:
         raise AssertionError("Hermes accounting must include the optional prefix")
 
     representative = {
+        "codex": [
+            "Codex Session Names Capped at 60 Characters",
+            "Codex Title Limits Verified Through Live Boundary Tests",
+            "Codex Naming Now Preserves Full Sidebar Titles",
+            "Session-Name Adds a 60-Character Codex Guard",
+            "Codex Cap Joins Antigravity and Hermes Host Rules",
+            "Live Tests Confirm the Codex 60-Character Ceiling",
+            "Codex Titles Rewrite Before the Sidebar Can Truncate",
+            "Full Codex Session Labels Stay Within 60 Characters",
+        ],
         "antigravity": [
             "Autonomous GitHub Sync Proven Across Two zCode Workspaces",
             "GitHub Sync Ends Approval Churn Without Weakening Safety",

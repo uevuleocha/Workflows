@@ -206,14 +206,16 @@ def check_setup(tier: str = DEFAULT_TIER, verbose: bool = True) -> bool:
     except ImportError:
         ok = False
         if verbose:
-            print("MISSING: google-genai (pip install google-genai).")
+            print("MISSING: google-genai "
+                  "(install with: python -m pip install google-genai).")
     try:
         import dotenv  # noqa: F401
     except ImportError:
         dotenv_available = False
         ok = False
         if verbose:
-            print("MISSING: python-dotenv (pip install python-dotenv).")
+            print("MISSING: python-dotenv "
+                  "(install with: python -m pip install python-dotenv).")
     try:
         import youtube_transcript_api  # noqa: F401
     except ImportError:
@@ -221,7 +223,7 @@ def check_setup(tier: str = DEFAULT_TIER, verbose: bool = True) -> bool:
         if verbose:
             print(
                 "MISSING: youtube-transcript-api "
-                "(pip install youtube-transcript-api)."
+                "(install with: python -m pip install youtube-transcript-api)."
             )
     discovery = {
         "searched": env_file_candidates(),

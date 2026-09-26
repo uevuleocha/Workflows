@@ -162,6 +162,15 @@ Do not:
 - **More than 8 agents requested:** capped at 8 (framings would repeat and cost grows steeply).
 - **Non-interactive shells:** `--interactive` degrades gracefully on EOF and continues the debate.
 
+## Runtime Dependencies
+
+The helper script imports the third-party packages below. It checks them before doing work (`--check-setup` and the automatic run preflight) and, when one is missing, reports the package with its install command. Always install with `python -m pip install <install-name>` — never bare `pip`, which can resolve to a different interpreter than the one running the helper. To restore every Skills dependency in one command, run `python -m pip install -r Skills/requirements.txt` from the workspace root.
+
+| Import name | Install name  | Used for            | Minimum version |
+| ----------- | ------------- | ------------------- | --------------- |
+| anthropic   | anthropic     | Anthropic API calls | N/A             |
+| dotenv      | python-dotenv | Loading the API key | N/A             |
+
 ## Agent Provenance For Durable Artifacts
 
 This skill applies the workspace's first-party durable-artifact provenance rule to durable debate reports and any human-readable run artifacts.

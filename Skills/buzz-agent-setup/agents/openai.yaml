@@ -1,7 +1,0 @@
-interface:
-  display_name: "Buzz Agent Setup"
-  short_description: "Generate paste-ready Buzz managed-agent configuration"
-  default_prompt: "Use $buzz-agent-setup to produce the complete configuration for a Buzz managed agent: dialog fields (branching on harness class), agent instructions opening with the mandatory model-identity line plus stale-value warning, an under-2KB core memory built through the written admission test, and optional cold memory slugs. Output only - never calls the Buzz CLI, never writes files, never touches secrets."
-
-policy:
-  allow_implicit_invocation: true

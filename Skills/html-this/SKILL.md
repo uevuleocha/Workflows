@@ -102,6 +102,16 @@ Every normal `--to html` creation requires canonical Agent Provenance. Markdown 
 
 PDF conversion requires `pypdf` for semantic extraction and uses Poppler for page images when available. Prefer the host document runtime and do not install dependencies silently.
 
+## Runtime Dependencies
+
+The helper script imports the third-party packages below. It checks them before doing work and, when one is missing, stops with a one-line message naming the package and its install command. Always install with `python -m pip install <install-name>` — never bare `pip`, which can resolve to a different interpreter than the one running the helper. To restore every Skills dependency in one command, run `python -m pip install -r Skills/requirements.txt` from the workspace root.
+
+| Import name | Install name | Used for            | Minimum version |
+| ----------- | ------------ | ------------------- | --------------- |
+| pypdf       | pypdf        | PDF text extraction | N/A             |
+
+Note: pypdf is needed only when the input is a PDF (Mode F, or a PDF carried inside an embedded source packet). Every other input format runs without it, so the helper checks this import at first PDF use by design and fails there with the install command instead of blocking non-PDF runs.
+
 ## Agent Provenance For Durable Artifacts
 
 For a new standalone HTML artifact, visibly render the standard `Agent Provenance` fields immediately after the artifact's opening block — its title, status, and lifecycle lines — and an append-only `Agent Change Log` as the last section, or immediately above any section the artifact already reserves for the last position. Preserve both in the embedded native source.

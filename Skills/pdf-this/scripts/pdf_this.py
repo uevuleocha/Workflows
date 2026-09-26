@@ -42,9 +42,10 @@ try:
         Table,
         TableStyle,
     )
-except ImportError as exc:  # pragma: no cover - environment gate
+except ImportError as exc:  # pragma: no cover - dependency preflight
     raise SystemExit(
-        "pdf-this requires reportlab and pypdf. Use the host bundled PDF runtime."
+        f"missing dependency: {exc.name or exc}; "
+        "install with: python -m pip install pypdf reportlab"
     ) from exc
 
 

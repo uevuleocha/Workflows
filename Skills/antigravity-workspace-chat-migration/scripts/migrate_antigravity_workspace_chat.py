@@ -24,7 +24,13 @@ from collections import Counter
 from pathlib import Path
 from typing import Any
 
-import blackboxprotobuf
+try:
+    import blackboxprotobuf
+except ImportError as exc:  # pragma: no cover - dependency preflight
+    raise SystemExit(
+        "missing dependency: blackboxprotobuf; "
+        "install with: python -m pip install blackboxprotobuf"
+    ) from exc
 
 GEMINI_HOME = Path.home() / ".gemini"
 CONV_DIR = GEMINI_HOME / "antigravity" / "conversations"

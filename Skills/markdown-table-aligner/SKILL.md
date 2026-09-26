@@ -81,6 +81,16 @@ Every Markdown table this skill writes - inside a durable artifact or into chat 
 
 The script itself never performs the editorial truncation or note creation described above; it reports those cases for the owning agent.
 
+## Runtime Dependencies
+
+The helper script imports the third-party packages below. It checks them before doing work and, when one is missing, stops with a one-line message naming the package and its install command. Always install with `python -m pip install <install-name>` — never bare `pip`, which can resolve to a different interpreter than the one running the helper. To restore every Skills dependency in one command, run `python -m pip install -r Skills/requirements.txt` from the workspace root.
+
+| Import name | Install name | Used for             | Minimum version |
+| ----------- | ------------ | -------------------- | --------------- |
+| wcwidth     | wcwidth      | Unicode width tables | 0.2.14          |
+
+Note (wcwidth floor): the helper measures cells with `wcwidth.wcswidth(..., unicode_version="17.0.0")` and verifies `"17.0.0" in wcwidth.list_versions()` before any work. wcwidth 0.2.14 (released 2025-09-22) is the first release whose data tables include Unicode 17.0.0, so it is the demonstrated minimum; older releases hard-fail the version check.
+
 ## Validation
 
 - Run `python -X utf8 scripts/test_align_markdown_tables.py` and require exit `0`.

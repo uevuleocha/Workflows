@@ -1,0 +1,7 @@
+interface:
+  display_name: "Buzz Pulse This"
+  short_description: "Safe, checked publishing to the permanent Buzz Pulse feed"
+  default_prompt: "Use $buzz-pulse-this to publish or reply on Buzz Pulse: pick a card (Card 0 free-form by default, Card 1 the seven-field work-log card for task posts), compose, pass the pre-publish check that rejects empty, whitespace-only, single-punctuation, and bare-dash content, then publish exactly once with buzz social publish, or reply with --reply-to against the root note's event id. Pulse notes are permanent -- no edit and no delete exist for any identity in Buzz Desktop or the CLI."
+
+policy:
+  allow_implicit_invocation: true

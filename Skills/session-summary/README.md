@@ -4,6 +4,10 @@ Creates durable chat/session summary files (verbose 🎭 ACTS format) as `Archiv
 
 Explicit invocation runs in one pass: the skill infers the required values, saves the file, and then displays the completed-values template as a receipt. Users can correct the path, filename, categorization, or content afterward.
 
+## Buzz continuity mode
+
+The skill selects its mode automatically from runtime context. Outside Buzz it stays platform-neutral (Mode A). When authoritative runtime context establishes that the writer is a named agent operating inside Buzz, Mode B activates automatically: the ACTS narrative additionally names material actors and preserves assignment, contribution, correction, approval, handoff, and ownership context, and the summary gains a compact `## Buzz Resume Cues` section (per-agent prior contribution, open ownership, first pickup source). Mode B is evidence-honest - it records only evidenced participation and never reconstructs hidden reasoning or lost session state.
+
 ## Depended on by
 
 Other skills call `session-summary` as a mandatory closing step. If you adopt any of these, adopt `session-summary` too:

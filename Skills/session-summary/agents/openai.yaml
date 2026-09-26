@@ -1,6 +1,6 @@
 interface:
   display_name: "Session Summary"
-  short_description: "Write session summary files"
+  short_description: "Write session summary files; auto Buzz continuity mode"
   default_prompt: "Use $session-summary to create a durable session summary for the current conversation."
 
 policy:

@@ -511,7 +511,9 @@ def extract_source_packet(document: str) -> tuple[str, str] | None:
 
 def pdf_text(source: bytes) -> tuple[list[str], dict[str, str]]:
     if PdfReader is None:
-        raise RuntimeError("PDF conversion requires pypdf from the host document runtime")
+        raise RuntimeError(
+            "missing dependency: pypdf; install with: python -m pip install pypdf"
+        )
     reader = PdfReader(io.BytesIO(source))
     pages = [(page.extract_text() or "").strip() for page in reader.pages]
     metadata = {

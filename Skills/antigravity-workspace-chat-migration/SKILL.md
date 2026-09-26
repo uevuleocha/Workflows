@@ -176,6 +176,14 @@ After verification passes, produce an execution feedback summary by explicitly i
 
 If anything fails before a conversation is fully written, stop and report the failing conversation ID. If a post-write verification fails, restore from backups before retrying. If the UI still shows a chat under the old project after Field 18 is reassigned, re-confirm the destination Project UUID actually exists in the registry, then try a full Antigravity quit (the index regenerates on launch).
 
+## Runtime Dependencies
+
+The helper script imports the third-party packages below. It checks them before doing work and, when one is missing, stops with a one-line message naming the package and its install command. Always install with `python -m pip install <install-name>` — never bare `pip`, which can resolve to a different interpreter than the one running the helper. To restore every Skills dependency in one command, run `python -m pip install -r Skills/requirements.txt` from the workspace root.
+
+| Import name      | Install name     | Used for                        | Minimum version |
+| ---------------- | ---------------- | ------------------------------- | --------------- |
+| blackboxprotobuf | blackboxprotobuf | Decode/re-encode protobuf blobs | N/A             |
+
 ## Agent Provenance For Durable Artifacts
 
 The migration manifest is a first-party durable artifact and must carry schema-safe agent provenance. `manifest-this` renders the visible Agent Provenance table and append-only Agent Change Log in the manifest artifact; the embedded native JSON payload keeps its own top-level `agent_provenance` object containing `content_owner`, `original_writing_agent`, `original_writing_llm`, `created`, `artifact_role`, and an append-only `change_log`. Each change-log item records the clock-read `YYYY-MM-DD-HH:mm:ss` timestamp, truthful acting agent, that agent's `model`, action, and concise scope. Preserve the original writer and the original writing model permanently.

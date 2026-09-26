@@ -58,7 +58,7 @@ Load it, or invoke `<available child>` directly if you only want that half.
 
 `finalize-session` **does not** reimplement, restate, or override:
 
-- the direct context-rich eight-option naming algorithm, uppercase display-start rule, verbatim-prefix rule, Antigravity 70-character cap, Hermes 100-character cap, or non-blocking completion semantics — `session-name` owns these;
+- the direct context-rich eight-option naming algorithm, uppercase display-start rule, verbatim-prefix rule, Codex 60-character cap, Antigravity 70-character cap, Hermes 100-character cap, or non-blocking completion semantics — `session-name` owns these;
 - summary Subject/Topic/number inference, collision safety, `🎭 ACTS` structure, Definition of Done ACT, provenance, delegated return-report shape, artifact serialization, or the completed-values receipt — `session-summary` owns these;
 - either child's validation logic, lifecycle rules, or platform behavior.
 

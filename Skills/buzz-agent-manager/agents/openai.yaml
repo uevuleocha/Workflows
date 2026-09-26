@@ -1,0 +1,7 @@
+interface:
+  display_name: "Buzz Agent Manager"
+  short_description: "Check seven Buzz agent facts and reconcile roster drift"
+  default_prompt: "Use $buzz-agent-manager to check the Buzz agent roster and Claude adapter, prepare a new agent, record an app change, check package freshness, or sync documentation toward the authority I name. Start with tread-lightly. Never write to Buzz."
+
+policy:
+  allow_implicit_invocation: true

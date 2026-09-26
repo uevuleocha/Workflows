@@ -108,6 +108,15 @@ Every normal `--to pdf` creation requires canonical Agent Provenance. Markdown o
 
 Prefer the host document runtime. Semantic generation and forms require `reportlab` and `pypdf`; richer extraction may use `pdfplumber`; visual checks require Poppler; faithful HTML conversion requires a supported browser. Do not install dependencies silently.
 
+## Runtime Dependencies
+
+The helper script imports the third-party packages below. It checks them at startup, before any work, and exits with a one-line message naming the missing package and its install command. Always install with `python -m pip install <install-name>` — never bare `pip`, which can resolve to a different interpreter than the one running the helper. To restore every Skills dependency in one command, run `python -m pip install -r Skills/requirements.txt` from the workspace root.
+
+| Import name | Install name | Used for             | Minimum version |
+| ----------- | ------------ | -------------------- | --------------- |
+| pypdf       | pypdf        | PDF read/write/forms | N/A             |
+| reportlab   | reportlab    | Semantic PDF layout  | N/A             |
+
 ## Agent Provenance For Durable Artifacts
 
 For a new standalone PDF artifact, visibly render the standard `Agent Provenance` fields immediately after the artifact's opening block — its title, status, and lifecycle lines — and an append-only `Agent Change Log` as the last section, or immediately above any section the artifact already reserves for the last position. Preserve both in the embedded native source.

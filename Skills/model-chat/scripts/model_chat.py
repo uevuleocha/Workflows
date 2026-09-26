@@ -229,7 +229,7 @@ def check_setup(verbose: bool = True) -> bool:
         ok = False
         if verbose:
             print("MISSING: the 'anthropic' package is not installed "
-                  "(pip install anthropic).")
+                  "(install with: python -m pip install anthropic).")
 
     try:
         import dotenv  # noqa: F401
@@ -237,7 +237,7 @@ def check_setup(verbose: bool = True) -> bool:
         ok = False
         if verbose:
             print("MISSING: the 'python-dotenv' package is not installed "
-                  "(pip install python-dotenv).")
+                  "(install with: python -m pip install python-dotenv).")
 
     if ok:
         load_env_files()

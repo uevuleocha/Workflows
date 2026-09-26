@@ -30,7 +30,7 @@ This frame is the reason this skill exists separately from `inspect` (which audi
 
 This skill operates under the project's canonical contract (e.g. `CLAUDE.md`, `AGENTS.md`, or `GEMINI.md`). Safety rules, path scope, and product-code workflow defined there apply unchanged.
 
-This skill's unique authority is the **feedback writeback** — appending a new dated subsection to a durable artifact's feedback section. That is a bounded mutating action this skill is explicitly authorized to perform when the user invoked verification. It does not broaden authority to edit the artifact's goals, contract, plan, task, or any non-feedback content.
+This skill's unique authority is the **feedback writeback** — appending a new dated subsection to a durable artifact's feedback section. That is a bounded mutating action this skill is explicitly authorized to perform when the user invoked verification. It does not broaden authority to edit the artifact's goals, contract, plan, task, or any non-feedback content. Appending the matching row to the artifact's `## Agent Change Log` is part of the writeback, not a broadening of it: the feedback subsection is a material change to a durable artifact and the workspace contract requires every material change to be recorded in the artifact's own append-only change log. The writeback still never touches the artifact's goals, contract, plan, task, `## Agent Provenance`, or any existing change-log row.
 
 ## Invocation
 
@@ -153,6 +153,8 @@ The implementation is sound and ready for finalization.
 
 When the target is a North Star, do **not** hand-write the subsection. Its Feedback Section is helper-owned state and a hand-written entry is discarded on the next mutation; append through `north_star_state.py feedback-add` instead, which numbers the entry for you.
 
+**Change-log row.** The writeback is a material change: in the same pass, append one row to the artifact's `## Agent Change Log` — five columns `Date and Time | Agent | Model | Action | Scope`, timestamp read from the machine clock at write time in `YYYY-MM-DD-HH:mm:ss`, never estimated. If the artifact carries no change log at all, note that absence in the feedback subsection as a genuine uncertainty rather than fabricating the section. Where the artifact's owning helper manages its change log through encoded state, append through that helper's own command instead of hand-editing; the North Star rule above is one instance of this.
+
 Use the agent-family label truthfully (`Codex Agent`, `Claude Agent`, `Antigravity Agent`, `Hermes Agent`, or `zCode Agent`). If a sub-agent the orchestrator spawned performed the verification, credit that sub-agent's family in the heading, not the orchestrator's.
 
 #### Verdict markers (use exactly)
@@ -199,7 +201,7 @@ This is the default behavior. It does not require the user to opt in per run.
 
 Every feedback subsection this skill writes carries its verifying-agent-family label and the date in its heading (see the writeback shape above). This is lightweight provenance — who verified and when — sufficient for the iteration loop. It does not replace the artifact's own `## Agent Provenance` or `## Agent Change Log`, which the artifact's owning skill already manages.
 
-Do not inject full provenance blocks into feedback subsections. Do not edit the artifact's `## Agent Provenance` table — that is the owning skill's responsibility. If the artifact lacks provenance entirely, note it as a genuine uncertainty in the feedback subsection and move on; do not retroactively author provenance for a work you did not create.
+Do not inject full provenance blocks into feedback subsections. Do not edit the artifact's `## Agent Provenance` table — that is the owning skill's responsibility. The `## Agent Change Log` is the opposite case: appending its new row is required (see the writeback step); rewriting, renumbering, or reordering earlier rows remains forbidden. If the artifact lacks provenance entirely, note it as a genuine uncertainty in the feedback subsection and move on; do not retroactively author provenance for a work you did not create.
 
 ## Boundaries
 
@@ -209,6 +211,7 @@ Do:
 - read and diff the implementation, not the whole repository;
 - report unmet goals, blatant defects, and explicitly requested checks;
 - write a new dated feedback subsection by default (No-Don't-Make-Me-Wait);
+- append the artifact's `## Agent Change Log` row recording the writeback, without touching earlier rows;
 - always prompt the user that feedback was added;
 - use the verdict markers exactly as defined;
 - credit the verifying sub-agent's family truthfully.
@@ -301,6 +304,7 @@ After a verification run, confirm and report:
 - the goals/DoD source used (Prompt Contract / Verification Checklist / plan / task / North Star);
 - the verdict and marker, with evidence for each confirmed or unmet item;
 - the feedback subsection was written to a resolved writeback target (or the fallback pause fired and what the user chose);
+- confirm the writeback's Agent Change Log row was appended, or its absence noted as an uncertainty;
 - the user was prompted that feedback was added;
 - no over-sabi: no speculative findings, no style nitpicks, no optional improvements reported as findings;
 - no edits were made to non-feedback content or the artifact's provenance table.

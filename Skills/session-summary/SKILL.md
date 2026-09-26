@@ -1,6 +1,6 @@
 ---
 name: session-summary
-description: Create chat/session summary files for continuity after implementation, debugging, planning, or architecture sessions. Use when explicitly invoked with /session-summary or when the user asks to use the session-summary skill. For natural phrases like "session summary", "chat summary", "wrap up", "handoff", or "summarize this session", first confirm the user wants the saved session-summary workflow before creating or editing files. Produces durable markdown summaries with verbose 🎭 ACTS breakdowns, project/topic/session metadata, active plan status, and next-session pickup context.
+description: Create chat/session summary files for continuity after implementation, debugging, planning, or architecture sessions. Use when explicitly invoked with /session-summary or when the user asks to use the session-summary skill. For natural phrases like "session summary", "chat summary", "wrap up", "handoff", or "summarize this session", first confirm the user wants the saved session-summary workflow before creating or editing files. Produces durable markdown summaries with verbose 🎭 ACTS breakdowns, project/topic/session metadata, active plan status, and next-session pickup context. Under authoritative Buzz runtime context, automatically activates a multi-agent continuity mode that also records participation, delegation, handoff, and ownership context with per-agent resume cues; outside Buzz, the platform-neutral workflow applies unchanged.
 ---
 
 # Session Summary
@@ -117,6 +117,43 @@ Optional review when the user asks or context requires it:
 
 This skill summarizes the current conversation first. Do not perform a broad repo audit.
 
+## Buzz Continuity Mode (Automatic A/B Selection)
+
+This skill has two runtime-selected modes. Selection is automatic from runtime context and is never asked of the user.
+
+**Mode A - platform-neutral (default).** Outside authoritative Buzz context, the workflow in this skill applies exactly as written, with no Buzz-specific section, field, or attribution added to the artifact. Nothing in this section activates.
+
+**Mode B - Buzz multi-agent continuity (automatic).** Mode B activates by itself only when authoritative runtime context establishes that the writer is a named agent operating inside Buzz - for example a harness-supplied channel-scoped context block that identifies the writer's named Buzz agent identity, channel, and relay. A guessed platform, a generic agent-family label, or a sign-off string alone is not authoritative context; when those are all that exists, stay in Mode A.
+
+Mode B preserves everything Mode A records and additionally makes recorded participation and delegation context explicit:
+
+- Name material actors naturally throughout the chronological ACTS narrative - who asked for or assigned the work, who handled each material contribution, who reviewed, approved, or corrected decisions, what handoffs occurred, and where ownership ended or remains open.
+- Add a compact `## Buzz Resume Cues` section (below) so each participating agent can recognize and resume its own thread of work after a session rotation.
+
+Mode B participation content stays inside the ACTS narrative and the resume cues. Never add thread participants to the artifact's Agent Provenance or Agent Change Log merely because they participated in the summarized session: provenance still identifies the agent that originally wrote the summary, and the change log still records only agents that later materially modify the summary file.
+
+### Buzz Resume Cues
+
+In Mode B, insert a `## Buzz Resume Cues` section after the `## Next Session Pickup` block and before the `## Feedback Section`. For each agent that materially participated within the requested summary scope, record in compact prose or bullets - no separate participation ledger and no mandatory table:
+
+- **prior contribution** - what that agent should recognize as its own earlier work;
+- **open ownership** - whether that agent owns any follow-up, or holds none;
+- **first pickup source** - the first relevant artifact path or thread point to consult.
+
+Keep the cues readable and concise. An agent with no material participation in scope gets no cue.
+
+### Scope And Retrieval (Mode B)
+
+Summary scope remains controlled by the caller. A request for the whole thread covers the whole thread; a stated Point A-to-Point B range covers that range. Mode B governs the content and continuity of the summary, not a Buzz retrieval protocol: full-thread retrieval, channel UUIDs, thread-root event IDs, and the injected-context window are never mandatory parts of a Mode B summary. The writer may retrieve additional thread history when the requested scope or missing context makes that necessary.
+
+### Evidence Honesty (Mode B)
+
+Mode B is evidence-honest. It may preserve only contributions, decisions, deliverables, approvals, handoffs, and ownership the writer can support from available conversation or artifacts. It must never claim to recreate another agent's hidden reasoning, unposted tool activity, or lost private session state. Where participation cannot be supported by recorded evidence, leave it out.
+
+### Attribution Under Authoritative Buzz Context
+
+Under authoritative Buzz context, use the named Buzz-agent sign-off supplied by that agent's own instructions (for example `Tunde Agent`) in place of a generic harness-family label for the provenance and change-log rows that agent writes. Outside Buzz, the existing platform-neutral attribution behavior applies unchanged. Do not retroactively rewrite historical rows.
+
 ## Active Plan Handling
 
 If an active plan drove the session, inspect it before writing the summary.
@@ -193,6 +230,8 @@ Use headings like:
 ```
 
 Use as many 🎭 ACTS as needed. Do not compress separate events into one ACT if doing so would hide important context.
+
+In Mode B, name material actors naturally throughout the chronological narrative - who assigned or prompted the work, who handled each material contribution, who reviewed, approved, or corrected decisions, what handoffs occurred, and where ownership ended or remains open - without displacing the work-context narrative Mode A already records.
 
 The **last** ACT of every summary must always be the Definition of Done ACT, titled `🎭 FINAL ACT: Definition of Done`. It comes after every chronological ACT and before the `Final State At End Of Session` block. See the `Definition of Done ACT` section below for required contents.
 
@@ -274,6 +313,9 @@ DoD met when:
 ## Next Session Pickup
 
 [Concrete next action for the next agent.]
+## Buzz Resume Cues
+
+[Mode B only - omit this entire section outside authoritative Buzz context. Compact per-agent resume cues: prior contribution, open ownership, first pickup source, per `Buzz Continuity Mode (Automatic A/B Selection)` above.]
 ## Feedback Section
 
 <Always present, empty by default. Any agent appends `### Feedback N - YYYY-MM-DD - Agent - short descriptor`. Append-only; a correction is a new entry, never an edit. Never prune this section for being empty.>
@@ -315,6 +357,7 @@ Do:
 - Include method names, field names, enum names, file names, plan phase names, and command names
 - Use absolute paths for important files
 - Mention user decisions and objections
+- In Mode B, record only evidenced participation, delegation, handoff, and ownership context, and name the actors involved
 - Mention assistant mistakes if they affected the session
 - Mention rejected approaches and why they were rejected
 - Explain why final decisions were made
@@ -323,6 +366,7 @@ Do:
 Do not:
 
 - Invent state
+- Claim access to hidden reasoning, unposted tool activity, or lost private session state (Mode B evidence-honesty boundary)
 - Claim a file was modified if it was only discussed
 - Claim tests passed if they were not run
 - Summarize only the last few turns
@@ -411,6 +455,7 @@ For every in-scope artifact:
 - place an `## Agent Provenance` section immediately after the artifact's opening block -- its title, status, and lifecycle lines -- carrying `Content owner`, `Original writing agent`, `Original writing LLM`, `Created`, and `Artifact role`, in that order;
 - record `Original writing LLM` as the model that produced the artifact, kept distinct from the agent family that performed the write; use `Not recorded` when the model is genuinely unknown, and never infer it from the agent label or backfill it later;
 - use a stable truthful agent-family label such as `Codex Agent`, `Claude Agent`, `Antigravity Agent`, `Hermes Agent`, or `zCode Agent`;
+- under authoritative Buzz context, use the named Buzz-agent sign-off supplied by that agent's own instructions (for example `Tunde Agent`) instead of a generic harness-family label, and never rewrite a historical row to conform;
 - keep the original writing-agent entry immutable;
 - keep an append-only `## Agent Change Log` as the last section, or immediately above any section the artifact already reserves for the last position, rendered as a five-column `Date and Time | Agent | Model | Action | Scope` table with one row per material edit;
 - stamp every change-log row `YYYY-MM-DD-HH:mm:ss` on a 24-hour clock, read from the machine clock and never estimated; leave historical date-only rows exactly as written rather than backfilling them, because a log carrying both shapes is correct and the boundary between them is itself information;

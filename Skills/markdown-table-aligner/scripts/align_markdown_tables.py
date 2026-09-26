@@ -52,11 +52,16 @@ def _width_function():
     try:
         import wcwidth
     except ImportError as exc:
-        raise OperationalError("wcwidth is required; raw character count is unsafe") from exc
+        raise OperationalError(
+            "wcwidth is required; raw character count is unsafe; "
+            "install with: python -m pip install wcwidth"
+        ) from exc
     versions = set(wcwidth.list_versions())
     if UNICODE_VERSION not in versions:
         raise OperationalError(
-            f"wcwidth lacks required Unicode data {UNICODE_VERSION}; available={sorted(versions)}"
+            f"wcwidth lacks required Unicode data {UNICODE_VERSION} "
+            f"(upgrade with: python -m pip install --upgrade wcwidth); "
+            f"available={sorted(versions)}"
         )
 
     def width(text: str) -> int:

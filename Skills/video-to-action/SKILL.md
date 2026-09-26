@@ -163,6 +163,16 @@ Procedure always requests the Overview and detailed Steps in one response. Deep 
 8. If the transcript failed, name it as a failure in chat and include the exact `--complete-transcript` command printed by the helper.
 9. Do not act on Procedure steps without separate authorization.
 
+## Runtime Dependencies
+
+The helper script imports the third-party packages below. It checks them before doing work (`--check-setup` and the automatic run preflight) and, when one is missing, reports the package with its install command. Always install with `python -m pip install <install-name>` — never bare `pip`, which can resolve to a different interpreter than the one running the helper. To restore every Skills dependency in one command, run `python -m pip install -r Skills/requirements.txt` from the workspace root.
+
+| Import name            | Install name           | Used for          | Minimum version |
+| ---------------------- | ---------------------- | ----------------- | --------------- |
+| google.genai           | google-genai           | Gemini analysis   | N/A             |
+| dotenv                 | python-dotenv          | Loading API keys  | N/A             |
+| youtube_transcript_api | youtube-transcript-api | Caption retrieval | N/A             |
+
 ## Durable Artifact Format Handling
 
 This skill owns video retrieval, provenance, phase isolation, prompts, transcript content, report content, run-folder naming, and its deterministic helper. When co-invoked with `html-this` or `pdf-this`, the helper may write native intermediates only under an approved temporary path; convert `report.md`, `transcript.md`, and `prompts.md` to the requested format and leave only their `.html` or `.pdf` equivalents in the durable run folder. Keep `latest.json` and machine state native.

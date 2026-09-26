@@ -69,7 +69,17 @@ The number is permanent within the matching Subject. Allocate it from the highes
 
 ## State Helper
 
-Use `scripts/brainstorm_state.py` for create, checkpoint, pause, resume, readiness, reopen, and lifecycle state. Run it with Python UTF-8 mode. It writes only the resolved Brainstorm artifact, uses atomic updates, and refuses collisions.
+Use `scripts/brainstorm_state.py` for create, checkpoint, feedback, pause, resume, readiness, reopen, and lifecycle state. Run it with Python UTF-8 mode. It writes only the resolved Brainstorm artifact, uses atomic updates, and refuses collisions.
+
+The helper's current state schema is version 2. It models `provenance`, `feedback`, and `change_log`, accepts v1 captures, and upgrades them in memory without inventing history. During migration it adopts visible hand-added provenance, Feedback, and change-log content and preserves other unmodelled top-level sections. Every mutating command accepts `--agent` and `--model`; callers supply the acting agent family and the exact model established by `exact-model-confirmation-gate` rather than asking the helper to infer either identity.
+
+Use the append-only Feedback command as follows:
+
+```text
+python -X utf8 scripts/brainstorm_state.py feedback --artifact <capture> --agent <agent-family> --model <exact-model> --descriptor <short-description> --body <feedback-body>
+```
+
+The command assigns the next permanent `### Feedback N` number, preserves earlier entries, and records the mutation in the Agent Change Log.
 
 The helper is the deterministic mechanism; this skill owns the reasoning and content supplied to it.
 
@@ -95,6 +105,7 @@ The Brainstorm skill defines and maintains its own self-contained schema.
 Every capture contains:
 
 - identity and lifecycle metadata;
+- canonical Agent Provenance;
 - a provisional Working Direction;
 - a North Star finalized only at convergence;
 - Running Summary;
@@ -106,7 +117,9 @@ Every capture contains:
 - Open Flags with owner, state, and disposition;
 - Completeness State;
 - Next Step Or Handoff; and
-- Lifecycle And Reopen History.
+- Lifecycle And Reopen History;
+- an append-only Feedback Section; and
+- an append-only Agent Change Log.
 
 Running sections may be clarified as understanding improves. Never erase Q&A history, prior North Stars, corrections, contradictions, or lifecycle evidence.
 
@@ -297,6 +310,12 @@ If `exact-model-confirmation-gate` is unavailable and no verified stable-session
 
 **Validation check:** Confirm the dependency is named in this skill and its README; the canonical caller block is byte-identical to `exact-model-confirmation-gate/references/canonical-caller-block.md`; first-write blocking, one-time confirmation, stable-session reuse, proactive change, context invalidation, identity separation, targeted lookup, unresolved fallback, and append-only history pass the shared deterministic suite; and no historical row was rewritten.
 
+## Markdown Table Alignment
+
+All Markdown tables this skill writes must be visually pipe-aligned. Cap every cell at 80 characters, including any overflow marker. If a cell's full content would exceed 80 characters, truncate it at the nearest word boundary within the cap, append a pointer such as `-> see note [row-id]` using that row's own identifier, and place the full original text as a plain note directly below the table, keyed by that identifier. Pad columns so the table is aligned in a monospaced raw-text or Markdown view. Rendered visual alignment is authoritative; raw `|` indices are diagnostic only because Unicode display width can differ from raw character counts. Do not flag or rework a table solely because raw pipe indices differ when the rendered table is visually aligned. Visibly uneven columns, malformed separators, or cells above 80 characters still fail. Prefer ASCII-only characters (`->`, `--`, `...`) inside table cells. When a table exceeds approximately 120 characters in total width, narrow the columns by moving detail to notes so it renders on a single line without word-wrapping.
+
+After the helper or this skill has semantically completed a Markdown artifact containing tables, invoke `markdown-table-aligner` at the file-ownership boundary and require its deterministic `check` to exit `0`. The helper must emit provenance and change-log tables that pass this check without a formatting repair.
+
 ## Validation
 
 - confirm a newly produced artifact carries a `## Feedback Section` immediately above its `## Agent Change Log`, present even when empty, using the numbered `### Feedback N` grammar;
@@ -306,6 +325,8 @@ After creating or updating this skill:
 - run `scripts/verify_brainstorm_state.py` with Python UTF-8 mode;
 - validate the folder with `quick_validate.py` in UTF-8 mode;
 - verify new, resume, pause, correction, flag, contradiction, readiness, collision, finalization, and reopen behavior;
+- verify schema-v2 creation, v1 migration, hand-added section adoption, Feedback survival across later mutations, and exactly one change-log row per successful mutating command;
+- require every helper-emitted Markdown table to pass `markdown-table-aligner check` with exit `0`;
 - confirm `_chivita` and `_fini` use combined Subject numbering;
 - confirm conditional `for-dummies` and `analogy` relationships are reciprocal;
 - confirm no global copy changes until the authorized sync stage.
