@@ -117,7 +117,7 @@ When a North Star run is active and not paused, open a provisional turn timer at
 
 ## Workspace Layout
 
-> **Layout sync status:** `current` · last verified 2026-08-04 (root Codex control plane and three `.agents` homes reviewed)
+> **Layout sync status:** `current` · last verified 2026-10-29 (user-approved root .env layout entry reviewed)
 >
 > Keep this tree honest. If the real workspace and this tree disagree — a new folder/file that isn't shown here, or an entry here that no longer exists — **prompt the user before continuing substantive work**. The user may: (a) add the entry to the tree, (b) prune or replace something to keep it lean, or (c) decline the change. In every case, once the user has reviewed, reset the status line to `current` with today's date so the next agent doesn't re-raise it. Prefer a lean schema over an exhaustive one — prompt to prune before the tree sprawls; the goal is a map, not an inventory.
 
@@ -132,6 +132,7 @@ C:\Users\Admin\Uzzys Universe\MilkyWay\Tools\Workflows\
 │   ├── config.toml              ← Harness-managed sandbox/workspace settings
 │   └── settings.local.json      ← Codex coordination settings
 ├── .obsidian/                   ← Optional Obsidian viewer state
+├── .env                         ← Local environment file; sensitive contents excluded from wiki
 ├── AGENTS.md                    ← Four-platform wrapper → points to CLAUDE.md
 ├── CLAUDE.md                    ← This file. Canonical workspace contract.
 ├── README.md                    ← Human-facing overview of the skills home

@@ -1,0 +1,7 @@
+interface:
+  display_name: "New Workspace"
+  short_description: "Bootstrap a minimal local Git workspace"
+  default_prompt: "Use $new-workspace to confirm this folder's identity and bootstrap its minimal local Git workspace."
+
+policy:
+  allow_implicit_invocation: true

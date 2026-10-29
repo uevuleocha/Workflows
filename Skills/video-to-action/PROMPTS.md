@@ -2,14 +2,20 @@
 
 Auto-generated from `scripts/video_to_action.py` by `--dump-prompts`.
 Free tier is the non-blocking default. The primary model is
-`gemini-3.7-flash` and the one-attempt fallback after three recognized
+`gemini-3.8-flash` and the one-attempt fallback after three recognized
 transient primary failures is `gemini-3.6-flash`.
 
-The Procedure call always runs. Deep Summary is opt-in. Technical is
+The Procedure call always runs. Deep Summary is default-on. Technical is
 opt-in and requires an explicit coding/software relevance confirmation.
 Choices already present in the request are reused without reconfirmation.
 Per-run prompts.md stores each exact selected prompt once and associates
 all sanitized model-attempt provenance with that prompt.
+
+Every selected phase uses static video processing by default.
+--processing agentic opts into agentic processing; a failed agentic phase
+recovers through static processing with the same prompt. An explicit optional
+--custom-request supplements the Procedure prompt in the same call and
+requires a Your Specific Request answer section. Empty requests add nothing.
 
 ## Procedure (always)
 
@@ -55,7 +61,7 @@ If and only if video metadata exposes a title, add a metadata-title bullet and
 compare it with the supplied title; otherwise omit that bullet entirely.
 ```
 
-## Deep Summary (opt-in)
+## Deep Summary (default-on; --no-deep-summary opts out)
 
 ```text
 Create a long, faithful, chronological deep summary of

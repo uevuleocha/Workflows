@@ -7,7 +7,7 @@
 # google.genai -> google-genai, youtube_transcript_api -> youtube-transcript-api.
 wcwidth>=0.2.14  # markdown-table-aligner; needs Unicode 17.0.0 tables, first shipped in 0.2.14 (2025-09-22)
 python-dotenv    # model-chat, video-to-action (.env loading)
-google-genai     # video-to-action (Gemini API)
+google-genai>=2.29.0  # video-to-action (agentic Interactions API)
 youtube-transcript-api  # video-to-action (caption retrieval)
 pypdf            # html-this (PDF input), pdf-this (read/write/forms)
 reportlab        # pdf-this (semantic PDF layout)

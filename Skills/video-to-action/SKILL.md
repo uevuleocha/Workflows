@@ -1,6 +1,6 @@
 ---
 name: video-to-action
-description: Extract deterministic report.md, transcript.md, and prompts.md artifacts from public YouTube videos with a non-blocking free-tier default, Gemini 3.7 Flash primary processing, bounded Gemini 3.6 Flash fallback, explicit optional phases, and provenance-safe failure isolation. Run only when explicitly invoked with /video-to-action.
+description: Extract deterministic report.md, transcript.md, and prompts.md artifacts from public YouTube videos with a non-blocking free-tier default, Gemini 3.8 Flash primary processing, bounded Gemini 3.6 Flash fallback, static video processing by default with opt-in agentic processing that falls back to static, an agentic recovery probe, default-on Deep Summary and opt-in Technical, and provenance-safe failure isolation. Run only when explicitly invoked with /video-to-action.
 ---
 
 # Video-to-Action
@@ -23,13 +23,15 @@ Free tier is the default. State that assumption briefly and proceed without a co
 - exact user-authoritative title; and
 - exact user-authoritative duration.
 
+Resolve a broad Subject too: reuse the user's supplied subject, otherwise reuse a clear existing category from context and ask only when genuinely ambiguous. Subject folders are unnumbered (for example `AI Agents` or `Trading`); do not create a category for every video. Pass the resolved value as `--subject`. Missing or unsafe subjects fail before an API call. Maintenance-only modes do not require a subject.
+
 When more than one is missing, request all missing values together once. Never infer the title or duration.
 
 Reuse choices already supplied in the request or current context:
 
-- An explicit Deep Summary request selects Deep Summary.
+- Deep Summary is on by default. An explicit request to skip it passes `--no-deep-summary`; `--deep-summary` remains supported.
 - An explicit Technical request selects Technical when the content is coding or software related.
-- Unmentioned optional phases remain off.
+- Technical remains off unless requested. Do not ask users to opt into the default Deep Summary.
 - Do not show another pop-up or request another chat confirmation for supplied choices.
 
 ## Tier And Credential Policy
@@ -48,7 +50,7 @@ Before a real call:
 
 1. Change to the workspace root, then run `--check-setup` for the selected tier.
 2. Confirm URL, exact title, and exact duration are present.
-3. Derive optional phases from the user's current request.
+3. Include Deep Summary unless explicitly declined; select Technical only when requested.
 4. Present one concise preflight summary and proceed.
 
 Stop only when setup or required inputs are missing, a paid run lacks its paid credential, or no safe supported route exists.
@@ -57,11 +59,13 @@ Stop only when setup or required inputs are missing, a paid run lacks its paid c
 
 The free-tier defaults are deterministic:
 
-- Primary: `gemini-3.7-flash`.
+- Primary: `gemini-3.8-flash`.
 - Fallback: `gemini-3.6-flash`.
 - Primary budget: three total attempts per selected phase.
 - Backoff: one second, then three seconds.
 - Fallback budget: one attempt after three transient primary failures.
+
+Google deprecated `gemini-3.7-flash` and `gemini-3.5-flash` on 2026-10-08 and serves them as `gemini-3.8-flash` and `gemini-3.6-flash`. The helper maps those IDs to their served models before any call and records a preflight override, so a fallback never silently duplicates the primary.
 
 Retry only recognized transient capacity failures, primarily structured Gemini `503 UNAVAILABLE`. Do not retry authentication, permission, invalid-input, unsupported-feature, paid-authorization, or generic `429 RESOURCE_EXHAUSTED` errors. A failed fallback ends automatic attempts for that phase and is reported to the user.
 
@@ -69,20 +73,43 @@ Each selected phase has an independent attempt budget. Procedure failure does no
 
 ## Call Model
 
-| Phase        | Contents                          | Selection                    |
-| ------------ | --------------------------------- | ---------------------------- |
-| Procedure    | Overview and detailed steps       | Always                       |
-| Deep Summary | Chronological ACTS summary        | Explicit opt-in              |
-| Technical    | Code, commands, and configuration | Opt-in; coding/software only |
+Every selected Gemini phase uses the Interactions API. `--processing` chooses how Gemini reads the video:
 
-One to three phases are selected. Each phase normally makes one Gemini call and can make at most three primary attempts plus one fallback attempt during a recognized transient-capacity incident. Documentation and artifacts distinguish selected phases from actual attempts.
+- `static` (default): Gemini samples the whole video at fixed intervals with its audio. No processing evidence is required.
+- `agentic` (opt-in, only when the user asks): the model inspects relevant video sections dynamically; this is not a guarantee that every frame is examined. Success requires `processing_call` and `processing_result` evidence. When an agentic phase ends without a result after its own model recovery, the helper runs that phase again with static processing and the same prompt, and records those attempts as `agentic-to-static` recovery.
+
+Static is the default because Google's agentic video route failed for every tested model on 2026-10-28 (INTERNAL and DEADLINE_EXCEEDED) while static processing on the same video, key, and models completed. The helper records processing mode, processing counts, numeric usage totals, interaction IDs, states, and sanitized error details, never internal reasoning or raw response payloads.
+
+The helper creates one background interaction per attempt, then polls that same job up to 120 times at five-second intervals (each network request has a 30-second timeout). Polling does not create another analysis. SDK retries are disabled so the helper owns the attempt budget. Transient status-check failures (HTTP 408/500/502/503/504, connection errors, or timeouts) receive at most three retries per interaction, waiting 2, 5, and 10 seconds and always querying the same interaction ID. These retries count within the 120-check budget; successful checks resume the usual five-second interval. Authentication, invalid-input, and generic 429 errors stop immediately. Exhausted retries or polling budget trigger best-effort cancellation and end the phase without automatic resubmission; cancellation can be unconfirmed. Sanitized polling failures and retry delays remain in provenance even when the job recovers. Terminal failed/cancelled states, and missing processing evidence in agentic mode, fail explicitly. Recognized create-time capacity failures and terminal failures with explicit `503` or `UNAVAILABLE` error codes use the existing bounded model recovery.
+
+SDK 2.29.0 rewrites a zero retry setting during client construction. The helper therefore disables retries on the generated Interactions configuration after construction and fails closed if that adapter changes. Actual HTTP request-count tests cover quota, capacity, authentication, and connection failures; rerun them when upgrading the SDK.
+
+Hard `--start`/`--end` clipping is not supported in either processing mode and is rejected before any API call. Do not silently drop offsets. An explicit custom request may ask about a timestamp range, but the full video remains available to Gemini. `--resolution low` sets the video input's `resolution: "low"`.
+
+## Agentic Probe
+
+`--agentic-probe` checks whether Google's agentic route works again. It makes exactly one agentic call (no retries, no static fallback) on a fixed 19-second public video using the resolved primary model, creates no run folder, and writes `agentic-status.json` at the output root with the last result, timestamp, sanitized error, consecutive-success count, and the last 20 checks. It prints `WORKING` (exit 0), `STILL BROKEN` (exit 1), or `INCONCLUSIVE` (exit 2) when the only provider codes are quota or rate-limit codes (`429`, `RESOURCE_EXHAUSTED`); an inconclusive probe keeps the consecutive-success count unchanged because it says nothing about agentic health. Every later `report.md` and `prompts.md` shows the latest probe result, or `never probed`. Treat agentic as recovered only after three consecutive `WORKING` probes; switching the default back to agentic is a separate, user-authorized change. Run the probe only when the user asks.
+
+## Optional Custom Request
+
+`--custom-request` defaults to empty. Populate it only from an explicit additional user instruction, such as "also explain", "focus on", or "my custom request is"; no special phrase is required. Do not infer a request from the title, subject folder, video content, or assumed interests. Do not ask for an optional request when none was supplied. Whitespace-only input is absent.
+
+Pass the user's supplied request to the helper without inventing additions. It supplements normal work in the same Procedure call; it does not select Deep Summary or Technical or trigger a separate analysis. The helper appends the request to that prompt, records the exact effective prompt in `prompts.md`, and places the answer under `## Your Specific Request` in `report.md`. With no request, that section is omitted. Missing normal content or a missing/empty requested answer is an explicit phase failure, not a fabricated answer or an automatic second review. Extra content and internal inspection can consume more tokens even without another top-level analysis call.
+
+| Phase        | Contents                          | Selection                     |
+| ------------ | --------------------------------- | ----------------------------- |
+| Procedure    | Overview and detailed steps       | Always                        |
+| Deep Summary | Chronological ACTS summary        | Default-on; opt-out available |
+| Technical    | Code, commands, and configuration | Opt-in; coding/software only  |
+
+Normally two phases are selected (Procedure and Deep Summary); opting out of Deep Summary leaves one, and Technical can add one. Each phase normally makes one Gemini call and can make at most three primary attempts plus one fallback attempt during a recognized transient-capacity incident. Documentation and artifacts distinguish selected phases from actual attempts.
 
 ## Single-Folder Artifact Contract
 
 One helper invocation creates exactly one final run folder after internal model attempts finish:
 
 ```text
-Archive\Historical\Video-to-action\<timestamp - title>\
+Archive\Historical\Video-to-action\<Subject>\<timestamp - title>\
 ```
 
 Internal attempts never create separate Historical folders. Do not externally rerun the helper merely because one attempt returns `503`; the helper owns recovery. A complete, partial, or failed invocation retains one honest folder. Historical folders from separate invocations are never deleted automatically.
@@ -95,15 +122,28 @@ Each run folder contains:
 | `transcript.md` | Captions or honest manual-recovery marker       |
 | `prompts.md`    | Exact selected prompts and attempt provenance   |
 
-The output root also contains `latest.json`, a Windows-safe pointer to the latest completed invocation.
+The output root and each populated Subject contain `latest.json`. The root points to the latest finished invocation across subjects; each Subject points to its latest finished invocation. These include partial and failed runs with honest `completed` and `successful_models` fields, not only successful runs. Both pointers use the same metadata and explicit `subject`. Relative `run_dir` values resolve from the workspace working directory, including in the Subject pointer; an absolute custom output root produces absolute run paths. `--output-dir` is always the root above subjects.
+
+The helper validates subject names and containment, reuses existing casing, and rejects traversal, Windows-invalid/reserved names, and redirected paths escaping the root. An OS lock serializes pointer publication; each JSON replacement is atomic. A `.latest-pending.json` journal survives interrupted publication. Run `--repair-pointers --output-dir <root>` from the original workspace to replay it without a Gemini call. The next pointer publication also repairs an existing journal first. Do not rerun extraction to repair pointers. The persistent lock is operational state under `<workspace>/tmp/video-to-action-locks/<output-root-hash>.lock`, never in the video archive. The nearest ancestor containing `CLAUDE.md`, `AGENTS.md`, or `.git` owns the lock; for custom roots without such an ancestor, the current workspace working directory owns it. Always invoke operations on a custom root from that same workspace. The resolved output-root hash gives separate roots separate locks and reuses the same lock for equivalent root paths. Clearing temporary locks is safe only when no extraction, migration, or pointer repair is active; the next operation recreates the directory and file automatically. The recovery journal stays in the archive so idle tmp cleanup cannot erase pending pointer recovery. If publication fails before its journal is saved, retain the run and inspect its report metadata to reconstruct pointers; never invent success.
+
+## Existing Archive Migration
+
+Only when separately requested, use `scripts/migrate_legacy.py --workspace <root> --evidence <JSON path>` to inventory flat timestamped runs, then repeat with `--apply`. Evidence retains source/destination paths, SHA-256 hashes, original pointer bytes, and the resulting pointer. Move run folders intact into `Legacy`, including old `procedure.md` outputs; never re-extract or rewrite historical content. Check the actual workspace contract, permissions, collisions, and concurrent changes before applying. Each workspace is independent.
+
+Preserve existing valid latest metadata and change relocation fields only; root and Legacy pointers initially agree. An empty archive with an empty pointer becomes explicit no-run JSON (`latest_run` and `run_dir` null, `completed` false), with the old bytes retained in evidence. No subject pointer or invented run is created. Repeating a completed migration verifies hashes and performs no duplicate moves. Interrupted migration stops for evidence-led recovery rather than overwriting destinations.
+
+Rollback procedure: first verify every destination still matches its recorded hashes, every original path is absent, and current pointers equal the recorded post-migration state. Move only recorded destinations back to their exact sources, restore original pointer bytes from evidence, and remove only the migration-created Legacy pointer after confirming it is unchanged. If any check fails, stop for review; do not overwrite newer runs or pointers.
 
 ## Attempt Provenance
 
 Both `report.md` and `prompts.md` record, per phase:
 
 - primary and fallback model names;
+- processing mode, and `agentic-to-static` recovery when it applies;
 - attempt role and bounded attempt number;
 - sanitized error and transient/non-retryable classification;
+- interaction ID, terminal state, and bounded provider error codes/messages when supplied;
+- polling failure and cancellation outcome when polling stops;
 - successful model; and
 - any free-mode model-policy override.
 
@@ -127,23 +167,29 @@ Procedure always requests the Overview and detailed Steps in one response. Deep 
 
 ## Configuration
 
-| Parameter           | Default                              | Purpose                       |
-| ------------------- | ------------------------------------ | ----------------------------- |
-| `url`               | required                             | Public YouTube URL            |
-| `--title`           | required                             | Exact supplied title          |
-| `--duration`        | required                             | Exact normalized duration     |
-| `--tier`            | `free`                               | Credential and billing policy |
-| `--model`           | `gemini-3.7-flash`                   | Primary model                 |
-| `--fallback-model`  | `gemini-3.6-flash`                   | One-attempt fallback          |
-| `--deep-summary`    | off                                  | Select Deep Summary           |
-| `--technical`       | off                                  | Select Technical              |
-| `--coding-video`    | off                                  | Confirm Technical relevance   |
-| `--resolution`      | `default`                            | `low` reduces video tokens    |
-| `--start` / `--end` | none                                 | Optional clip offsets         |
-| `--output-dir`      | `Archive\Historical\Video-to-action` | Run-record root               |
-| `--check-setup`     | off                                  | No-API setup check            |
-| `--dump-prompts`    | off                                  | Regenerate prompt reference   |
-| `--self-test`       | off                                  | Deterministic no-API fixtures |
+| Parameter           | Default                              | Purpose                         |
+| ------------------- | ------------------------------------ | ------------------------------- |
+| `url`               | required                             | Public YouTube URL              |
+| `--title`           | required                             | Exact supplied title            |
+| `--subject`         | required for extraction              | Broad output category           |
+| `--duration`        | required                             | Exact normalized duration       |
+| `--tier`            | `free`                               | Credential and billing policy   |
+| `--model`           | `gemini-3.8-flash`                   | Primary model                   |
+| `--fallback-model`  | `gemini-3.6-flash`                   | One-attempt fallback            |
+| `--processing`      | `static`                             | `static` or opt-in `agentic`    |
+| `--agentic-probe`   | off                                  | One-call agentic status check   |
+| `--deep-summary`    | on                                   | Include Deep Summary            |
+| `--no-deep-summary` | off                                  | Skip Deep Summary               |
+| `--technical`       | off                                  | Select Technical                |
+| `--coding-video`    | off                                  | Confirm Technical relevance     |
+| `--custom-request`  | empty                                | Explicit additional instruction |
+| `--resolution`      | `default`                            | Optional low video resolution   |
+| `--start` / `--end` | none                                 | Rejected in both modes          |
+| `--output-dir`      | `Archive\Historical\Video-to-action` | Run-record root                 |
+| `--check-setup`     | off                                  | No-API setup check              |
+| `--dump-prompts`    | off                                  | Regenerate prompt reference     |
+| `--self-test`       | off                                  | Deterministic no-API fixtures   |
+| `--repair-pointers` | off                                  | Replay pending pointer writes   |
 
 ## Intent Routing
 
@@ -154,12 +200,12 @@ Procedure always requests the Overview and detailed Steps in one response. Deep 
 ## Workflow
 
 1. Confirm explicit invocation.
-2. Gather missing URL, title, and duration together once.
-3. Reuse stated optional-phase and tier choices; default omissions off/free.
+2. Gather missing URL, title, and duration together once; resolve Subject from supplied choices or clear context.
+3. Reuse stated optional-phase and tier choices; default Deep Summary on, Technical off, and tier free. Forward an explicit additional user instruction through `--custom-request`; otherwise leave it empty.
 4. From the workspace root, run the no-API setup check for the selected tier.
 5. State the concise preflight and run the helper once.
 6. Let the helper own per-phase retry, fallback, transcript, and artifact writes.
-7. Present results, attempt history, phase errors, transcript retrieval path, and LOW CONFIDENCE warnings.
+7. Present results, processing mode, attempt history (including any agentic-to-static recovery), phase errors, the report's agentic status line, transcript retrieval path, and LOW CONFIDENCE warnings.
 8. If the transcript failed, name it as a failure in chat and include the exact `--complete-transcript` command printed by the helper.
 9. Do not act on Procedure steps without separate authorization.
 
@@ -169,7 +215,7 @@ The helper script imports the third-party packages below. It checks them before 
 
 | Import name            | Install name           | Used for          | Minimum version |
 | ---------------------- | ---------------------- | ----------------- | --------------- |
-| google.genai           | google-genai           | Gemini analysis   | N/A             |
+| google.genai           | google-genai           | Video analysis    | 2.29.0          |
 | dotenv                 | python-dotenv          | Loading API keys  | N/A             |
 | youtube_transcript_api | youtube-transcript-api | Caption retrieval | N/A             |
 
@@ -214,7 +260,11 @@ After updates:
 - run `--check-setup` without an API call;
 - run `--dump-prompts` and confirm `PROMPTS.md` matches live constants;
 - run `--self-test` for tier policy, selection reuse, bounded retry/fallback, non-retryable errors, phase isolation, single-folder output, provenance, transcript primary/fallback/failure states, VTT deduplication, chat reporting, and secret redaction;
+- run `python -X utf8 scripts/test_agentic.py` for static-default and explicit agentic inputs, agentic-to-static fallback, deprecated-model aliasing, the agentic probe and its status line, SDK serialization, bounded polling/cancellation, evidence checks, clipping rejection, and optional custom-request behavior;
+- run `python -X utf8 scripts/test_subject_outputs.py` for subject safety, independent pointers, concurrency, interrupted publication, Legacy hash preservation, reruns, and collisions;
 - compile with Python UTF-8 mode;
 - audit Markdown tables for visual alignment and cells of at most 80 characters;
 - validate the folder with `quick_validate.py` using separated streams; and
 - make no real Gemini call during deterministic validation.
+
+Terminal failed interactions retain their structured provider errors. Only explicit `503` or `UNAVAILABLE` codes qualify for the existing bounded capacity recovery; unknown failures, cancellation, and exhausted polling failures do not trigger resubmission. Diagnostics retain allowlisted fields only, never raw response payloads.

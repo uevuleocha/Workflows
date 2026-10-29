@@ -1,7 +1,7 @@
 interface:
   display_name: "Video to Action"
-  short_description: "Create free-tier video reports with bounded fallback"
-  default_prompt: "Use /video-to-action with the public URL, exact title, exact duration, and any requested optional phases. Default to free tier with Gemini 3.7 Flash, reuse supplied choices, and let the helper handle bounded Gemini 3.6 Flash fallback and one-folder provenance."
+  short_description: "Create video reports with optional requests"
+  default_prompt: "Use /video-to-action with the public URL, exact title, exact duration, resolved broad subject, and any requested Technical phase. Include Deep Summary unless the user explicitly opts out; then pass --no-deep-summary. Use static processing with Gemini 3.8 Flash and bounded 3.6 Flash fallback; pass --processing agentic only when the user asks, and run --agentic-probe only when the user asks to check whether agentic processing works. Forward only an explicit additional user instruction as --custom-request in the main call; otherwise leave it empty. Default to free tier, reuse supplied choices, and preserve one-folder provenance plus workspace and subject latest pointers."
 
 policy:
   allow_implicit_invocation: false
